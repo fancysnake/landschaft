@@ -17,9 +17,9 @@
   ],
   "type": "module",
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
-    "preview": "node dist/server/entry.mjs",
+    "dev": "node bin/landschaft.js dev",
+    "build": "node bin/landschaft.js build",
+    "preview": "node bin/landschaft.js start",
     "check": "astro check",
     "test": "vitest run"
   },

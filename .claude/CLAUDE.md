@@ -12,7 +12,7 @@ through tasks.
 ```sh
 mise run dev        # dev server at http://localhost:4321
 mise run build      # SSR build into dist/
-mise run preview    # node dist/server/entry.mjs
+mise run preview    # node bin/landschaft.js start
 mise run check      # astro check (types for .astro and .tsx)
 mise run lint       # hk check --all (oxlint, oxfmt --check, file hygiene)
 mise run format     # oxfmt --write .
@@ -32,7 +32,7 @@ type-checked (`astro check`), not formatted.
 ## Layout
 
 - `bin/landschaft.js` — CLI for consumers (`dev|build|start`): runs Astro with `root` = this
-  package; config, DB and the production build (`dist/`, fully bundled via `ssr.noExternal`)
+  package; config, DB and the production build (`dist/`, fully bundled via `ssr.noExternal` in the CLI's build call)
   live in the consumer's cwd. Plain JS, `@ts-check`.
 - `src/lib/schema.ts` — zod schemas + types shared by server and client (config, filters, move).
 - `src/lib/types.ts` — runtime data shapes (Issue, Card, Board, SyncStatus).

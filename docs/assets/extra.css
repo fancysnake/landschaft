@@ -66,10 +66,6 @@
     var(--md-primary-fg-color--light)
   );
 }
-.md-tabs {
-  background-color: var(--md-primary-fg-color--dark);
-}
-
 [data-md-color-scheme="default"] .md-typeset h1,
 [data-md-color-scheme="default"] .md-typeset h2 {
   color: var(--md-primary-fg-color--dark);

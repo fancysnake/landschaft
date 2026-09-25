@@ -35,7 +35,9 @@ switch (command) {
   }
   case "build": {
     const astro = await import("astro");
-    await astro.build({ root: pkgRoot, outDir });
+    // Bundle every dependency into the server build so dist/ runs from anywhere: it lands in
+    // the consumer directory, away from any node_modules.
+    await astro.build({ root: pkgRoot, outDir, vite: { ssr: { noExternal: true } } });
     break;
   }
   case "start": {

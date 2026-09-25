@@ -8,7 +8,5 @@ export default defineConfig({
   output: "server",
   adapter: node({ mode: "standalone" }),
   integrations: [react()],
-  // Bundle every dependency into the server build so dist/ runs from anywhere (the CLI writes
-  // it into the consumer directory, away from any node_modules).
-  vite: { plugins: [tailwindcss()], ssr: { noExternal: true } },
+  vite: { plugins: [tailwindcss()] },
 });

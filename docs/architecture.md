@@ -1,8 +1,9 @@
 # How it works
 
 Astro 7 in SSR mode (`@astrojs/node`, standalone) with React 19 islands, Tailwind 4, a
-`node:sqlite` cache and a JSON config file. No database server, no auth, no build step for
-consumers beyond installing the package.
+`node:sqlite` cache and a JSON config file. No database server, no auth. Consumers run
+`landschaft dev` straight after installing; production needs `landschaft build` before
+`landschaft start`.
 
 - `bin/landschaft.js` — the CLI. Points Astro's `root` at the installed package, so the
   bundled `astro.config.mjs` and `src/` are used while config and cache come from the

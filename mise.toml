@@ -18,15 +18,15 @@ NODE_USE_ENV_PROXY = "1"
 
 [tasks.dev]
 description = "Start the dev server at http://localhost:4321"
-run = "astro dev"
+run = "node bin/landschaft.js dev"
 
 [tasks.build]
 description = "Build the SSR app into dist/"
-run = "astro build"
+run = "node bin/landschaft.js build"
 
 [tasks.preview]
 description = "Serve the production build"
-run = "node dist/server/entry.mjs"
+run = "node bin/landschaft.js start"
 
 [tasks.check]
 description = "Type-check .astro and .ts(x) with astro check"
@@ -54,7 +54,7 @@ run = "mkdocs serve"
 
 [tasks."site:check"]
 description = "Build the docs, failing on a broken link"
-run = "mkdocs build --strict --site-dir ${SITE_DIR:-site}"
+run = "mkdocs build --strict"
 
 [tasks.sync]
 description = "Trigger an issue sync on the running dev server"

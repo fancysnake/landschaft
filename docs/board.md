@@ -1,7 +1,6 @@
 # How the board works
 
-A dashboard spans one or more repositories and lays their open issues out on a grid of
-swimlanes × columns, both defined by labels. Dragging a card swaps the labels on GitHub.
+--8<-- "README.md:grid"
 
 ## Placement
 

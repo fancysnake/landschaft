@@ -1,6 +1,8 @@
 # landschaft
 
---8<-- "README.md:tagline"
+--8<-- "README.md:what"
+
+--8<-- "README.md:grid"
 
 --8<-- "README.md:built-with"
 

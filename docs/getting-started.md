@@ -10,15 +10,7 @@
 A dashboards repo is a `package.json`, a `landschaft.config.json` and a git-ignored
 `landschaft.db` — nothing else:
 
-```json
-{
-  "name": "my-dashboards",
-  "private": true,
-  "type": "module",
-  "scripts": { "dev": "landschaft dev", "build": "landschaft build", "start": "landschaft start" },
-  "dependencies": { "landschaft": "github:fancysnake/landschaft#v0.1.1" }
-}
-```
+--8<-- "README.md:package-json"
 
 ```toml
 # mise.toml
@@ -54,11 +46,7 @@ labels are cached the pickers suggest them. Commit the config; the cache is disp
 
 The CLI:
 
-| Command            | What it does                                          |
-| ------------------ | ----------------------------------------------------- |
-| `landschaft dev`   | Dev server at http://localhost:4321 (default command) |
-| `landschaft build` | Build the production server into `./dist`             |
-| `landschaft start` | Serve the production build from `./dist`              |
+--8<-- "README.md:cli"
 
 Config, cache and the production build are read from and written to the directory you run in. `LANDSCHAFT_CONFIG` and
 `LANDSCHAFT_DB` override the paths.
@@ -67,11 +55,7 @@ Config, cache and the production build are read from and written to the director
 
 There is no registry release behind `github:` — the package manager resolves the ref once,
 writes the commit into the lockfile, and reuses that commit forever. So pin the tag you want
-and treat it as the version:
-
-```json
-{ "dependencies": { "landschaft": "github:fancysnake/landschaft#v0.1.1" } }
-```
+and treat it as the version, as the `dependencies` entry above does.
 
 To move to a new release, bump the tag and re-install, then commit the lockfile:
 
