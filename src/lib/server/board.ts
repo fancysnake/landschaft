@@ -41,18 +41,32 @@ export function isBlocked(issue: Issue, byKey: Map<string, Issue>): boolean {
   );
 }
 
-function matchesFilters(issue: Issue, filters: Filters, query: string | undefined): boolean {
+/** Keys of the epic's sub-issues and of issues on either side of a "blocked by" link with it. */
+export function relatedTo(epicKey: string, issues: Issue[]): Set<string> {
+  const keys = new Set<string>();
+  for (const issue of issues) {
+    const key = issueKey(issue.repo, issue.number);
+    const blockers = issue.blockedBy.map((b) => issueKey(b.repo, b.number));
+    if (key === epicKey) for (const blocker of blockers) keys.add(blocker);
+    if (issue.parent && issueKey(issue.parent.repo, issue.parent.number) === epicKey) keys.add(key);
+    if (blockers.includes(epicKey)) keys.add(key);
+  }
+  return keys;
+}
+
+function matchesFilters(
+  issue: Issue,
+  filters: Filters,
+  query: string | undefined,
+  related: Set<string> | null,
+): boolean {
   if (query) {
     const haystack = `${issue.number} ${issue.title}`.toLowerCase();
     if (!haystack.includes(query)) return false;
   }
   if (filters.assignee && !issue.assignees.some((a) => a.login === filters.assignee)) return false;
   if (filters.label && !issue.labels.some((l) => l.name === filters.label)) return false;
-  if (filters.epic) {
-    if (!issue.parent || issueKey(issue.parent.repo, issue.parent.number) !== filters.epic) {
-      return false;
-    }
-  }
+  if (related && !related.has(issueKey(issue.repo, issue.number))) return false;
   return true;
 }
 
@@ -111,6 +125,7 @@ export function buildBoard(
   const assignees = new Set<string>();
   const labels = new Set<string>();
   const query = filters.q?.trim().toLowerCase() || undefined;
+  const related = filters.epic ? relatedTo(filters.epic, issues) : null;
   const epicIssues: Issue[] = [];
 
   for (const issue of open) {
@@ -122,7 +137,7 @@ export function buildBoard(
       issue.labels.some((label) => label.name === dashboard.epicLabel);
     if (isEpic) epicIssues.push(issue);
 
-    if (!matchesFilters(issue, filters, query)) continue;
+    if (!matchesFilters(issue, filters, query, related)) continue;
 
     const names = new Set(issue.labels.map((label) => label.name));
     const lane = placeIn(dashboard.swimlanes, names);

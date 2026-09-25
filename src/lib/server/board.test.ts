@@ -198,6 +198,23 @@ describe("buildBoard", () => {
     expect(numbers(buildBoard(issues, DASHBOARD, { q: "login", assignee: "ann" }))).toEqual([1]);
   });
 
+  it("epic filter keeps sub-issues and issues blocking or blocked by the epic", () => {
+    const epic = { repo: REPO, number: 10 };
+    const issues = [
+      makeIssue({ number: 1, parent: epic }),
+      makeIssue({ number: 2, blockedBy: [{ ...epic, state: "OPEN" }], blockedByTotal: 1 }),
+      makeIssue({ number: 3 }),
+      makeIssue({ number: 4 }),
+      makeIssue({
+        number: 10,
+        labels: [label("epic")],
+        blockedBy: [{ repo: REPO, number: 3, state: "OPEN" }],
+        blockedByTotal: 1,
+      }),
+    ];
+    expect(numbers(buildBoard(issues, DASHBOARD, { epic: "acme/app#10" }))).toEqual([3, 2, 1]);
+  });
+
   it("lists epics with progress regardless of filters", () => {
     const issues = [
       makeIssue({

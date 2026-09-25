@@ -72,7 +72,8 @@ Saving triggers the first sync; once labels are cached the pickers suggest them.
 - **Hide blocked** (per swimlane) drops issues that have at least one open blocker
   (GitHub "blocked by" relationships).
 - Issues carrying the **epic label** appear in the strip above the board with sub-issue
-  progress; clicking one filters the board to its children.
+  progress; clicking one filters the board to its sub-issues and to issues it blocks or is
+  blocked by.
 - Filters (text, assignee, label, epic, sort) live in the URL, so a view is a link.
 
 ## Data
