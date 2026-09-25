@@ -16,7 +16,7 @@ A dashboards repo is a `package.json`, a `landschaft.config.json` and a git-igno
   "private": true,
   "type": "module",
   "scripts": { "dev": "landschaft dev", "build": "landschaft build", "start": "landschaft start" },
-  "dependencies": { "landschaft": "github:fancysnake/landschaft#v0.1.0" }
+  "dependencies": { "landschaft": "github:fancysnake/landschaft#v0.1.1" }
 }
 ```
 
@@ -70,7 +70,7 @@ writes the commit into the lockfile, and reuses that commit forever. So pin the 
 and treat it as the version:
 
 ```json
-{ "dependencies": { "landschaft": "github:fancysnake/landschaft#v0.1.0" } }
+{ "dependencies": { "landschaft": "github:fancysnake/landschaft#v0.1.1" } }
 ```
 
 To move to a new release, bump the tag and re-install, then commit the lockfile:
