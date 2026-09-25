@@ -41,33 +41,27 @@ export function isBlocked(issue: Issue, byKey: Map<string, Issue>): boolean {
   );
 }
 
-/** Keys of the epic's sub-issues and of issues on either side of a "blocked by" link with it. */
-export function relatedTo(epicKey: string, issues: Issue[]): Set<string> {
-  const keys = new Set<string>();
-  for (const issue of issues) {
-    const key = issueKey(issue.repo, issue.number);
-    const blockers = issue.blockedBy.map((b) => issueKey(b.repo, b.number));
-    if (key === epicKey) for (const blocker of blockers) keys.add(blocker);
-    if (issue.parent && issueKey(issue.parent.repo, issue.parent.number) === epicKey) keys.add(key);
-    if (blockers.includes(epicKey)) keys.add(key);
-  }
-  return keys;
+const keyOf = (ref: { repo: string; number: number }): string => issueKey(ref.repo, ref.number);
+
+/** Keys of the epic's blockers, its sub-issues and the issues it blocks. */
+function relatedTo(epicKey: string, byKey: Map<string, Issue>): Set<string> {
+  const issues = [...byKey.values()];
+  return new Set([
+    ...(byKey.get(epicKey)?.blockedBy ?? []).map(keyOf),
+    ...issues.filter((issue) => issue.parent && keyOf(issue.parent) === epicKey).map(keyOf),
+    ...issues.filter((issue) => issue.blockedBy.some((b) => keyOf(b) === epicKey)).map(keyOf),
+  ]);
 }
 
-function matchesFilters(
-  issue: Issue,
-  filters: Filters,
-  query: string | undefined,
-  related: Set<string> | null,
-): boolean {
-  if (query) {
-    const haystack = `${issue.number} ${issue.title}`.toLowerCase();
-    if (!haystack.includes(query)) return false;
-  }
-  if (filters.assignee && !issue.assignees.some((a) => a.login === filters.assignee)) return false;
-  if (filters.label && !issue.labels.some((l) => l.name === filters.label)) return false;
-  if (related && !related.has(issueKey(issue.repo, issue.number))) return false;
-  return true;
+/** Text, assignee, label and epic filters as one predicate; an unset filter passes everything. */
+function issueFilter(filters: Filters, byKey: Map<string, Issue>): (issue: Issue) => boolean {
+  const query = filters.q?.trim().toLowerCase();
+  const related = filters.epic ? relatedTo(filters.epic, byKey) : null;
+  return (issue) =>
+    (!query || `${issue.number} ${issue.title}`.toLowerCase().includes(query)) &&
+    (!filters.assignee || issue.assignees.some((a) => a.login === filters.assignee)) &&
+    (!filters.label || issue.labels.some((l) => l.name === filters.label)) &&
+    (!related || related.has(keyOf(issue)));
 }
 
 function compareBy(by: SortBy, dir: SortDir) {
@@ -98,6 +92,7 @@ export function buildBoard(
 ): Board {
   const byKey = new Map(issues.map((issue) => [issueKey(issue.repo, issue.number), issue]));
   const mine = inScope(dashboard, viewer);
+  const wanted = issueFilter(filters, byKey);
   const open = issues.filter((issue) => issue.state === "OPEN" && mine(issue));
   const structural = new Set<string>([
     ...dashboard.swimlanes.flatMap((lane) => lane.labels),
@@ -124,8 +119,6 @@ export function buildBoard(
 
   const assignees = new Set<string>();
   const labels = new Set<string>();
-  const query = filters.q?.trim().toLowerCase() || undefined;
-  const related = filters.epic ? relatedTo(filters.epic, issues) : null;
   const epicIssues: Issue[] = [];
 
   for (const issue of open) {
@@ -137,7 +130,7 @@ export function buildBoard(
       issue.labels.some((label) => label.name === dashboard.epicLabel);
     if (isEpic) epicIssues.push(issue);
 
-    if (!matchesFilters(issue, filters, query, related)) continue;
+    if (!wanted(issue)) continue;
 
     const names = new Set(issue.labels.map((label) => label.name));
     const lane = placeIn(dashboard.swimlanes, names);
