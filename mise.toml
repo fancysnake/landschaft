@@ -3,11 +3,6 @@ aube = "2.2.14"
 node = "26.10.0"
 hk = "1.58.1"
 pkl = "0.32.1"
-pipx = "1.17.2"
-python = "3.11.16"
-# vekna is the CLI that casts cabinet's PR maintenance rituals; cabinet rides along in
-# the same venv (see .vekna.toml).
-"pipx:vekna" = { version = "0.8.0", pipx_args = "--preinstall git+https://github.com/fancysnake/cabinet.git@v0.3.0" }
 
 [hooks]
 enter = ["aube install", "hk install"]

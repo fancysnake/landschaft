@@ -1,19 +1,17 @@
 # What `vekna cast <ritual>` runs here: cabinet's pull request maintenance
-# rituals (refresh, cover, review, labels), read from the `[cabinet]` section.
+# rituals (refresh, review, labels), read from the `[cabinet]` section.
 [rituals]
-modules = ["cabinet.rituals"]
+modules = ["cabinet.rituals.refresh", "cabinet.rituals.review", "cabinet.rituals.labels"]
 
 [cabinet]
-forge = "github"
-base = "main"
 remote = "https-origin"
 gate = "mise run fullcheck"
-# No diff-coverage tooling here: `cover` can only repair a red suite.
-coverage = "mise run test"
-fast_coverage = "mise run test"
 
 [cabinet.agent]
-model = "opus"
-effort = "high"
-max_turns = 0
-may_run = ["mise run test", "mise run check", "mise run lint"]
+may_run = [
+  "mise run fullcheck",
+  "mise run test",
+  "mise run check",
+  "mise run lint",
+  "mise run format",
+]
