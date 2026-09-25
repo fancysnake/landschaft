@@ -1,0 +1,40 @@
+---
+import Base from "../layouts/Base.astro";
+import { loadConfig } from "../lib/server/config";
+
+const { dashboards } = loadConfig();
+---
+
+<Base title="Dashboards">
+  <div class="mx-auto max-w-2xl p-6">
+    <h1 class="mb-4 text-2xl font-semibold">Dashboards</h1>
+    {
+      dashboards.length === 0 ? (
+        <p class="text-neutral-600">
+          No dashboards yet.{" "}
+          <a href="/settings" class="text-sky-700 underline">
+            Create one in settings
+          </a>{" "}
+          by naming the repositories and the labels that make up its swimlanes and columns.
+        </p>
+      ) : (
+        <ul class="grid gap-3 sm:grid-cols-2">
+          {dashboards.map((dashboard) => (
+            <li>
+              <a
+                href={`/d/${dashboard.id}`}
+                class="block rounded-md border border-neutral-200 bg-white p-4 hover:border-neutral-400"
+              >
+                <div class="font-medium">{dashboard.name}</div>
+                <div class="mt-1 text-sm text-neutral-500">{dashboard.repos.join(", ")}</div>
+                <div class="mt-1 text-xs text-neutral-400">
+                  {dashboard.swimlanes.length} swimlanes · {dashboard.columns.length} columns
+                </div>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </div>
+</Base>

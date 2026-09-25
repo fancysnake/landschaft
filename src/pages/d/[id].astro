@@ -1,0 +1,13 @@
+---
+import Board from "../../components/board/Board";
+import Base from "../../layouts/Base.astro";
+import { findDashboard, loadConfig } from "../../lib/server/config";
+
+const id = Astro.params.id ?? "";
+const dashboard = findDashboard(loadConfig(), id);
+if (!dashboard) return Astro.redirect("/", 302);
+---
+
+<Base title={dashboard.name}>
+  <Board client:only="react" dashboardId={dashboard.id} />
+</Base>

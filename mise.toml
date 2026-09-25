@@ -1,0 +1,52 @@
+[tools]
+aube = "2.2.14"
+node = "26.10.0"
+hk = "1.58.1"
+pkl = "0.32.1"
+
+[hooks]
+enter = ["aube install", "hk install"]
+
+[env]
+_.path = ['{{config_root}}/node_modules/.bin']
+# Node's fetch ignores HTTPS_PROXY unless told; harmless when no proxy is set.
+NODE_USE_ENV_PROXY = "1"
+
+[tasks.dev]
+description = "Start the dev server at http://localhost:4321"
+run = "astro dev"
+
+[tasks.build]
+description = "Build the SSR app into dist/"
+run = "astro build"
+
+[tasks.preview]
+description = "Serve the production build"
+run = "node dist/server/entry.mjs"
+
+[tasks.check]
+description = "Type-check .astro and .ts(x) with astro check"
+run = "astro check"
+
+[tasks.lint]
+description = "Run every hk linter (oxlint, oxfmt check, hygiene) on all files"
+run = "hk check --all"
+
+[tasks.format]
+description = "Format with oxfmt"
+run = "oxfmt --write ."
+
+[tasks.test]
+description = "Run vitest"
+run = "vitest run"
+
+[tasks.fullcheck]
+description = "The gate before a commit: format check, lint, types, tests"
+run = ["oxfmt --check .", "oxlint", { task = "check" }, { task = "test" }]
+
+[tasks.sync]
+description = "Trigger an issue sync on the running dev server"
+run = "curl -sf -X POST http://localhost:4321/api/sync"
+
+[tasks.update]
+run = ["mise upgrade --bump --minimum-release-age=7d", "aube update", "aube outdated"]

@@ -1,0 +1,41 @@
+---
+import "../styles/global.css";
+
+import { loadConfig } from "../lib/server/config";
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+const { dashboards } = loadConfig();
+const path = Astro.url.pathname;
+const linkClass = (href: string) =>
+  `rounded-md px-2 py-1 text-sm ${
+    path === href ? "bg-neutral-800 text-white" : "text-neutral-700 hover:bg-neutral-200"
+  }`;
+---
+
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title} · landschaft</title>
+  </head>
+  <body class="flex h-full flex-col bg-neutral-100 text-neutral-900">
+    <nav class="flex items-center gap-1 border-b border-neutral-200 bg-white px-4 py-2">
+      <a href="/" class="mr-3 font-semibold tracking-tight">landschaft</a>
+      {dashboards.map((dashboard) => (
+        <a href={`/d/${dashboard.id}`} class={linkClass(`/d/${dashboard.id}`)}>
+          {dashboard.name}
+        </a>
+      ))}
+      <a href="/settings" class={`ml-auto ${linkClass("/settings")}`}>Settings</a>
+    </nav>
+    <main class="min-h-0 flex-1">
+      <slot />
+    </main>
+  </body>
+</html>

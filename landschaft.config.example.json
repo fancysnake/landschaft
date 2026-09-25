@@ -1,0 +1,30 @@
+{
+  "dashboards": [
+    {
+      "id": "main",
+      "name": "Main",
+      "repos": ["owner/repo", "owner/other-repo"],
+      "scope": "mine",
+      "epicLabel": "epic",
+      "sort": { "by": "updated", "dir": "desc" },
+      "refreshMinutes": 5,
+      "swimlanes": [
+        { "id": "high", "name": "High priority", "labels": ["prio:high"], "hideBlocked": false },
+        { "id": "normal", "name": "Normal", "labels": ["prio:normal"], "hideBlocked": true },
+        { "id": "rest", "name": "Unprioritised", "labels": [], "hideBlocked": true }
+      ],
+      "columns": [
+        { "id": "backlog", "name": "Backlog", "labels": ["backlog"] },
+        { "id": "ready", "name": "Ready", "labels": [] },
+        { "id": "doing", "name": "In progress", "labels": ["phase:doing"] },
+        { "id": "review", "name": "In review", "labels": ["phase:review"] },
+        {
+          "id": "stuck",
+          "name": "Review blocked",
+          "labels": ["phase:review", "wait"],
+          "match": "all"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "name": "landschaft",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local kanban dashboards over GitHub issues",
+  "license": "MIT",
+  "repository": "github:fancysnake/landschaft",
+  "bin": {
+    "landschaft": "./bin/landschaft.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "public",
+    "astro.config.mjs",
+    "tsconfig.json"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "node dist/server/entry.mjs",
+    "check": "astro check",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@astrojs/node": "^11.1.6",
+    "@astrojs/react": "^7.0.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "astro": "^7.3.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwindcss": "^4.3.3",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@types/node": "^26.6.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "oxfmt": "^0.70.0",
+    "oxlint": "^1.85.0",
+    "typescript": "6",
+    "vitest": "^5.0.1"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "aube": {
+    "allowBuilds": {
+      "esbuild": true
+    }
+  }
+}
