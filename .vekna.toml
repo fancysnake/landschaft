@@ -6,7 +6,7 @@ modules = ["cabinet.rituals"]
 [cabinet]
 forge = "github"
 base = "main"
-remote = "origin"
+remote = "https-origin"
 gate = "mise run fullcheck"
 # No diff-coverage tooling here: `cover` can only repair a red suite.
 coverage = "mise run test"
