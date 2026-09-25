@@ -1,5 +1,7 @@
 # landschaft
 
+<!-- --8<-- [start:tagline] -->
+
 Local kanban dashboards over GitHub issues. _Landschaft_ is German for "landscape": the point
 is to see the whole terrain of a project at once, spot what is next and how far each epic has
 come, without paying for GitHub Projects.
@@ -7,6 +9,19 @@ come, without paying for GitHub Projects.
 A dashboard spans one or more repositories and lays their open issues out on a grid of
 swimlanes × columns, both defined by labels. Dragging a card swaps the labels on GitHub.
 Everything runs on your machine against a local SQLite cache that refreshes in the background.
+
+<!-- --8<-- [end:tagline] -->
+
+- **Docs:** <https://landschaft.fancysnake.dev>
+
+<!-- --8<-- [start:built-with] -->
+
+Built with [Astro](https://astro.build) (SSR, node adapter), [React](https://react.dev) islands,
+[Tailwind](https://tailwindcss.com) and Node's built-in SQLite. Tooling:
+[mise](https://mise.jdx.dev) for tasks and tool versions, [aube](https://aube.jdx.dev) as the
+package manager.
+
+<!-- --8<-- [end:built-with] -->
 
 ## Use as a package
 
@@ -31,8 +46,8 @@ aube run dev          # http://localhost:4321, reads ./landschaft.config.json
 | Command            | What it does                                          |
 | ------------------ | ----------------------------------------------------- |
 | `landschaft dev`   | Dev server at http://localhost:4321 (default command) |
-| `landschaft build` | Build the production server (into the package)        |
-| `landschaft start` | Serve the production build                            |
+| `landschaft build` | Build the production server into `./dist`             |
+| `landschaft start` | Serve the production build from `./dist`              |
 
 Pin the tag and treat it as the version: `github:` refs are resolved once and frozen in the
 lockfile, so a bare ref silently stays on whatever `main` was on install day. To upgrade, bump
@@ -58,6 +73,8 @@ Saving triggers the first sync; once labels are cached the pickers suggest them.
 
 ## How placement works
 
+<!-- --8<-- [start:placement] -->
+
 - A dashboard shows only open issues **you created or are assigned to** (scope `mine`, the
   default; "you" is the account behind the token). Switch a dashboard to `all` in settings to
   see everyone's.
@@ -74,6 +91,8 @@ Saving triggers the first sync; once labels are cached the pickers suggest them.
 - Issues carrying the **epic label** appear in the strip above the board with sub-issue
   progress; clicking one filters the board to its children.
 - Filters (text, assignee, label, epic, sort) live in the URL, so a view is a link.
+
+<!-- --8<-- [end:placement] -->
 
 ## Data
 
@@ -103,6 +122,9 @@ All JSON, no auth (local only):
 | `POST /api/move`                | Apply a drag: label diff on GitHub, refetch the issue |
 
 ## Development
+
+Everything else is in the [docs](https://landschaft.fancysnake.dev) (MkDocs sources in
+[`docs/`](docs); `mise run site:serve` to preview them).
 
 `mise tasks` lists everything. `mise run fullcheck` is the gate before a commit (format check,
 oxlint, `astro check`, vitest). `hk` installs a pre-commit hook that formats and lints staged

@@ -19,6 +19,8 @@ mise run format     # oxfmt --write .
 mise run test       # vitest run
 mise run fullcheck  # THE GATE before a commit: format check + oxlint + check + test
 mise run sync       # POST /api/sync on the running dev server
+mise run site:serve # MkDocs (Material) docs at http://localhost:8000
+mise run site:check # strict docs build into site/
 ```
 
 Narrow first: `mise exec -- vitest run src/lib/server/board.test.ts`, `mise exec -- oxlint <file>`.
@@ -30,7 +32,8 @@ type-checked (`astro check`), not formatted.
 ## Layout
 
 - `bin/landschaft.js` — CLI for consumers (`dev|build|start`): runs Astro with `root` = this
-  package, config and DB read from the consumer's cwd. Plain JS, `@ts-check`.
+  package; config, DB and the production build (`dist/`, fully bundled via `ssr.noExternal`)
+  live in the consumer's cwd. Plain JS, `@ts-check`.
 - `src/lib/schema.ts` — zod schemas + types shared by server and client (config, filters, move).
 - `src/lib/types.ts` — runtime data shapes (Issue, Card, Board, SyncStatus).
 - `src/lib/server/` — Node only: `config.ts` (JSON file, atomic save), `db.ts` (SQLite),
@@ -41,6 +44,9 @@ type-checked (`astro check`), not formatted.
 - `src/lib/client/` — fetch wrappers, `useBoard` (polling + optimistic move), URL filters, DnD.
 - `src/components/board/` and `src/components/settings/` — React islands mounted with
   `client:only="react"` from `src/pages/d/[id].astro` and `src/pages/settings.astro`.
+
+- `docs/` + `mkdocs.yml` — MkDocs Material site (green theme in `docs/assets/extra.css`);
+  shared prose is included from README.md through `--8<--` snippet markers.
 
 ## Conventions
 
