@@ -26,11 +26,5 @@ jobs:
       - name: Install dependencies
         run: aube install --frozen-lockfile
 
-      - name: Lint
-        run: mise run lint
-
-      - name: Type-check
-        run: mise run check
-
-      - name: Test
-        run: mise run test
+      - name: Fullcheck
+        run: mise run fullcheck

@@ -11,7 +11,10 @@ local linters = new Mapping<String, Step> {
 
   // oxfmt/oxlint are aube devDeps, so run through aube rather than a global install
   ["oxfmt"] {
-    glob = List("**/*.ts", "**/*.tsx", "**/*.mts", "**/*.js", "**/*.mjs", "**/*.css", "**/*.json")
+    glob = List(
+      "**/*.ts", "**/*.tsx", "**/*.mts", "**/*.js", "**/*.mjs", "**/*.css", "**/*.json",
+      "**/*.md", "**/*.yml", "**/*.yaml", "**/*.toml"
+    )
     exclude = List("aube-lock.yaml")
     check = "aube exec --no-install oxfmt --check {{files}}"
     fix = "aube exec --no-install oxfmt --write {{files}}"
