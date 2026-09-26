@@ -7,7 +7,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
-## [0.1.1] - 2026-09-25
+## [0.1.1] - 2026-09-26
+
+### Added
+
+- Documentation site at <https://landschaft.fancysnake.dev>: getting started, configuration,
+  board rules, API and architecture, published from `main` by CI.
 
 ### Fixed
 
