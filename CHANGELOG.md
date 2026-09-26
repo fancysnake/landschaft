@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-26
+
+### Changed
+
+- Selecting an epic also shows the issues it blocks and the issues blocking it, next to its
+  sub-issues.
+
 ## [0.1.1] - 2026-09-26
 
 ### Added
@@ -30,6 +37,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v0.1.1...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/fancysnake/landschaft/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/fancysnake/landschaft/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/fancysnake/landschaft/releases/tag/v0.1.0
