@@ -4,6 +4,8 @@ node = "26.10.0"
 hk = "1.58.1"
 pkl = "0.32.1"
 pipx = "1.17.2"
+python = "3.14.7"
+"pipx:vekna" = { version = "0.8.0", pipx_args = "--preinstall git+https://github.com/fancysnake/cabinet.git@v0.3.0" }
 # --include-deps: the mkdocs binary belongs to a dependency of mkdocs-material; uvx = false
 # because mise prefers uvx where uv is installed, and there --include-deps is not accepted.
 "pipx:mkdocs-material" = { version = "9.7.7", uvx = false, pipx_args = "--include-deps" }
