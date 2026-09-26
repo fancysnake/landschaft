@@ -1,17 +1,38 @@
 # landschaft
 
+<!-- --8<-- [start:what] -->
+
 Local kanban dashboards over GitHub issues. _Landschaft_ is German for "landscape": the point
 is to see the whole terrain of a project at once, spot what is next and how far each epic has
 come, without paying for GitHub Projects.
+
+<!-- --8<-- [end:what] -->
+
+<!-- --8<-- [start:grid] -->
 
 A dashboard spans one or more repositories and lays their open issues out on a grid of
 swimlanes × columns, both defined by labels. Dragging a card swaps the labels on GitHub.
 Everything runs on your machine against a local SQLite cache that refreshes in the background.
 
+<!-- --8<-- [end:grid] -->
+
+- **Docs:** <https://landschaft.fancysnake.dev>
+
+<!-- --8<-- [start:built-with] -->
+
+Built with [Astro](https://astro.build) (SSR, node adapter), [React](https://react.dev) islands,
+[Tailwind](https://tailwindcss.com) and Node's built-in SQLite. Tooling:
+[mise](https://mise.jdx.dev) for tasks and tool versions, [aube](https://aube.jdx.dev) as the
+package manager.
+
+<!-- --8<-- [end:built-with] -->
+
 ## Use as a package
 
 The engine installs straight from GitHub; your dashboards live in a separate (private) repo
 holding a `package.json`, a `landschaft.config.json` and a git-ignored `landschaft.db`:
+
+<!-- --8<-- [start:package-json] -->
 
 ```json
 {
@@ -19,20 +40,26 @@ holding a `package.json`, a `landschaft.config.json` and a git-ignored `landscha
   "private": true,
   "type": "module",
   "scripts": { "dev": "landschaft dev", "build": "landschaft build", "start": "landschaft start" },
-  "dependencies": { "landschaft": "github:fancysnake/landschaft#v0.1.0" }
+  "dependencies": { "landschaft": "github:fancysnake/landschaft#v0.1.1" }
 }
 ```
+
+<!-- --8<-- [end:package-json] -->
 
 ```sh
 aube install          # or npm install
 aube run dev          # http://localhost:4321, reads ./landschaft.config.json
 ```
 
+<!-- --8<-- [start:cli] -->
+
 | Command            | What it does                                          |
 | ------------------ | ----------------------------------------------------- |
 | `landschaft dev`   | Dev server at http://localhost:4321 (default command) |
-| `landschaft build` | Build the production server (into the package)        |
-| `landschaft start` | Serve the production build                            |
+| `landschaft build` | Build the production server into `./dist`             |
+| `landschaft start` | Serve the production build from `./dist`              |
+
+<!-- --8<-- [end:cli] -->
 
 Pin the tag and treat it as the version: `github:` refs are resolved once and frozen in the
 lockfile, so a bare ref silently stays on whatever `main` was on install day. To upgrade, bump
@@ -58,6 +85,8 @@ Saving triggers the first sync; once labels are cached the pickers suggest them.
 
 ## How placement works
 
+<!-- --8<-- [start:placement] -->
+
 - A dashboard shows only open issues **you created or are assigned to** (scope `mine`, the
   default; "you" is the account behind the token). Switch a dashboard to `all` in settings to
   see everyone's.
@@ -75,34 +104,18 @@ Saving triggers the first sync; once labels are cached the pickers suggest them.
   progress; clicking one filters the board to its children.
 - Filters (text, assignee, label, epic, sort) live in the URL, so a view is a link.
 
-## Data
+<!-- --8<-- [end:placement] -->
 
-| What        | Where                                                      |
-| ----------- | ---------------------------------------------------------- |
-| Dashboards  | `./landschaft.config.json` (`LANDSCHAFT_CONFIG` overrides) |
-| Issue cache | `./landschaft.db` (`LANDSCHAFT_DB` overrides), git-ignored |
+## Data and API
 
-Both are relative to the directory you run in. In this repo `landschaft.config.json` is
-git-ignored (see `landschaft.config.example.json`).
-
-Sync is incremental (issues updated since the last run); a full pass of every open issue runs
-once a day, on demand from the board, and for newly added repositories. Rate-limit budget is
-shown next to the sync status.
-
-## API
-
-All JSON, no auth (local only):
-
-| Route                           | Purpose                                               |
-| ------------------------------- | ----------------------------------------------------- |
-| `GET/PUT /api/config`           | Read or replace the whole config (validated)          |
-| `GET /api/dashboards/:id/board` | Computed board; query string = filters                |
-| `POST /api/sync`                | `{ "repo"?: "o/r", "full"?: true }`                   |
-| `GET /api/version`              | Sync status; the board polls this                     |
-| `GET /api/labels?repos=a/b,c/d` | Cached label catalogue                                |
-| `POST /api/move`                | Apply a drag: label diff on GitHub, refetch the issue |
+Dashboards live in `./landschaft.config.json` and the issue cache in `./landschaft.db`; see
+[Files and environment](https://landschaft.fancysnake.dev/configuration/#files-and-environment).
+The local JSON endpoints are listed under [API](https://landschaft.fancysnake.dev/api/).
 
 ## Development
+
+Everything else is in the [docs](https://landschaft.fancysnake.dev) (MkDocs sources in
+[`docs/`](docs); `mise run site:serve` to preview them).
 
 `mise tasks` lists everything. `mise run fullcheck` is the gate before a commit (format check,
 oxlint, `astro check`, vitest). `hk` installs a pre-commit hook that formats and lints staged

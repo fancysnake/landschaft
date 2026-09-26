@@ -1,0 +1,61 @@
+site_name: landschaft
+site_url: https://landschaft.fancysnake.dev
+site_description: Local kanban dashboards over GitHub issues — swimlanes × columns from labels.
+repo_url: https://github.com/fancysnake/landschaft
+repo_name: fancysnake/landschaft
+copyright: MIT
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.top
+    - navigation.footer
+  logo: assets/logo.png
+  favicon: assets/favicon.png
+  font:
+    text: Nunito
+    code: JetBrains Mono
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle: { icon: material/weather-night, name: Switch to dark mode }
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle: { icon: material/weather-sunny, name: Switch to light mode }
+
+extra_css:
+  - assets/extra.css
+
+markdown_extensions:
+  - admonition
+  - toc: { permalink: true }
+  - pymdownx.highlight: { anchor_linenums: true }
+  - pymdownx.superfences
+  - pymdownx.details
+  # Shared prose lives in README.md and is included from there, so the two
+  # cannot drift. base_path is the repo root, which is where mkdocs runs.
+  - pymdownx.snippets: { base_path: ["."], check_paths: true }
+
+validation:
+  anchors: warn
+
+nav:
+  - index.md
+  - getting-started.md
+  - configuration.md
+  - board.md
+  - api.md
+  - architecture.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/fancysnake/landschaft
+    - icon: fontawesome/solid/globe
+      link: https://fancysnake.dev
+      name: fancysnake.dev

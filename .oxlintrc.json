@@ -13,5 +13,5 @@
     "no-await-in-loop": "off",
     "react/react-in-jsx-scope": "off"
   },
-  "ignorePatterns": ["dist", ".astro", "node_modules"]
+  "ignorePatterns": ["dist", ".astro", "node_modules", "site"]
 }

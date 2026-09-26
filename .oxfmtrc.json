@@ -4,7 +4,8 @@
     ".astro",
     "aube-lock.yaml",
     "landschaft.db*",
-    "landschaft.config.json"
+    "landschaft.config.json",
+    "site"
   ],
   "sortImports": {
     "groups": [

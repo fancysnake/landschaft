@@ -6,6 +6,9 @@ pkl = "0.32.1"
 pipx = "1.17.2"
 python = "3.11.16"
 "pipx:vekna" = { version = "0.8.0", pipx_args = "--preinstall git+https://github.com/fancysnake/cabinet.git@v0.3.0" }
+# --include-deps: the mkdocs binary belongs to a dependency of mkdocs-material; uvx = false
+# because mise prefers uvx where uv is installed, and there --include-deps is not accepted.
+"pipx:mkdocs-material" = { version = "9.7.7", uvx = false, pipx_args = "--include-deps" }
 
 [hooks]
 enter = ["aube install", "hk install"]
@@ -17,15 +20,15 @@ NODE_USE_ENV_PROXY = "1"
 
 [tasks.dev]
 description = "Start the dev server at http://localhost:4321"
-run = "astro dev"
+run = "node bin/landschaft.js dev"
 
 [tasks.build]
 description = "Build the SSR app into dist/"
-run = "astro build"
+run = "node bin/landschaft.js build"
 
 [tasks.preview]
 description = "Serve the production build"
-run = "node dist/server/entry.mjs"
+run = "node bin/landschaft.js start"
 
 [tasks.check]
 description = "Type-check .astro and .ts(x) with astro check"
@@ -46,6 +49,14 @@ run = "vitest run"
 [tasks.fullcheck]
 description = "The gate before a commit: format check, lint, types, tests"
 run = ["oxfmt --check .", "oxlint", { task = "check" }, { task = "test" }]
+
+[tasks."site:serve"]
+description = "Serve the docs at http://localhost:8000"
+run = "mkdocs serve"
+
+[tasks."site:check"]
+description = "Build the docs, failing on a broken link"
+run = "mkdocs build --strict"
 
 [tasks.sync]
 description = "Trigger an issue sync on the running dev server"
