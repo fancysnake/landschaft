@@ -118,6 +118,6 @@ The local JSON endpoints are listed under [API](https://landschaft.fancysnake.de
 Everything else is in the [docs](https://landschaft.fancysnake.dev) (MkDocs sources in
 [`docs/`](docs); `mise run site:serve` to preview them).
 
-`mise tasks` lists everything. `mise run fullcheck` is the gate before a commit (format check,
-oxlint, `astro check`, vitest). `hk` installs a pre-commit hook that formats and lints staged
+`mise tasks` lists everything. `mise run fullcheck` is the gate before a commit and in CI
+(`hk` lint, `astro check`, vitest, build). `hk` installs a pre-commit hook that formats and lints staged
 files.

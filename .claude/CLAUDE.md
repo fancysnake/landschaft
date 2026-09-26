@@ -17,7 +17,7 @@ mise run check      # astro check (types for .astro and .tsx)
 mise run lint       # hk check --all (oxlint, oxfmt --check, file hygiene)
 mise run format     # oxfmt --write .
 mise run test       # vitest run
-mise run fullcheck  # THE GATE before a commit: format check + oxlint + check + test
+mise run fullcheck  # THE GATE before a commit and in CI: lint + check + test + build
 mise run sync       # POST /api/sync on the running dev server
 mise run site:serve # MkDocs (Material) docs at http://localhost:8000
 mise run site:check # strict docs build into site/

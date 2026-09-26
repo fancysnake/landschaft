@@ -47,8 +47,8 @@ description = "Run vitest"
 run = "vitest run"
 
 [tasks.fullcheck]
-description = "The gate before a commit: format check, lint, types, tests"
-run = ["oxfmt --check .", "oxlint", { task = "check" }, { task = "test" }]
+description = "The gate before a commit and in CI: lint, types, tests, build"
+run = [{ task = "lint" }, { task = "check" }, { task = "test" }, { task = "build" }]
 
 [tasks."site:serve"]
 description = "Serve the docs at http://localhost:8000"
