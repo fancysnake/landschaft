@@ -41,19 +41,27 @@ export function isBlocked(issue: Issue, byKey: Map<string, Issue>): boolean {
   );
 }
 
-function matchesFilters(issue: Issue, filters: Filters, query: string | undefined): boolean {
-  if (query) {
-    const haystack = `${issue.number} ${issue.title}`.toLowerCase();
-    if (!haystack.includes(query)) return false;
-  }
-  if (filters.assignee && !issue.assignees.some((a) => a.login === filters.assignee)) return false;
-  if (filters.label && !issue.labels.some((l) => l.name === filters.label)) return false;
-  if (filters.epic) {
-    if (!issue.parent || issueKey(issue.parent.repo, issue.parent.number) !== filters.epic) {
-      return false;
-    }
-  }
-  return true;
+const keyOf = (ref: { repo: string; number: number }): string => issueKey(ref.repo, ref.number);
+
+/** Keys of the epic's blockers, its sub-issues and the issues it blocks. */
+function relatedTo(epicKey: string, byKey: Map<string, Issue>): Set<string> {
+  const issues = [...byKey.values()];
+  return new Set([
+    ...(byKey.get(epicKey)?.blockedBy ?? []).map(keyOf),
+    ...issues.filter((issue) => issue.parent && keyOf(issue.parent) === epicKey).map(keyOf),
+    ...issues.filter((issue) => issue.blockedBy.some((b) => keyOf(b) === epicKey)).map(keyOf),
+  ]);
+}
+
+/** Text, assignee, label and epic filters as one predicate; an unset filter passes everything. */
+function issueFilter(filters: Filters, byKey: Map<string, Issue>): (issue: Issue) => boolean {
+  const query = filters.q?.trim().toLowerCase();
+  const related = filters.epic ? relatedTo(filters.epic, byKey) : null;
+  return (issue) =>
+    (!query || `${issue.number} ${issue.title}`.toLowerCase().includes(query)) &&
+    (!filters.assignee || issue.assignees.some((a) => a.login === filters.assignee)) &&
+    (!filters.label || issue.labels.some((l) => l.name === filters.label)) &&
+    (!related || related.has(keyOf(issue)));
 }
 
 function compareBy(by: SortBy, dir: SortDir) {
@@ -84,6 +92,7 @@ export function buildBoard(
 ): Board {
   const byKey = new Map(issues.map((issue) => [issueKey(issue.repo, issue.number), issue]));
   const mine = inScope(dashboard, viewer);
+  const wanted = issueFilter(filters, byKey);
   const open = issues.filter((issue) => issue.state === "OPEN" && mine(issue));
   const structural = new Set<string>([
     ...dashboard.swimlanes.flatMap((lane) => lane.labels),
@@ -110,7 +119,6 @@ export function buildBoard(
 
   const assignees = new Set<string>();
   const labels = new Set<string>();
-  const query = filters.q?.trim().toLowerCase() || undefined;
   const epicIssues: Issue[] = [];
 
   for (const issue of open) {
@@ -122,7 +130,7 @@ export function buildBoard(
       issue.labels.some((label) => label.name === dashboard.epicLabel);
     if (isEpic) epicIssues.push(issue);
 
-    if (!matchesFilters(issue, filters, query)) continue;
+    if (!wanted(issue)) continue;
 
     const names = new Set(issue.labels.map((label) => label.name));
     const lane = placeIn(dashboard.swimlanes, names);
