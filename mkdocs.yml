@@ -11,9 +11,8 @@ theme:
     - content.code.copy
     - navigation.top
     - navigation.footer
-  icon:
-    logo: material/view-dashboard-variant
-  favicon: assets/favicon.svg
+  logo: assets/logo.png
+  favicon: assets/favicon.png
   font:
     text: Nunito
     code: JetBrains Mono
