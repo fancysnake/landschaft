@@ -1,8 +1,0 @@
-# Opt-in with `MISE_ENV=cabinet`: vekna is the CLI that casts cabinet's PR maintenance
-# rituals; cabinet rides along in the same venv (see .vekna.toml).
-[tools]
-pipx = "1.17.2"
-python = "3.11.16"
-# Nothing bumps cabinet's @tag in the git URL: move it by hand, in step with vekna.
-# `mise run update` only reaches these tools under MISE_ENV=cabinet.
-"pipx:vekna" = { version = "0.8.0", pipx_args = "--preinstall git+https://github.com/fancysnake/cabinet.git@v0.3.0" }
