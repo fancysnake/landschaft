@@ -23,6 +23,9 @@ pnpm-debug.log*
 # jetbrains setting folder
 .idea/
 
+# mkdocs output
+site/
+
 # landschaft
 landschaft.config.json
 landschaft.db

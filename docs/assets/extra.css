@@ -1,0 +1,108 @@
+/* Lush green: deep forest primary, moss accent, mint-cream surfaces. */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #1f5c3a;
+  --md-primary-fg-color--light: #3f8a5f;
+  --md-primary-fg-color--dark: #143f27;
+  --md-primary-bg-color: #f3faf3;
+  --md-primary-bg-color--light: #d9eedc;
+
+  --md-accent-fg-color: #4f9a3d;
+  --md-accent-fg-color--transparent: #4f9a3d1a;
+  --md-accent-bg-color: #ffffff;
+  --md-accent-bg-color--light: #ffffffb3;
+
+  --md-default-bg-color: #f6fbf4;
+  --md-default-fg-color: #16301f;
+  --md-default-fg-color--light: #2f4a3a;
+  --md-default-fg-color--lighter: #6f8a78;
+  --md-default-fg-color--lightest: #dcebdf;
+
+  --md-typeset-a-color: #1f6d43;
+  --md-typeset-mark-color: #d7f2a8;
+  --md-typeset-kbd-color: #e8f3e8;
+  --md-typeset-kbd-accent-color: #ffffff;
+  --md-typeset-kbd-border-color: #b9d6bf;
+  --md-typeset-table-color: #cfe4d3;
+
+  --md-code-bg-color: #e9f4ea;
+  --md-code-fg-color: #1d3b2a;
+  --md-code-hl-color: #c7e9a8;
+  --md-code-hl-color--light: #c7e9a866;
+  --md-code-hl-keyword-color: #1f6d43;
+  --md-code-hl-string-color: #6b7a1c;
+  --md-code-hl-number-color: #8a5a10;
+  --md-code-hl-function-color: #2f5f8f;
+  --md-code-hl-constant-color: #7a3e8a;
+  --md-code-hl-comment-color: #7b907f;
+
+  --md-admonition-fg-color: var(--md-default-fg-color);
+  --md-admonition-bg-color: #ffffff;
+  --md-footer-bg-color: #143f27;
+  --md-footer-bg-color--dark: #0e2d1c;
+  --md-footer-fg-color: #eaf6ec;
+  --md-footer-fg-color--light: #bcd8c3;
+  --md-footer-fg-color--lighter: #8fb59a;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #143f27;
+  --md-primary-fg-color--light: #3f8a5f;
+  --md-primary-fg-color--dark: #0e2d1c;
+  --md-accent-fg-color: #8fd36f;
+  --md-accent-fg-color--transparent: #8fd36f1a;
+  --md-typeset-a-color: #8fd36f;
+  --md-default-bg-color: #0f1d15;
+  --md-code-bg-color: #16281d;
+  --md-footer-bg-color: #0e2d1c;
+  --md-footer-bg-color--dark: #0a2115;
+}
+
+/* A leafy header: layered greens instead of a flat bar. */
+.md-header {
+  background: linear-gradient(
+    100deg,
+    var(--md-primary-fg-color--dark),
+    var(--md-primary-fg-color) 55%,
+    var(--md-primary-fg-color--light)
+  );
+}
+[data-md-color-scheme="default"] .md-typeset h1,
+[data-md-color-scheme="default"] .md-typeset h2 {
+  color: var(--md-primary-fg-color--dark);
+}
+.md-typeset h2 {
+  border-bottom: 2px solid var(--md-default-fg-color--lightest);
+  padding-bottom: 0.2em;
+}
+
+/* Cards and code sit on mint with a soft leaf-shadow. */
+.md-typeset pre > code,
+.md-typeset .highlight > pre,
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: 0.6rem;
+}
+[data-md-color-scheme="default"] .md-typeset .highlight > pre,
+[data-md-color-scheme="default"] .md-typeset pre > code {
+  box-shadow: 0 1px 0 #cfe4d3 inset;
+}
+.md-typeset .admonition,
+.md-typeset details {
+  border-width: 0 0 0 0.25rem;
+  box-shadow: 0 0.2rem 0.8rem #1f5c3a14;
+}
+
+.md-typeset table:not([class]) th {
+  background-color: var(--md-primary-bg-color--light);
+  color: var(--md-primary-fg-color--dark);
+}
+.md-typeset table:not([class]) {
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.md-nav__link--active,
+.md-nav__item .md-nav__link--active {
+  color: var(--md-primary-fg-color);
+  font-weight: 700;
+}
