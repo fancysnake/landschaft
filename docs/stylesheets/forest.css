@@ -2,54 +2,53 @@
  * Forest — the page is mint paper, the chrome is deep forest, the accent is
  * moss: what the eye lands on when it stops on a link or a hover.
  *
- * Every pairing below clears WCAG AA against the surface it sits on. Measured,
- * not asserted: the tightest pairing is the light scheme's lighter foreground
- * on paper at 4.61:1, then the light accent on paper at 4.69:1.
+ * Measured to clear WCAG AA in both schemes: the default foregrounds, links
+ * and accent on the page, the header foreground along its gradient, and the
+ * accent's own foreground on the accent. Tightest: the light scheme's lighter
+ * foreground on paper at 4.61:1, then the dark header's light end at 4.65:1.
  */
-
-:root {
-  --forest-paper: #f6fbf4;
-  --forest-ink: #16301f;
-  --forest-canopy: #1f5c3a;
-  --forest-canopy-light: #3f8a5f;
-  --forest-canopy-dark: #143f27;
-  --forest-moss: #3d7f2e;
-  --forest-mint: #e9f4ea;
-  --forest-night: #0f1d15;
-  --forest-night-ink: #e4efe6;
-  --forest-night-moss: #8fd36f;
-  --forest-night-mint: #16281d;
-}
 
 /* ---- Light ---- */
 
 [data-md-color-scheme="forest"] {
   color-scheme: light;
 
-  --md-default-bg-color: var(--forest-paper);
-  --md-default-fg-color: var(--forest-ink);
+  --md-default-bg-color: #f6fbf4;
+  --md-default-fg-color: #16301f;
   --md-default-fg-color--light: #2f4a3a;
   --md-default-fg-color--lighter: #5d7866;
   --md-default-fg-color--lightest: #dcebdf;
 
-  --md-primary-fg-color: var(--forest-canopy);
-  --md-primary-fg-color--light: var(--forest-canopy-light);
-  --md-primary-fg-color--dark: var(--forest-canopy-dark);
+  --md-primary-fg-color: #1f5c3a;
+  --md-primary-fg-color--light: #357a53;
+  --md-primary-fg-color--dark: #143f27;
   --md-primary-bg-color: #f3faf3;
   --md-primary-bg-color--light: #d9eedc;
 
-  --md-accent-fg-color: var(--forest-moss);
-  --md-accent-fg-color--transparent: rgb(61 127 46 / 10%);
+  --md-accent-fg-color: #3d7f2e;
+  --md-accent-fg-color--transparent: color-mix(in srgb, var(--md-accent-fg-color) 10%, transparent);
 
   --md-typeset-a-color: #1f6d43;
   --md-typeset-mark-color: #d7f2a8;
   --md-typeset-table-color: #cfe4d3;
 
-  --md-code-bg-color: var(--forest-mint);
+  --md-code-bg-color: #e9f4ea;
   --md-code-fg-color: #1d3b2a;
 
-  --md-footer-bg-color: var(--forest-canopy-dark);
+  --md-footer-bg-color: #143f27;
   --md-footer-bg-color--dark: #0e2d1c;
+
+  /* Syntax: Material's defaults do not know this palette. */
+  --md-code-hl-keyword-color: #1f6d43;
+  --md-code-hl-function-color: #2f5f8f;
+  --md-code-hl-string-color: #5c6b12;
+  --md-code-hl-number-color: #8a5a10;
+  --md-code-hl-comment-color: #53705c;
+  --md-code-hl-name-color: var(--md-code-fg-color);
+  --md-code-hl-operator-color: var(--md-default-fg-color--light);
+  --md-code-hl-punctuation-color: var(--md-default-fg-color--light);
+  --md-code-hl-constant-color: #7a3e8a;
+  --md-code-hl-special-color: #8a5a10;
 }
 
 /* ---- Dark ---- */
@@ -57,63 +56,50 @@
 [data-md-color-scheme="forest-night"] {
   color-scheme: dark;
 
-  --md-default-bg-color: var(--forest-night);
-  --md-default-bg-color--light: rgb(15 29 21 / 54%);
-  --md-default-bg-color--lighter: rgb(15 29 21 / 26%);
-  --md-default-bg-color--lightest: rgb(15 29 21 / 7%);
-  --md-default-fg-color: var(--forest-night-ink);
+  --md-default-bg-color: #0f1d15;
+  --md-default-bg-color--light: color-mix(in srgb, var(--md-default-bg-color) 54%, transparent);
+  --md-default-bg-color--lighter: color-mix(in srgb, var(--md-default-bg-color) 26%, transparent);
+  --md-default-bg-color--lightest: color-mix(in srgb, var(--md-default-bg-color) 7%, transparent);
+  --md-default-fg-color: #e4efe6;
   --md-default-fg-color--light: #b6cabc;
   --md-default-fg-color--lighter: #88a291;
   --md-default-fg-color--lightest: #24392c;
 
-  --md-primary-fg-color: var(--forest-canopy-dark);
-  --md-primary-fg-color--light: var(--forest-canopy-light);
+  --md-primary-fg-color: #143f27;
+  --md-primary-fg-color--light: #357a53;
   --md-primary-fg-color--dark: #0e2d1c;
   --md-primary-bg-color: #eaf6ec;
   --md-primary-bg-color--light: #bcd8c3;
 
   --md-accent-fg-color: #a6e08a;
-  --md-accent-fg-color--transparent: rgb(166 224 138 / 10%);
+  --md-accent-fg-color--transparent: color-mix(in srgb, var(--md-accent-fg-color) 10%, transparent);
+  --md-accent-bg-color: var(--md-default-bg-color);
+  --md-accent-bg-color--light: color-mix(in srgb, var(--md-accent-bg-color) 70%, transparent);
 
-  --md-typeset-a-color: var(--forest-night-moss);
-  --md-typeset-mark-color: rgb(143 211 111 / 35%);
+  --md-typeset-a-color: #8fd36f;
+  --md-typeset-mark-color: color-mix(in srgb, var(--md-typeset-a-color) 35%, transparent);
   --md-typeset-table-color: #2a4233;
 
-  --md-code-bg-color: var(--forest-night-mint);
+  --md-code-bg-color: #16281d;
   --md-code-fg-color: #d9e8dc;
 
   --md-footer-bg-color: #0e2d1c;
   --md-footer-bg-color--dark: #0a2115;
-}
 
-/*
- * Syntax highlighting, both schemes. Material ships a sensible default; what
- * it does not do is agree with a palette it has never heard of, and a code
- * block is most of what these pages are.
- */
+  /* Material's slate shadows: the light ones vanish on a dark page. */
+  --md-shadow-z1: 0 0.2rem 0.5rem #0000000d, 0 0 0.05rem #0000001a;
+  --md-shadow-z2: 0 0.2rem 0.5rem #00000040, 0 0 0.05rem #00000040;
+  --md-shadow-z3: 0 0.2rem 0.5rem #0006, 0 0 0.05rem #00000059;
 
-[data-md-color-scheme="forest"] {
-  --md-code-hl-keyword-color: #1f6d43;
-  --md-code-hl-function-color: #2f5f8f;
-  --md-code-hl-string-color: #5c6b12;
-  --md-code-hl-number-color: #8a5a10;
-  --md-code-hl-comment-color: #53705c;
-  --md-code-hl-name-color: var(--md-code-fg-color);
-  --md-code-hl-operator-color: #2f4a3a;
-  --md-code-hl-punctuation-color: #2f4a3a;
-  --md-code-hl-constant-color: #7a3e8a;
-  --md-code-hl-special-color: #8a5a10;
-}
-
-[data-md-color-scheme="forest-night"] {
-  --md-code-hl-keyword-color: var(--forest-night-moss);
+  /* Syntax */
+  --md-code-hl-keyword-color: #8fd36f;
   --md-code-hl-function-color: #8fc1ee;
   --md-code-hl-string-color: #cdd97a;
   --md-code-hl-number-color: #e0b46a;
   --md-code-hl-comment-color: #7f9a86;
   --md-code-hl-name-color: var(--md-code-fg-color);
-  --md-code-hl-operator-color: #b6cabc;
-  --md-code-hl-punctuation-color: #b6cabc;
+  --md-code-hl-operator-color: var(--md-default-fg-color--light);
+  --md-code-hl-punctuation-color: var(--md-default-fg-color--light);
   --md-code-hl-constant-color: #d3a3e0;
   --md-code-hl-special-color: #e0b46a;
 }
