@@ -5,6 +5,7 @@ import { DASHBOARD, label, makeIssue, REPO } from "./__fixtures__/issues";
 import { buildBoard, isBlocked, labelDiffForMove, placeIn } from "./board";
 
 const cell = (laneId: string, colId: string) => cellKey(laneId, colId);
+const TWO_REPOS = { ...DASHBOARD, repos: [REPO, "acme/other"] };
 const numbers = (board: ReturnType<typeof buildBoard>) =>
   board.cells[cell("rest", "todo")]?.map((c) => c.number);
 
@@ -200,8 +201,7 @@ describe("buildBoard", () => {
 
   it("repo filter keeps only that repo's issues", () => {
     const issues = [makeIssue({ number: 1 }), makeIssue({ number: 2, repo: "acme/other" })];
-    expect(numbers(buildBoard(issues, DASHBOARD, { repo: "acme/other" }))).toEqual([2]);
-    expect(numbers(buildBoard(issues, DASHBOARD, { repo: "acme/none" }))).toEqual([]);
+    expect(numbers(buildBoard(issues, TWO_REPOS, { repo: "acme/other" }))).toEqual([2]);
   });
 
   it("epic filter keeps sub-issues and issues blocking or blocked by the epic", () => {
@@ -221,7 +221,7 @@ describe("buildBoard", () => {
     expect(numbers(buildBoard(issues, DASHBOARD, { epic: "acme/app#10" }))).toEqual([3, 2, 1]);
   });
 
-  it("lists epics with progress regardless of filters", () => {
+  it("lists epics with progress regardless of non-repo filters", () => {
     const issues = [
       makeIssue({
         number: 10,
@@ -240,6 +240,25 @@ describe("buildBoard", () => {
       }),
     ]);
     expect(board.cells[cell("rest", "todo")]).toEqual([]);
+  });
+
+  it("hides epics from other repos under the repo filter", () => {
+    const issues = [
+      makeIssue({ number: 10, labels: [label("epic")] }),
+      makeIssue({ number: 11, repo: "acme/other", labels: [label("epic")] }),
+    ];
+    const board = buildBoard(issues, TWO_REPOS, { repo: "acme/other" });
+    expect(board.epics.map((epic) => epic.key)).toEqual(["acme/other#11"]);
+  });
+
+  it("ignores a repo filter for a repo not on the dashboard", () => {
+    const issues = [
+      makeIssue({ number: 1 }),
+      makeIssue({ number: 10, repo: "acme/other", labels: [label("epic")] }),
+    ];
+    const board = buildBoard(issues, DASHBOARD, { repo: "acme/other" });
+    expect(numbers(board)).toEqual([10, 1]);
+    expect(board.epics.map((epic) => epic.key)).toEqual(["acme/other#10"]);
   });
 
   it("skips epics when no epic label is configured", () => {

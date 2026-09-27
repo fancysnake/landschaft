@@ -93,7 +93,9 @@ export function buildBoard(
 ): Board {
   const byKey = new Map(issues.map((issue) => [issueKey(issue.repo, issue.number), issue]));
   const mine = inScope(dashboard, viewer);
-  const wanted = issueFilter(filters, byKey);
+  // A repo not on the dashboard (stale URL) would filter with no control to clear it.
+  const repo = filters.repo && dashboard.repos.includes(filters.repo) ? filters.repo : undefined;
+  const wanted = issueFilter({ ...filters, repo }, byKey);
   const open = issues.filter((issue) => issue.state === "OPEN" && mine(issue));
   const structural = new Set<string>([
     ...dashboard.swimlanes.flatMap((lane) => lane.labels),
@@ -129,7 +131,7 @@ export function buildBoard(
     const isEpic =
       dashboard.epicLabel !== undefined &&
       issue.labels.some((label) => label.name === dashboard.epicLabel);
-    if (isEpic) epicIssues.push(issue);
+    if (isEpic && (!repo || issue.repo === repo)) epicIssues.push(issue);
 
     if (!wanted(issue)) continue;
 

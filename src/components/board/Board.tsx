@@ -82,7 +82,12 @@ export default function Board({ dashboardId }: Props) {
           onSelect={(key) => updateFilters({ epic: key })}
         />
       )}
-      <FilterBar filters={filters} board={board} repos={dashboard.repos} onChange={updateFilters} />
+      <FilterBar
+        filters={filters}
+        board={board}
+        repos={showRepo ? dashboard.repos : []}
+        onChange={updateFilters}
+      />
 
       <div className="min-h-0 flex-1 overflow-auto">
         <div

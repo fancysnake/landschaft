@@ -109,15 +109,14 @@ export const SyncRequestSchema = z.object({
 });
 export type SyncRequest = z.infer<typeof SyncRequestSchema>;
 
-export interface Filters {
-  q?: string;
-  repo?: string;
-  assignee?: string;
-  label?: string;
-  epic?: string;
+/** Free-text filters: set from the filter bar, cleared together by "Clear filters". */
+export const TEXT_FILTER_KEYS = ["q", "repo", "assignee", "label", "epic"] as const;
+export type TextFilterKey = (typeof TEXT_FILTER_KEYS)[number];
+
+export type Filters = { [K in TextFilterKey]?: string } & {
   sort?: SortBy;
   dir?: SortDir;
-}
+};
 
 const optionalText = z
   .string()
@@ -126,11 +125,10 @@ const optionalText = z
 
 /** Query-string filters; empty strings count as "not set". */
 export const FiltersSchema: z.ZodType<Filters, Record<string, unknown>> = z.object({
-  q: optionalText,
-  repo: optionalText,
-  assignee: optionalText,
-  label: optionalText,
-  epic: optionalText,
+  ...(Object.fromEntries(TEXT_FILTER_KEYS.map((key) => [key, optionalText])) as Record<
+    TextFilterKey,
+    typeof optionalText
+  >),
   sort: SortBySchema.optional(),
   dir: SortDirSchema.optional(),
 });
