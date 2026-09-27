@@ -1,0 +1,141 @@
+/*
+ * Forest — the page is mint paper, the chrome is deep forest, the accent is
+ * moss: what the eye lands on when it stops on a link or a hover.
+ *
+ * Every pairing below clears WCAG AA against the surface it sits on. Measured,
+ * not asserted: the tightest pairing is the light scheme's lighter foreground
+ * on paper at 4.61:1, then the light accent on paper at 4.69:1.
+ */
+
+:root {
+  --forest-paper: #f6fbf4;
+  --forest-ink: #16301f;
+  --forest-canopy: #1f5c3a;
+  --forest-canopy-light: #3f8a5f;
+  --forest-canopy-dark: #143f27;
+  --forest-moss: #3d7f2e;
+  --forest-mint: #e9f4ea;
+  --forest-night: #0f1d15;
+  --forest-night-ink: #e4efe6;
+  --forest-night-moss: #8fd36f;
+  --forest-night-mint: #16281d;
+}
+
+/* ---- Light ---- */
+
+[data-md-color-scheme="forest"] {
+  color-scheme: light;
+
+  --md-default-bg-color: var(--forest-paper);
+  --md-default-fg-color: var(--forest-ink);
+  --md-default-fg-color--light: #2f4a3a;
+  --md-default-fg-color--lighter: #5d7866;
+  --md-default-fg-color--lightest: #dcebdf;
+
+  --md-primary-fg-color: var(--forest-canopy);
+  --md-primary-fg-color--light: var(--forest-canopy-light);
+  --md-primary-fg-color--dark: var(--forest-canopy-dark);
+  --md-primary-bg-color: #f3faf3;
+  --md-primary-bg-color--light: #d9eedc;
+
+  --md-accent-fg-color: var(--forest-moss);
+  --md-accent-fg-color--transparent: rgb(61 127 46 / 10%);
+
+  --md-typeset-a-color: #1f6d43;
+  --md-typeset-mark-color: #d7f2a8;
+  --md-typeset-table-color: #cfe4d3;
+
+  --md-code-bg-color: var(--forest-mint);
+  --md-code-fg-color: #1d3b2a;
+
+  --md-footer-bg-color: var(--forest-canopy-dark);
+  --md-footer-bg-color--dark: #0e2d1c;
+}
+
+/* ---- Dark ---- */
+
+[data-md-color-scheme="forest-night"] {
+  color-scheme: dark;
+
+  --md-default-bg-color: var(--forest-night);
+  --md-default-bg-color--light: rgb(15 29 21 / 54%);
+  --md-default-bg-color--lighter: rgb(15 29 21 / 26%);
+  --md-default-bg-color--lightest: rgb(15 29 21 / 7%);
+  --md-default-fg-color: var(--forest-night-ink);
+  --md-default-fg-color--light: #b6cabc;
+  --md-default-fg-color--lighter: #88a291;
+  --md-default-fg-color--lightest: #24392c;
+
+  --md-primary-fg-color: var(--forest-canopy-dark);
+  --md-primary-fg-color--light: var(--forest-canopy-light);
+  --md-primary-fg-color--dark: #0e2d1c;
+  --md-primary-bg-color: #eaf6ec;
+  --md-primary-bg-color--light: #bcd8c3;
+
+  --md-accent-fg-color: #a6e08a;
+  --md-accent-fg-color--transparent: rgb(166 224 138 / 10%);
+
+  --md-typeset-a-color: var(--forest-night-moss);
+  --md-typeset-mark-color: rgb(143 211 111 / 35%);
+  --md-typeset-table-color: #2a4233;
+
+  --md-code-bg-color: var(--forest-night-mint);
+  --md-code-fg-color: #d9e8dc;
+
+  --md-footer-bg-color: #0e2d1c;
+  --md-footer-bg-color--dark: #0a2115;
+}
+
+/*
+ * Syntax highlighting, both schemes. Material ships a sensible default; what
+ * it does not do is agree with a palette it has never heard of, and a code
+ * block is most of what these pages are.
+ */
+
+[data-md-color-scheme="forest"] {
+  --md-code-hl-keyword-color: #1f6d43;
+  --md-code-hl-function-color: #2f5f8f;
+  --md-code-hl-string-color: #5c6b12;
+  --md-code-hl-number-color: #8a5a10;
+  --md-code-hl-comment-color: #53705c;
+  --md-code-hl-name-color: var(--md-code-fg-color);
+  --md-code-hl-operator-color: #2f4a3a;
+  --md-code-hl-punctuation-color: #2f4a3a;
+  --md-code-hl-constant-color: #7a3e8a;
+  --md-code-hl-special-color: #8a5a10;
+}
+
+[data-md-color-scheme="forest-night"] {
+  --md-code-hl-keyword-color: var(--forest-night-moss);
+  --md-code-hl-function-color: #8fc1ee;
+  --md-code-hl-string-color: #cdd97a;
+  --md-code-hl-number-color: #e0b46a;
+  --md-code-hl-comment-color: #7f9a86;
+  --md-code-hl-name-color: var(--md-code-fg-color);
+  --md-code-hl-operator-color: #b6cabc;
+  --md-code-hl-punctuation-color: #b6cabc;
+  --md-code-hl-constant-color: #d3a3e0;
+  --md-code-hl-special-color: #e0b46a;
+}
+
+/* A leafy header: layered greens instead of a flat bar. */
+.md-header {
+  background: linear-gradient(
+    100deg,
+    var(--md-primary-fg-color--dark),
+    var(--md-primary-fg-color) 55%,
+    var(--md-primary-fg-color--light)
+  );
+}
+
+/* Section headings ruled like a field boundary. */
+.md-typeset h2 {
+  border-bottom: 2px solid var(--md-default-fg-color--lightest);
+  padding-bottom: 0.2em;
+}
+
+/* Table headers sit on the pale primary so they read as chrome, not data. */
+.md-typeset table:not([class]) th {
+  background-color: var(--md-primary-bg-color--light);
+  color: var(--md-primary-fg-color--dark);
+}

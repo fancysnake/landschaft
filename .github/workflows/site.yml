@@ -1,19 +1,17 @@
-name: Pages
+name: Site
 
 on:
+  pull_request:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
+
+concurrency:
+  group: site-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
-
-# One group per ref: a pull request's build never queues behind a deploy, and a newer push to
-# the same pull request replaces the running build.
-concurrency:
-  group: pages-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -22,26 +20,31 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
       - uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518 # v4.2.5
-
-      - name: Build the docs
-        run: mise run site:check
-
+      - run: mise install
+      - run: mise run site:build
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          path: site
+          path: site/
 
+  # Pages has no per-pull-request preview, so a pull request builds and stops
+  # there. The build is the review; the deploy waits for main.
   deploy:
-    needs: build
     if: github.ref == 'refs/heads/main'
+    needs: build
     runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
+    # Its own group, because a deploy wants the opposite policy to a build: a
+    # publish cut off halfway leaves the site on the old commit, so two merges
+    # queue here rather than cancel each other.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
     steps:
       - id: deployment
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

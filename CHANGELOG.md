@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- Docs tasks are `site:dev` and `site:build` (strict is set in `mkdocs.yml`); the site gains a
+  changelog page and its own `forest` / `forest-night` colour schemes.
+
 ## [0.3.0] - 2026-09-27
 
 ### Added
