@@ -111,6 +111,7 @@ export type SyncRequest = z.infer<typeof SyncRequestSchema>;
 
 export interface Filters {
   q?: string;
+  repo?: string;
   assignee?: string;
   label?: string;
   epic?: string;
@@ -126,6 +127,7 @@ const optionalText = z
 /** Query-string filters; empty strings count as "not set". */
 export const FiltersSchema: z.ZodType<Filters, Record<string, unknown>> = z.object({
   q: optionalText,
+  repo: optionalText,
   assignee: optionalText,
   label: optionalText,
   epic: optionalText,

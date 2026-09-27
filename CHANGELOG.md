@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- Repo filter on boards that span more than one repository.
+- Epic tiles carry a link that opens the epic on GitHub.
+
 ## [0.2.0] - 2026-09-26
 
 ### Changed

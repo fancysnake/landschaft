@@ -30,7 +30,7 @@ labels the target entry does not ask for. GitHub writes go through REST by label
 
 ## Board
 
-`GET /api/dashboards/:id/board?q=&assignee=&label=&epic=&sort=updated&dir=desc` returns the
+`GET /api/dashboards/:id/board?q=&repo=&assignee=&label=&epic=&sort=updated&dir=desc` returns the
 grid as cells keyed by swimlane and column id, the epic strip, the unplaced count and the
 label catalogue used for colouring. The React island renders it as-is; all placement logic is
 server-side and unit-tested.

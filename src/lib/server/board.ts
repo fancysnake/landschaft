@@ -53,12 +53,13 @@ function relatedTo(epicKey: string, byKey: Map<string, Issue>): Set<string> {
   ]);
 }
 
-/** Text, assignee, label and epic filters as one predicate; an unset filter passes everything. */
+/** Text, repo, assignee, label and epic filters as one predicate; an unset filter passes everything. */
 function issueFilter(filters: Filters, byKey: Map<string, Issue>): (issue: Issue) => boolean {
   const query = filters.q?.trim().toLowerCase();
   const related = filters.epic ? relatedTo(filters.epic, byKey) : null;
   return (issue) =>
     (!query || `${issue.number} ${issue.title}`.toLowerCase().includes(query)) &&
+    (!filters.repo || issue.repo === filters.repo) &&
     (!filters.assignee || issue.assignees.some((a) => a.login === filters.assignee)) &&
     (!filters.label || issue.labels.some((l) => l.name === filters.label)) &&
     (!related || related.has(keyOf(issue)));

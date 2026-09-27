@@ -198,6 +198,12 @@ describe("buildBoard", () => {
     expect(numbers(buildBoard(issues, DASHBOARD, { q: "login", assignee: "ann" }))).toEqual([1]);
   });
 
+  it("repo filter keeps only that repo's issues", () => {
+    const issues = [makeIssue({ number: 1 }), makeIssue({ number: 2, repo: "acme/other" })];
+    expect(numbers(buildBoard(issues, DASHBOARD, { repo: "acme/other" }))).toEqual([2]);
+    expect(numbers(buildBoard(issues, DASHBOARD, { repo: "acme/none" }))).toEqual([]);
+  });
+
   it("epic filter keeps sub-issues and issues blocking or blocked by the epic", () => {
     const epic = { repo: REPO, number: 10 };
     const issues = [

@@ -4,7 +4,7 @@ import type { Filters } from "../schema";
 
 import { filtersToQuery } from "./api";
 
-const TEXT_KEYS = ["q", "assignee", "label", "epic"] as const;
+const TEXT_KEYS = ["q", "repo", "assignee", "label", "epic"] as const;
 
 export function readFilters(search: string): Filters {
   const params = new URLSearchParams(search);
