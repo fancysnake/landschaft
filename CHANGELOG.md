@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-27
+
+### Added
+
+- `repo` filter on boards that span more than one repository.
+- Epic tiles carry a link that opens the epic on GitHub.
+
 ## [0.2.0] - 2026-09-26
 
 ### Changed
@@ -37,7 +44,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v0.2.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/fancysnake/landschaft/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/fancysnake/landschaft/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/fancysnake/landschaft/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/fancysnake/landschaft/releases/tag/v0.1.0

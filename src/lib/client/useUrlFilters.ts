@@ -1,15 +1,12 @@
 import { useCallback, useState } from "react";
 
-import type { Filters } from "../schema";
-
+import { type Filters, TEXT_FILTER_KEYS } from "../schema";
 import { filtersToQuery } from "./api";
-
-const TEXT_KEYS = ["q", "assignee", "label", "epic"] as const;
 
 export function readFilters(search: string): Filters {
   const params = new URLSearchParams(search);
   const filters: Filters = {};
-  for (const key of TEXT_KEYS) {
+  for (const key of TEXT_FILTER_KEYS) {
     const value = params.get(key);
     if (value) filters[key] = value;
   }

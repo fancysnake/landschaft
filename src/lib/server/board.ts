@@ -53,12 +53,13 @@ function relatedTo(epicKey: string, byKey: Map<string, Issue>): Set<string> {
   ]);
 }
 
-/** Text, assignee, label and epic filters as one predicate; an unset filter passes everything. */
+/** Text, repo, assignee, label and epic filters as one predicate; an unset filter passes everything. */
 function issueFilter(filters: Filters, byKey: Map<string, Issue>): (issue: Issue) => boolean {
   const query = filters.q?.trim().toLowerCase();
   const related = filters.epic ? relatedTo(filters.epic, byKey) : null;
   return (issue) =>
     (!query || `${issue.number} ${issue.title}`.toLowerCase().includes(query)) &&
+    (!filters.repo || issue.repo === filters.repo) &&
     (!filters.assignee || issue.assignees.some((a) => a.login === filters.assignee)) &&
     (!filters.label || issue.labels.some((l) => l.name === filters.label)) &&
     (!related || related.has(keyOf(issue)));
@@ -92,7 +93,9 @@ export function buildBoard(
 ): Board {
   const byKey = new Map(issues.map((issue) => [issueKey(issue.repo, issue.number), issue]));
   const mine = inScope(dashboard, viewer);
-  const wanted = issueFilter(filters, byKey);
+  // A repo not on the dashboard (stale URL) would filter with no control to clear it.
+  const repo = filters.repo && dashboard.repos.includes(filters.repo) ? filters.repo : undefined;
+  const wanted = issueFilter({ ...filters, repo }, byKey);
   const open = issues.filter((issue) => issue.state === "OPEN" && mine(issue));
   const structural = new Set<string>([
     ...dashboard.swimlanes.flatMap((lane) => lane.labels),
@@ -128,7 +131,7 @@ export function buildBoard(
     const isEpic =
       dashboard.epicLabel !== undefined &&
       issue.labels.some((label) => label.name === dashboard.epicLabel);
-    if (isEpic) epicIssues.push(issue);
+    if (isEpic && (!repo || issue.repo === repo)) epicIssues.push(issue);
 
     if (!wanted(issue)) continue;
 

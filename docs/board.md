@@ -31,9 +31,9 @@ moves immediately; if GitHub rejects the change it snaps back and the error is s
 
 Issues carrying the dashboard's `epicLabel` are lifted out of the grid into a strip above it,
 each with its sub-issue progress from GitHub. Clicking an epic filters the board to its
-sub-issues and to issues it blocks or is blocked by; clicking again clears the filter.
+sub-issues and to issues it blocks or is blocked by; clicking again clears the filter. The ↗ on a tile opens the epic on GitHub.
 
 ## Filters
 
-Text, assignee, label, epic and sort live in the query string, so a filtered view is a link
+Text, repo (multi-repo boards), assignee, label, epic and sort live in the query string, so a filtered view is a link
 you can bookmark or send. Empty values count as unset.

@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
 
-import type { Filters } from "../../lib/schema";
 import type { Board } from "../../lib/types";
+
+import { type Filters, TEXT_FILTER_KEYS } from "../../lib/schema";
 
 interface Props {
   filters: Filters;
   board: Board;
+  repos: string[];
   onChange(patch: Partial<Filters>): void;
 }
 
 const select = "rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm text-neutral-800";
 
-export function FilterBar({ filters, board, onChange }: Props) {
+export function FilterBar({ filters, board, repos, onChange }: Props) {
   const [text, setText] = useState(filters.q ?? "");
 
   useEffect(() => {
@@ -20,7 +22,7 @@ export function FilterBar({ filters, board, onChange }: Props) {
     return () => clearTimeout(timer);
   }, [text, filters.q, onChange]);
 
-  const active = Boolean(filters.q || filters.assignee || filters.label || filters.epic);
+  const active = TEXT_FILTER_KEYS.some((key) => filters[key]);
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -31,7 +33,23 @@ export function FilterBar({ filters, board, onChange }: Props) {
         placeholder="Search title or #number"
         className={`${select} w-56`}
       />
+      {repos.length > 0 && (
+        <select
+          aria-label="Repository"
+          value={filters.repo ?? ""}
+          onChange={(event) => onChange({ repo: event.target.value || undefined })}
+          className={select}
+        >
+          <option value="">Any repo</option>
+          {repos.map((repo) => (
+            <option key={repo} value={repo}>
+              {repo}
+            </option>
+          ))}
+        </select>
+      )}
       <select
+        aria-label="Assignee"
         value={filters.assignee ?? ""}
         onChange={(event) => onChange({ assignee: event.target.value || undefined })}
         className={select}
@@ -44,6 +62,7 @@ export function FilterBar({ filters, board, onChange }: Props) {
         ))}
       </select>
       <select
+        aria-label="Label"
         value={filters.label ?? ""}
         onChange={(event) => onChange({ label: event.target.value || undefined })}
         className={select}
@@ -57,6 +76,7 @@ export function FilterBar({ filters, board, onChange }: Props) {
       </select>
       {board.epics.length > 0 && (
         <select
+          aria-label="Epic"
           value={filters.epic ?? ""}
           onChange={(event) => onChange({ epic: event.target.value || undefined })}
           className={`${select} max-w-72 truncate`}
@@ -93,7 +113,7 @@ export function FilterBar({ filters, board, onChange }: Props) {
           type="button"
           onClick={() => {
             setText("");
-            onChange({ q: undefined, assignee: undefined, label: undefined, epic: undefined });
+            onChange(Object.fromEntries(TEXT_FILTER_KEYS.map((key) => [key, undefined])));
           }}
           className="text-sm text-sky-700 hover:underline"
         >
