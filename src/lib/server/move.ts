@@ -3,7 +3,7 @@ import type { Db } from "./db";
 import type { Syncer } from "./sync";
 
 import { type Dashboard, fitsKind, type MoveRequest } from "../schema";
-import { labelDiffForMove } from "./board";
+import { labelDiffForMove, placeCard } from "./board";
 import { addLabels, type GithubClient, removeLabel } from "./github";
 
 export class MoveError extends Error {
@@ -56,11 +56,14 @@ export async function moveIssue(
       `swimlane "${to.lane.name}" takes no ${issue.kind === "pr" ? "PRs" : "issues"}`,
     );
 
-  const diff = labelDiffForMove(
-    issue.labels.map((label) => label.name),
-    from,
-    to,
-  );
+  const names = issue.labels.map((label) => label.name);
+  const diff = labelDiffForMove(names, from, to);
+  const after = new Set([...names.filter((name) => !diff.remove.includes(name)), ...diff.add]);
+  const landed = placeCard(dashboard, issue.kind, after);
+  if (landed?.lane.id !== to.lane.id || landed.column.id !== to.col.id)
+    throw new MoveError(
+      `an earlier swimlane or column takes the card before "${to.lane.name}" / "${to.col.name}"`,
+    );
   for (const name of diff.remove) await removeLabel(deps.gh, request.repo, request.number, name);
   await addLabels(deps.gh, request.repo, request.number, diff.add);
 

@@ -1,4 +1,5 @@
 import {
+  type Column,
   type Dashboard,
   type Filters,
   fitsKind,
@@ -8,6 +9,7 @@ import {
   selectedRepos,
   type SortBy,
   type SortDir,
+  type Swimlane,
 } from "../schema";
 import {
   type Board,
@@ -16,6 +18,7 @@ import {
   type Epic,
   type Issue,
   issueKey,
+  type IssueKind,
   type IssueRef,
 } from "../types";
 
@@ -50,6 +53,18 @@ export function placeIn<T extends Group>(groups: T[], labelNames: Set<string>): 
   const labeled = groups.find((group) => matches(group, labelNames));
   if (labeled) return labeled;
   return groups.find(isCatchAll) ?? null;
+}
+
+/** The lane (among those taking `kind`) and column an item carrying `labelNames` lands in. */
+export function placeCard(
+  dashboard: Pick<Dashboard, "swimlanes" | "columns">,
+  kind: IssueKind,
+  labelNames: Set<string>,
+): { lane: Swimlane; column: Column } | null {
+  const lanes = dashboard.swimlanes.filter((lane) => fitsKind(lane.kind, kind));
+  const lane = placeIn(lanes, labelNames);
+  const column = placeIn(dashboard.columns, labelNames);
+  return lane && column ? { lane, column } : null;
 }
 
 /** Blocked while any blocker is open. Prefers the blocker's cached row over the snapshot state. */
@@ -164,14 +179,12 @@ export function buildBoard(
 
     if (!wanted(issue)) continue;
 
-    const names = new Set(issue.labels.map((label) => label.name));
-    const lanes = dashboard.swimlanes.filter((lane) => fitsKind(lane.kind, issue.kind));
-    const lane = placeIn(lanes, names);
-    const column = placeIn(dashboard.columns, names);
-    if (!lane || !column) {
+    const placed = placeCard(dashboard, issue.kind, new Set(issue.labels.map((l) => l.name)));
+    if (!placed) {
       board.unplaced += 1;
       continue;
     }
+    const { lane, column } = placed;
     const blocked = isBlocked(issue, byKey);
     if (lane.hideBlocked && blocked) {
       board.hiddenBlocked[lane.id] = (board.hiddenBlocked[lane.id] ?? 0) + 1;
