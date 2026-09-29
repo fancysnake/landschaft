@@ -7,18 +7,17 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-29
+
 ### Added
 
-- Open pull requests appear on the board with a `PR` badge; an epic's view includes PRs
-  linked to it or to its related issues.
+- Open pull requests appear on the board with a `PR` badge, and an epic's view includes those
+  linked to it or its issues; upgrading forces a full resync to fetch them.
 
 ### Changed
 
-- The repo filter is a row of chips; several repos can be switched off at once (`repo`
-  takes a comma-separated list).
-- Upgrading forces a full resync to pick up pull requests.
-- Docs tasks are `site:dev` and `site:build` (strict is set in `mkdocs.yml`); the site gains a
-  changelog page and its own `forest` / `forest-night` colour schemes.
+- The repo filter is a row of chips that switch repos off independently; `repo` takes a
+  comma-separated list.
 
 ## [0.3.0] - 2026-09-27
 
@@ -57,7 +56,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v0.3.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/fancysnake/landschaft/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/fancysnake/landschaft/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/fancysnake/landschaft/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/fancysnake/landschaft/compare/v0.1.0...v0.1.1

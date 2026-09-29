@@ -13,7 +13,7 @@ the file is plain JSON you can also edit by hand (it is validated on load and on
 | ---------------- | ------------------------------------------ | ------------------------------------ | ---------------------------------------------------------------------- |
 | `id`             | `[a-z0-9_-]{1,32}`                         | required                             | In the URL (`/d/:id`); immutable once saved                            |
 | `name`           | string                                     | required                             | Shown in the header                                                    |
-| `repos`          | `owner/repo[]`, at least one               | required                             | Repositories whose open issues appear                                  |
+| `repos`          | `owner/repo[]`, at least one               | required                             | Repositories whose open issues and pull requests appear                |
 | `scope`          | `"mine"` \| `"all"`                        | `"mine"`                             | `mine`: issues you created or are assigned to (the token's account)    |
 | `epicLabel`      | string                                     | none                                 | Issues with this label form the epic strip above the board             |
 | `sort`           | `{ by: created\|updated, dir: asc\|desc }` | `{ "by": "updated", "dir": "desc" }` | Default card order; the URL can override it                            |
