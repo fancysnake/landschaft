@@ -7,9 +7,17 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-29
+
 ### Added
 
-- Swimlanes filter by type: issues only, PRs only, or both (`kind` in the config).
+- A swimlane takes only issues or only pull requests with `"kind": "issue"` or `"pr"`.
+- Cards are tinted by type: blocked red, epic violet, pull request sky, issue green.
+
+### Fixed
+
+- `POST /api/move` refuses a drop an earlier swimlane or column would capture, instead of
+  editing labels for a card that lands elsewhere.
 
 ## [0.4.0] - 2026-09-29
 
@@ -60,7 +68,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v0.4.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/fancysnake/landschaft/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/fancysnake/landschaft/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/fancysnake/landschaft/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/fancysnake/landschaft/compare/v0.1.1...v0.2.0
