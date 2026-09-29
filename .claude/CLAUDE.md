@@ -19,8 +19,8 @@ mise run format     # oxfmt --write .
 mise run test       # vitest run
 mise run fullcheck  # THE GATE before a commit and in CI: lint + check + test + build
 mise run sync       # POST /api/sync on the running dev server
-mise run site:serve # MkDocs (Material) docs at http://localhost:8000
-mise run site:check # strict docs build into site/
+mise run site:dev   # MkDocs (Material) docs at http://localhost:8000
+mise run site:build # docs build into site/; strict, so a broken link or anchor fails it
 ```
 
 Narrow first: `mise exec -- vitest run src/lib/server/board.test.ts`, `mise exec -- oxlint <file>`.

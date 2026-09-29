@@ -5,12 +5,17 @@ repo_url: https://github.com/fancysnake/landschaft
 repo_name: fancysnake/landschaft
 copyright: MIT
 
+# A link to a page that is not there is what rots first when a page is
+# renamed, and from here it fails `site:dev` as well as `site:build`.
+strict: true
+
+# Under strict a warning is a failure; anchors are how cross-references
+# between pages actually break, and MkDocs only logs them at info.
+validation:
+  anchors: warn
+
 theme:
   name: material
-  features:
-    - content.code.copy
-    - navigation.top
-    - navigation.footer
   logo: assets/logo.png
   favicon: assets/favicon.png
   font:
@@ -18,39 +23,15 @@ theme:
     code: JetBrains Mono
   palette:
     - media: "(prefers-color-scheme: light)"
-      scheme: default
-      primary: custom
-      accent: custom
-      toggle: { icon: material/weather-night, name: Switch to dark mode }
+      scheme: forest
+      toggle: { icon: material/weather-sunset-down, name: Dusk over the valley }
     - media: "(prefers-color-scheme: dark)"
-      scheme: slate
-      primary: custom
-      accent: custom
-      toggle: { icon: material/weather-sunny, name: Switch to light mode }
-
-extra_css:
-  - assets/extra.css
-
-markdown_extensions:
-  - admonition
-  - toc: { permalink: true }
-  - pymdownx.highlight: { anchor_linenums: true }
-  - pymdownx.superfences
-  - pymdownx.details
-  # Shared prose lives in README.md and is included from there, so the two
-  # cannot drift. base_path is the repo root, which is where mkdocs runs.
-  - pymdownx.snippets: { base_path: ["."], check_paths: true }
-
-validation:
-  anchors: warn
-
-nav:
-  - index.md
-  - getting-started.md
-  - configuration.md
-  - board.md
-  - api.md
-  - architecture.md
+      scheme: forest-night
+      toggle: { icon: material/weather-sunset-up, name: Dawn over the valley }
+  features:
+    - content.code.copy
+    - navigation.top
+    - navigation.footer
 
 extra:
   social:
@@ -59,3 +40,23 @@ extra:
     - icon: fontawesome/solid/globe
       link: https://fancysnake.dev
       name: fancysnake.dev
+
+extra_css:
+  - stylesheets/forest.css
+
+markdown_extensions:
+  - toc: { permalink: true }
+  - pymdownx.highlight
+  - pymdownx.superfences
+  # Shared prose lives in README.md and is included from there, so the two
+  # cannot drift. base_path is the repo root, which is where mkdocs runs.
+  - pymdownx.snippets: { base_path: ["."], check_paths: true }
+
+nav:
+  - index.md
+  - getting-started.md
+  - configuration.md
+  - board.md
+  - api.md
+  - architecture.md
+  - changelog.md

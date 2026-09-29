@@ -23,6 +23,7 @@
 - [How the board works](board.md) — placement, dragging, epics, filters
 - [API](api.md) — the local JSON endpoints the islands talk to
 - [How it works](architecture.md) — the shape of the codebase
+- [Changelog](changelog.md) — what each release changed
 - [Source on GitHub](https://github.com/fancysnake/landschaft)
 
 ## Licensing

@@ -16,7 +16,7 @@ Everything runs on your machine against a local SQLite cache that refreshes in t
 
 <!-- --8<-- [end:grid] -->
 
-- **Docs:** <https://landschaft.fancysnake.dev>
+Documentation is at [landschaft.fancysnake.dev](https://landschaft.fancysnake.dev).
 
 <!-- --8<-- [start:built-with] -->
 
@@ -119,7 +119,7 @@ The local JSON endpoints are listed under [API](https://landschaft.fancysnake.de
 ## Development
 
 Everything else is in the [docs](https://landschaft.fancysnake.dev) (MkDocs sources in
-[`docs/`](docs); `mise run site:serve` to preview them).
+[`docs/`](docs); `mise run site:dev` to preview them, `mise run site:build` to build them).
 
 `mise tasks` lists everything. `mise run fullcheck` is the gate before a commit and in CI
 (`hk` lint, `astro check`, vitest, build). `hk` installs a pre-commit hook that formats and lints staged

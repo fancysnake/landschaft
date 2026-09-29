@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 - The repo filter is a row of chips; several repos can be switched off at once (`repo`
   takes a comma-separated list).
 - Upgrading forces a full resync to pick up pull requests.
+- Docs tasks are `site:dev` and `site:build` (strict is set in `mkdocs.yml`); the site gains a
+  changelog page and its own `forest` / `forest-night` colour schemes.
 
 ## [0.3.0] - 2026-09-27
 
