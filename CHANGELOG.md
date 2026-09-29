@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- Swimlanes filter by type: issues only, PRs only, or both (`kind` in the config).
+
 ## [0.4.0] - 2026-09-29
 
 ### Added

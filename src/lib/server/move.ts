@@ -1,8 +1,8 @@
-import type { Dashboard, MoveRequest } from "../schema";
 import type { Issue, LabelRef } from "../types";
 import type { Db } from "./db";
 import type { Syncer } from "./sync";
 
+import { type Dashboard, fitsKind, type MoveRequest } from "../schema";
 import { labelDiffForMove } from "./board";
 import { addLabels, type GithubClient, removeLabel } from "./github";
 
@@ -51,6 +51,10 @@ export async function moveIssue(
   const issue = deps.db.getIssue(request.repo, request.number);
   if (!issue)
     throw new MoveError(`${request.repo}#${request.number} is not in the cache, sync first`);
+  if (!fitsKind(to.lane, issue.kind))
+    throw new MoveError(
+      `swimlane "${to.lane.name}" takes no ${issue.kind === "pr" ? "PRs" : "issues"}`,
+    );
 
   const diff = labelDiffForMove(
     issue.labels.map((label) => label.name),

@@ -1,6 +1,6 @@
-import type { Match } from "../../lib/schema";
 import type { LabelDef } from "../../lib/types";
 
+import { isCatchAll, type KindFilter, type Match } from "../../lib/schema";
 import { LabelPicker } from "./LabelPicker";
 
 interface Group {
@@ -8,6 +8,7 @@ interface Group {
   name: string;
   labels: string[];
   match: Match;
+  kind?: KindFilter;
   hideBlocked?: boolean;
 }
 
@@ -17,7 +18,7 @@ interface Props<T extends Group> {
   onChange(items: T[]): void;
   create(id: string): T;
   labels: LabelDef[];
-  /** Swimlanes get the "hide blocked" toggle. */
+  /** Swimlanes get the kind select and the "hide blocked" toggle. */
   withHideBlocked?: boolean;
 }
 
@@ -51,7 +52,7 @@ export function LaneColumnEditor<T extends Group>({
     next.splice(b, 0, item!);
     onChange(next);
   };
-  const catchAlls = items.filter((item) => item.labels.length === 0).length;
+  const catchAlls = items.filter(isCatchAll).length;
 
   return (
     <section>
@@ -63,7 +64,7 @@ export function LaneColumnEditor<T extends Group>({
       </div>
       {catchAlls > 1 && (
         <p className="mb-2 text-xs text-red-700">
-          Only one {title.toLowerCase()} entry may have no labels.
+          Only one {title.toLowerCase()} entry may be a catch-all (no labels, any kind).
         </p>
       )}
       <ol className="space-y-2">
@@ -76,6 +77,20 @@ export function LaneColumnEditor<T extends Group>({
                 className="w-full rounded-md border border-neutral-300 px-2 py-1 text-sm"
               />
               <div className="mt-0.5 font-mono text-[10px] text-neutral-400">{item.id}</div>
+              {withHideBlocked && (
+                <select
+                  value={item.kind ?? "any"}
+                  onChange={(event) =>
+                    replace(index, { ...item, kind: event.target.value as KindFilter })
+                  }
+                  title="Take issues, pull requests, or both"
+                  className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-1.5 py-1 text-xs"
+                >
+                  <option value="any">issues and PRs</option>
+                  <option value="issue">issues only</option>
+                  <option value="pr">PRs only</option>
+                </select>
+              )}
               {withHideBlocked && (
                 <label className="mt-1 flex items-center gap-1 text-xs text-neutral-700">
                   <input

@@ -43,6 +43,18 @@ describe("placeIn", () => {
     expect(placeIn(groups, new Set(["z"]))?.id).toBe("rest");
     expect(placeIn([groups[0]!], new Set(["y"]))).toBeNull();
   });
+
+  it("skips groups of the other kind; a kind-only group is not a catch-all", () => {
+    const groups = [
+      { id: "prs", labels: [], kind: "pr" as const },
+      { id: "bugs", labels: ["bug"], kind: "issue" as const },
+      { id: "rest", labels: [] },
+    ];
+    expect(placeIn(groups, new Set(["bug"]), "pr")?.id).toBe("prs");
+    expect(placeIn(groups, new Set(["bug"]), "issue")?.id).toBe("bugs");
+    expect(placeIn(groups, new Set(), "issue")?.id).toBe("rest");
+    expect(placeIn([groups[0]!], new Set(), "issue")).toBeNull();
+  });
 });
 
 describe("isBlocked", () => {
@@ -117,6 +129,30 @@ describe("buildBoard", () => {
     expect(mine.assignees).toEqual(["me"]);
     expect(numbers(buildBoard(issues, dashboard, {}, null))).toEqual([4, 3, 2, 1]);
     expect(numbers(buildBoard(issues, DASHBOARD, {}, "me"))).toEqual([4, 3, 2, 1]);
+  });
+
+  it("puts pull requests in a PR swimlane", () => {
+    const dashboard = {
+      ...DASHBOARD,
+      swimlanes: [
+        {
+          id: "prs",
+          name: "PRs",
+          labels: [],
+          match: "any" as const,
+          kind: "pr" as const,
+          hideBlocked: false,
+        },
+        ...DASHBOARD.swimlanes,
+      ],
+    };
+    const issues = [
+      makeIssue({ number: 1, kind: "pr", labels: [label("prio:high")] }),
+      makeIssue({ number: 2, labels: [label("prio:high")] }),
+    ];
+    const board = buildBoard(issues, dashboard);
+    expect(board.cells[cell("prs", "todo")]?.map((c) => c.number)).toEqual([1]);
+    expect(board.cells[cell("high", "todo")]?.map((c) => c.number)).toEqual([2]);
   });
 
   it("counts issues that fit no group when an axis has no catch-all", () => {

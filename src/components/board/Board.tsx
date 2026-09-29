@@ -5,7 +5,7 @@ import type { DragPayload } from "../../lib/client/dnd";
 import { repoShortName } from "../../lib/client/labels";
 import { useBoard } from "../../lib/client/useBoard";
 import { useUrlFilters } from "../../lib/client/useUrlFilters";
-import { repoFilter, selectedRepos } from "../../lib/schema";
+import { fitsKind, repoFilter, selectedRepos } from "../../lib/schema";
 import { cellKey } from "../../lib/types";
 import { Cell } from "./Cell";
 import { EpicStrip } from "./EpicStrip";
@@ -133,6 +133,7 @@ export default function Board({ dashboardId }: Props) {
                   cards={board.cells[cellKey(lane.id, column.id)] ?? []}
                   showRepo={showRepo}
                   dragging={dragging}
+                  accepts={(kind) => fitsKind(lane, kind)}
                   onDragStart={setDragging}
                   onDragEnd={() => setDragging(null)}
                   onDrop={(payload) => {

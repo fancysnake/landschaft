@@ -41,9 +41,16 @@ export const DASHBOARD: Dashboard = {
   sort: { by: "updated", dir: "desc" },
   refreshMinutes: 5,
   swimlanes: [
-    { id: "high", name: "High", labels: ["prio:high"], match: "any", hideBlocked: false },
-    { id: "low", name: "Low", labels: ["prio:low"], match: "any", hideBlocked: true },
-    { id: "rest", name: "Rest", labels: [], match: "any", hideBlocked: false },
+    {
+      id: "high",
+      name: "High",
+      labels: ["prio:high"],
+      match: "any",
+      kind: "any",
+      hideBlocked: false,
+    },
+    { id: "low", name: "Low", labels: ["prio:low"], match: "any", kind: "any", hideBlocked: true },
+    { id: "rest", name: "Rest", labels: [], match: "any", kind: "any", hideBlocked: false },
   ],
   columns: [
     { id: "todo", name: "Todo", labels: [], match: "any" },
