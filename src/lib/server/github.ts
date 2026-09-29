@@ -122,11 +122,37 @@ query IssuesPage($owner: String!, $name: String!, $since: DateTime, $states: [Is
 }
 ${ISSUE_FIELDS}`;
 
+const PULL_FIELDS = `
+fragment PullFields on PullRequest {
+  id number title state url createdAt updatedAt closedAt
+  author { login }
+  labels(first: 50) { nodes { name color } }
+  assignees(first: 10) { nodes { login avatarUrl } }
+  closingIssuesReferences(first: 20) { nodes { number repository { nameWithOwner } } }
+}`;
+
+/** No `since` filter on pullRequests: newest first, the caller stops paging past `since`. */
+const PULLS_PAGE_QUERY = `
+query PullsPage($owner: String!, $name: String!, $states: [PullRequestState!], $after: String) {
+  rateLimit { remaining }
+  repository(owner: $owner, name: $name) {
+    pullRequests(first: 50, after: $after, states: $states,
+                 orderBy: { field: UPDATED_AT, direction: DESC }) {
+      pageInfo { hasNextPage endCursor }
+      nodes { ...PullFields }
+    }
+  }
+}
+${PULL_FIELDS}`;
+
 const ISSUE_QUERY = `
 query Issue($owner: String!, $name: String!, $number: Int!) {
-  repository(owner: $owner, name: $name) { issue(number: $number) { ...IssueFields } }
+  repository(owner: $owner, name: $name) {
+    issueOrPullRequest(number: $number) { type: __typename ...IssueFields ...PullFields }
+  }
 }
-${ISSUE_FIELDS}`;
+${ISSUE_FIELDS}
+${PULL_FIELDS}`;
 
 const VIEWER_QUERY = `query Viewer { viewer { login } }`;
 
@@ -161,6 +187,23 @@ export interface IssueNode {
   };
 }
 
+export interface PullNode {
+  id: string;
+  number: number;
+  title: string;
+  state: IssueState | "MERGED";
+  url: string;
+  createdAt: string;
+  updatedAt: string;
+  closedAt: string | null;
+  author: { login: string } | null;
+  labels: { nodes: { name: string; color: string }[] };
+  assignees: { nodes: { login: string; avatarUrl: string }[] };
+  closingIssuesReferences: {
+    nodes: { number: number; repository: { nameWithOwner: string } }[];
+  };
+}
+
 interface PageInfo {
   hasNextPage: boolean;
   endCursor: string | null;
@@ -171,8 +214,18 @@ interface IssuesPageData {
   repository: { issues: { pageInfo: PageInfo; nodes: IssueNode[] } } | null;
 }
 
+interface PullsPageData {
+  rateLimit: { remaining: number };
+  repository: { pullRequests: { pageInfo: PageInfo; nodes: PullNode[] } } | null;
+}
+
 interface IssueData {
-  repository: { issue: IssueNode | null } | null;
+  repository: {
+    issueOrPullRequest:
+      | (IssueNode & { type: "Issue" })
+      | (PullNode & { type: "PullRequest" })
+      | null;
+  } | null;
 }
 
 interface LabelsData {
@@ -184,21 +237,29 @@ interface LabelsData {
   } | null;
 }
 
-export function toIssue(repo: string, node: IssueNode): Issue {
+/** The fields issues and pull requests map the same way. */
+function baseFields(repo: string, node: IssueNode | PullNode) {
   return {
     repo,
     number: node.number,
     nodeId: node.id,
     title: node.title,
-    state: node.state,
     url: node.url,
-    issueType: node.issueType?.name ?? null,
     author: node.author?.login ?? null,
     createdAt: node.createdAt,
     updatedAt: node.updatedAt,
     closedAt: node.closedAt,
     labels: node.labels.nodes.map((l) => ({ name: l.name, color: l.color })),
     assignees: node.assignees.nodes.map((a) => ({ login: a.login, avatarUrl: a.avatarUrl })),
+  };
+}
+
+export function toIssue(repo: string, node: IssueNode): Issue {
+  return {
+    ...baseFields(repo, node),
+    kind: "issue",
+    state: node.state,
+    issueType: node.issueType?.name ?? null,
     parent: node.parent
       ? { repo: node.parent.repository.nameWithOwner, number: node.parent.number }
       : null,
@@ -213,6 +274,25 @@ export function toIssue(repo: string, node: IssueNode): Issue {
       state: b.state,
     })),
     blockedByTotal: node.issueDependenciesSummary.totalBlockedBy,
+    linked: [],
+  };
+}
+
+/** A merged PR counts as closed. */
+export function toPull(repo: string, node: PullNode): Issue {
+  return {
+    ...baseFields(repo, node),
+    kind: "pr",
+    state: node.state === "OPEN" ? "OPEN" : "CLOSED",
+    issueType: null,
+    parent: null,
+    subIssues: { total: 0, completed: 0, percent: 0 },
+    blockedBy: [],
+    blockedByTotal: 0,
+    linked: node.closingIssuesReferences.nodes.map((ref) => ({
+      repo: ref.repository.nameWithOwner,
+      number: ref.number,
+    })),
   };
 }
 
@@ -229,12 +309,24 @@ export interface IssuesPage {
   rateRemaining: number;
 }
 
+/** `openOnly` fetches open items only; otherwise every state. */
+export interface PageOptions {
+  since: string | null;
+  openOnly: boolean;
+  after: string | null;
+}
+
 export async function fetchIssuesPage(
   gh: GithubClient,
   repo: string,
-  options: { since: string | null; states: IssueState[] | null; after: string | null },
+  options: PageOptions,
 ): Promise<IssuesPage> {
-  const data = await gh.gql<IssuesPageData>(ISSUES_PAGE_QUERY, { ...splitRepo(repo), ...options });
+  const data = await gh.gql<IssuesPageData>(ISSUES_PAGE_QUERY, {
+    ...splitRepo(repo),
+    since: options.since,
+    states: options.openOnly ? ["OPEN"] : null,
+    after: options.after,
+  });
   if (!data.repository)
     throw new GithubError(`repository ${repo} not found or not accessible`, 404);
   const { issues } = data.repository;
@@ -242,6 +334,31 @@ export async function fetchIssuesPage(
     issues: issues.nodes.map((node) => toIssue(repo, node)),
     hasNextPage: issues.pageInfo.hasNextPage,
     endCursor: issues.pageInfo.endCursor,
+    rateRemaining: data.rateLimit.remaining,
+  };
+}
+
+/** Same contract as fetchIssuesPage; with `since`, paging ends at the first older PR. */
+export async function fetchPullsPage(
+  gh: GithubClient,
+  repo: string,
+  options: PageOptions,
+): Promise<IssuesPage> {
+  const data = await gh.gql<PullsPageData>(PULLS_PAGE_QUERY, {
+    ...splitRepo(repo),
+    states: options.openOnly ? ["OPEN"] : null,
+    after: options.after,
+  });
+  if (!data.repository)
+    throw new GithubError(`repository ${repo} not found or not accessible`, 404);
+  const { pageInfo, nodes } = data.repository.pullRequests;
+  const since = options.since ? Date.parse(options.since) : null;
+  const fresh =
+    since === null ? nodes : nodes.filter((node) => Date.parse(node.updatedAt) >= since);
+  return {
+    issues: fresh.map((node) => toPull(repo, node)),
+    hasNextPage: pageInfo.hasNextPage && fresh.length === nodes.length,
+    endCursor: pageInfo.endCursor,
     rateRemaining: data.rateLimit.remaining,
   };
 }
@@ -258,8 +375,9 @@ export async function fetchIssue(
   number: number,
 ): Promise<Issue | null> {
   const data = await gh.gql<IssueData>(ISSUE_QUERY, { ...splitRepo(repo), number });
-  const node = data.repository?.issue;
-  return node ? toIssue(repo, node) : null;
+  const node = data.repository?.issueOrPullRequest;
+  if (!node) return null;
+  return node.type === "PullRequest" ? toPull(repo, node) : toIssue(repo, node);
 }
 
 export async function fetchRepoLabels(

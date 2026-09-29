@@ -1,6 +1,16 @@
 import { DatabaseSync } from "node:sqlite";
 
-import type { Assignee, Blocker, Issue, IssueState, LabelDef, LabelRef, SyncState } from "../types";
+import type {
+  Assignee,
+  Blocker,
+  Issue,
+  IssueKind,
+  IssueRef,
+  IssueState,
+  LabelDef,
+  LabelRef,
+  SyncState,
+} from "../types";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS issues (
@@ -11,7 +21,6 @@ CREATE TABLE IF NOT EXISTS issues (
   state TEXT NOT NULL,
   url TEXT NOT NULL,
   issue_type TEXT,
-  author TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   closed_at TEXT,
@@ -70,6 +79,8 @@ interface IssueRow {
   sub_completed: number;
   sub_percent: number;
   blocked_by_total: number;
+  kind: string;
+  linked_json: string;
 }
 
 interface BlockerRow {
@@ -101,6 +112,7 @@ function placeholders(count: number): string {
 
 function rowToIssue(row: IssueRow, blockedBy: Blocker[]): Issue {
   return {
+    kind: row.kind as IssueKind,
     repo: row.repo,
     number: row.number,
     nodeId: row.node_id,
@@ -121,8 +133,19 @@ function rowToIssue(row: IssueRow, blockedBy: Blocker[]): Issue {
     subIssues: { total: row.sub_total, completed: row.sub_completed, percent: row.sub_percent },
     blockedBy,
     blockedByTotal: row.blocked_by_total,
+    linked: JSON.parse(row.linked_json) as IssueRef[],
   };
 }
+
+/**
+ * Columns added after the first release, with their definitions. `SCHEMA` keeps the
+ * first-release table; `migrate()` adds these on every database, fresh or old.
+ */
+const ADDED_COLUMNS = [
+  ["author", "TEXT"],
+  ["kind", "TEXT NOT NULL DEFAULT 'issue'"],
+  ["linked_json", "TEXT NOT NULL DEFAULT '[]'"],
+] as const;
 
 export function dbPath(): string {
   return process.env.LANDSCHAFT_DB ?? "landschaft.db";
@@ -139,15 +162,21 @@ export class Db {
     this.migrate();
   }
 
-  /** Columns added after the first release; a new column forces a full resync to fill it. */
+  /** Adds missing columns; a new column forces a full resync to fill it. */
   private migrate(): void {
-    const columns = (
-      this.db.prepare("PRAGMA table_info(issues)").all() as unknown as { name: string }[]
-    ).map((column) => column.name);
-    if (!columns.includes("author")) {
-      this.db.exec("ALTER TABLE issues ADD COLUMN author TEXT");
+    const columns = new Set(
+      (this.db.prepare("PRAGMA table_info(issues)").all() as unknown as { name: string }[]).map(
+        (column) => column.name,
+      ),
+    );
+    const missing = ADDED_COLUMNS.filter(([name]) => !columns.has(name));
+    if (missing.length === 0) return;
+    this.transaction(() => {
+      for (const [name, definition] of missing) {
+        this.db.exec(`ALTER TABLE issues ADD COLUMN ${name} ${definition}`);
+      }
       this.db.exec("DELETE FROM sync_state");
-    }
+    });
   }
 
   close(): void {
@@ -171,8 +200,8 @@ export class Db {
     const upsert = this.db.prepare(`
       INSERT INTO issues (repo, number, node_id, title, state, url, issue_type, author, created_at,
         updated_at, closed_at, labels_json, assignees_json, parent_repo, parent_number, sub_total,
-        sub_completed, sub_percent, blocked_by_total)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        sub_completed, sub_percent, blocked_by_total, kind, linked_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (repo, number) DO UPDATE SET
         node_id = excluded.node_id, title = excluded.title, state = excluded.state, url = excluded.url,
         issue_type = excluded.issue_type, author = excluded.author, created_at = excluded.created_at,
@@ -180,7 +209,8 @@ export class Db {
         labels_json = excluded.labels_json, assignees_json = excluded.assignees_json,
         parent_repo = excluded.parent_repo, parent_number = excluded.parent_number,
         sub_total = excluded.sub_total, sub_completed = excluded.sub_completed,
-        sub_percent = excluded.sub_percent, blocked_by_total = excluded.blocked_by_total
+        sub_percent = excluded.sub_percent, blocked_by_total = excluded.blocked_by_total,
+        kind = excluded.kind, linked_json = excluded.linked_json
     `);
     const clearBlockers = this.db.prepare("DELETE FROM blocked_by WHERE repo = ? AND number = ?");
     const insertBlocker = this.db.prepare(
@@ -208,6 +238,8 @@ export class Db {
           issue.subIssues.completed,
           issue.subIssues.percent,
           issue.blockedByTotal,
+          issue.kind,
+          JSON.stringify(issue.linked),
         );
         clearBlockers.run(issue.repo, issue.number);
         for (const blocker of issue.blockedBy) {

@@ -32,8 +32,18 @@ moves immediately; if GitHub rejects the change it snaps back and the error is s
 Issues carrying the dashboard's `epicLabel` are lifted out of the grid into a strip above it,
 each with its sub-issue progress from GitHub. Clicking an epic filters the board to its
 sub-issues and to issues it blocks or is blocked by; clicking again clears the filter. The ↗ on a tile opens the epic on GitHub.
+Pull requests that close the epic or any of those issues (GitHub's "linked pull requests")
+are kept as well.
+
+## Pull requests
+
+Open pull requests are synced alongside issues and placed by the same label rules; dragging
+one edits its labels the same way. They carry a `PR` badge.
 
 ## Filters
 
-Text, repo (multi-repo boards), assignee, label, epic and sort live in the query string, so a filtered view is a link
+On multi-repo boards, chips above the board switch each repository on or off
+(`repo=owner/a,owner/b`). The last chip still on cannot be switched off.
+
+Text, repos, assignee, label, epic and sort live in the query string, so a filtered view is a link
 you can bookmark or send. Empty values count as unset.

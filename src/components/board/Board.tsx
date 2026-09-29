@@ -2,13 +2,16 @@ import { Fragment, useState } from "react";
 
 import type { DragPayload } from "../../lib/client/dnd";
 
+import { repoShortName } from "../../lib/client/labels";
 import { useBoard } from "../../lib/client/useBoard";
 import { useUrlFilters } from "../../lib/client/useUrlFilters";
+import { repoFilter, selectedRepos } from "../../lib/schema";
 import { cellKey } from "../../lib/types";
 import { Cell } from "./Cell";
 import { EpicStrip } from "./EpicStrip";
 import { FilterBar } from "./FilterBar";
 import { SyncStatus } from "./SyncStatus";
+import { Toggles } from "./Toggles";
 
 interface Props {
   dashboardId: string;
@@ -75,6 +78,14 @@ export default function Board({ dashboardId }: Props) {
         </p>
       )}
 
+      {showRepo && (
+        <Toggles
+          label="Repositories"
+          options={dashboard.repos.map((repo) => ({ value: repo, label: repoShortName(repo) }))}
+          selected={selectedRepos(filters.repo, dashboard.repos)}
+          onChange={(next) => updateFilters({ repo: repoFilter(next, dashboard.repos) })}
+        />
+      )}
       {dashboard.epicLabel && (
         <EpicStrip
           epics={board.epics}
@@ -82,12 +93,7 @@ export default function Board({ dashboardId }: Props) {
           onSelect={(key) => updateFilters({ epic: key })}
         />
       )}
-      <FilterBar
-        filters={filters}
-        board={board}
-        repos={showRepo ? dashboard.repos : []}
-        onChange={updateFilters}
-      />
+      <FilterBar filters={filters} board={board} onChange={updateFilters} />
 
       <div className="min-h-0 flex-1 overflow-auto">
         <div

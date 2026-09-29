@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Config } from "../schema";
-import type { GithubClient, IssueNode } from "./github";
+import type { GithubClient, IssueNode, PullNode } from "./github";
 
 import { makeIssue, REPO } from "./__fixtures__/issues";
 import { Db } from "./db";
@@ -34,7 +34,28 @@ interface Call {
   variables: Record<string, unknown>;
 }
 
-function fakeGithub(pages: IssueNode[][], remaining = 5000): { gh: GithubClient; calls: Call[] } {
+function toPullNode(number: number, updatedAt: string): PullNode {
+  return {
+    id: `PR_${number}`,
+    number,
+    title: `PR ${number}`,
+    state: "OPEN",
+    url: `https://github.com/${REPO}/pull/${number}`,
+    createdAt: updatedAt,
+    updatedAt,
+    closedAt: null,
+    author: null,
+    labels: { nodes: [] },
+    assignees: { nodes: [] },
+    closingIssuesReferences: { nodes: [{ number: 1, repository: { nameWithOwner: REPO } }] },
+  };
+}
+
+function fakeGithub(
+  pages: IssueNode[][],
+  remaining = 5000,
+  pulls: PullNode[][] = [],
+): { gh: GithubClient; calls: Call[] } {
   const calls: Call[] = [];
   const gh: GithubClient = {
     async gql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
@@ -53,19 +74,21 @@ function fakeGithub(pages: IssueNode[][], remaining = 5000): { gh: GithubClient;
         return { viewer: { login: "me" } } as T;
       }
       if (query.includes("query Issue(")) {
-        return { repository: { issue: toNode(variables.number as number) } } as T;
+        const node = { type: "Issue", ...toNode(variables.number as number) };
+        return { repository: { issueOrPullRequest: node } } as T;
       }
+      const pulled = query.includes("query PullsPage");
+      const source = pulled ? pulls : pages;
       const index = variables.after ? Number(variables.after) : 0;
-      const nodes = pages[index] ?? [];
-      const hasNextPage = index + 1 < pages.length;
+      const nodes = source[index] ?? [];
+      const hasNextPage = index + 1 < source.length;
+      const connection = {
+        pageInfo: { hasNextPage, endCursor: hasNextPage ? String(index + 1) : null },
+        nodes,
+      };
       return {
         rateLimit: { remaining },
-        repository: {
-          issues: {
-            pageInfo: { hasNextPage, endCursor: hasNextPage ? String(index + 1) : null },
-            nodes,
-          },
-        },
+        repository: pulled ? { pullRequests: connection } : { issues: connection },
       } as T;
     },
     async rest() {
@@ -137,6 +160,33 @@ describe("Syncer", () => {
     expect(db.getSyncState(REPO)?.lastFullSyncAt).toBe("2026-05-01T11:00:00.000Z");
   });
 
+  it("syncs pull requests newest first and stops paging at the first one older than since", async () => {
+    db.setSyncState(REPO, {
+      lastSyncAt: "2026-05-01T11:00:00.000Z",
+      lastFullSyncAt: "2026-05-01T11:00:00.000Z",
+    });
+    const { gh, calls } = fakeGithub([[]], 5000, [
+      [toPullNode(20, "2026-05-01T11:30:00Z"), toPullNode(21, "2026-04-01T00:00:00Z")],
+      [toPullNode(22, "2026-03-01T00:00:00Z")],
+    ]);
+    const syncer = new Syncer({ db, gh, now: () => now });
+
+    expect(await syncer.syncRepo(REPO)).toMatchObject({ upserted: 1 });
+    expect(calls.filter((c) => c.query.includes("query PullsPage"))).toHaveLength(1);
+    expect(db.getIssue(REPO, 20)).toMatchObject({
+      kind: "pr",
+      linked: [{ repo: REPO, number: 1 }],
+    });
+    expect(db.getIssue(REPO, 21)).toBeNull();
+  });
+
+  it("keeps open pull requests open on a full sync", async () => {
+    const { gh } = fakeGithub([[toNode(1)]], 5000, [[toPullNode(2, "2026-05-01T00:00:00Z")]]);
+    const syncer = new Syncer({ db, gh, now: () => now });
+    expect(await syncer.syncRepo(REPO)).toMatchObject({ full: true, upserted: 2, closed: 0 });
+    expect(db.getIssue(REPO, 2)?.state).toBe("OPEN");
+  });
+
   it("falls back to a full sync when the last one is older than a day", async () => {
     db.setSyncState(REPO, {
       lastSyncAt: "2026-04-29T11:00:00.000Z",
@@ -183,9 +233,10 @@ describe("Syncer", () => {
     const running = syncer.syncRepo(REPO);
     await expect(syncer.syncRepo(REPO)).rejects.toBeInstanceOf(SyncBusyError);
     expect(await syncer.syncAll([REPO])).toEqual([]);
+    const empty = { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] };
     gate.resolve({
       rateLimit: { remaining: 5000 },
-      repository: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } },
+      repository: { issues: empty, pullRequests: empty },
     });
     await expect(running).resolves.toMatchObject({ upserted: 0 });
     expect(syncer.inFlight.size).toBe(0);

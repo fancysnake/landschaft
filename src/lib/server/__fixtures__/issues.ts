@@ -6,6 +6,7 @@ export const REPO = "acme/app";
 export function makeIssue(overrides: Partial<Issue> & { number: number }): Issue {
   const { number } = overrides;
   return {
+    kind: "issue",
     repo: REPO,
     nodeId: `I_${number}`,
     title: `Issue ${number}`,
@@ -22,6 +23,7 @@ export function makeIssue(overrides: Partial<Issue> & { number: number }): Issue
     subIssues: { total: 0, completed: 0, percent: 0 },
     blockedBy: [],
     blockedByTotal: 0,
+    linked: [],
     ...overrides,
   };
 }

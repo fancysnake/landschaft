@@ -7,13 +7,12 @@ import { type Filters, TEXT_FILTER_KEYS } from "../../lib/schema";
 interface Props {
   filters: Filters;
   board: Board;
-  repos: string[];
   onChange(patch: Partial<Filters>): void;
 }
 
 const select = "rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm text-neutral-800";
 
-export function FilterBar({ filters, board, repos, onChange }: Props) {
+export function FilterBar({ filters, board, onChange }: Props) {
   const [text, setText] = useState(filters.q ?? "");
 
   useEffect(() => {
@@ -33,21 +32,6 @@ export function FilterBar({ filters, board, repos, onChange }: Props) {
         placeholder="Search title or #number"
         className={`${select} w-56`}
       />
-      {repos.length > 0 && (
-        <select
-          aria-label="Repository"
-          value={filters.repo ?? ""}
-          onChange={(event) => onChange({ repo: event.target.value || undefined })}
-          className={select}
-        >
-          <option value="">Any repo</option>
-          {repos.map((repo) => (
-            <option key={repo} value={repo}>
-              {repo}
-            </option>
-          ))}
-        </select>
-      )}
       <select
         aria-label="Assignee"
         value={filters.assignee ?? ""}

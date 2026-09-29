@@ -201,7 +201,39 @@ describe("buildBoard", () => {
 
   it("repo filter keeps only that repo's issues", () => {
     const issues = [makeIssue({ number: 1 }), makeIssue({ number: 2, repo: "acme/other" })];
-    expect(numbers(buildBoard(issues, TWO_REPOS, { repo: "acme/other" }))).toEqual([2]);
+    expect(numbers(buildBoard(issues, TWO_REPOS, { repo: ["acme/other"] }))).toEqual([2]);
+  });
+
+  it("repo filter takes a list and skips repos not on the dashboard", () => {
+    const three = { ...DASHBOARD, repos: [REPO, "acme/other", "acme/third"] };
+    const issues = [
+      makeIssue({ number: 1 }),
+      makeIssue({ number: 2, repo: "acme/other" }),
+      makeIssue({ number: 3, repo: "acme/third" }),
+    ];
+    const repo = ["acme/third", "acme/gone", "acme/app"];
+    expect(numbers(buildBoard(issues, three, { repo }))).toEqual([3, 1]);
+  });
+
+  it("places pull requests next to issues and never lists them as epics", () => {
+    const issues = [makeIssue({ number: 1 }), makeIssue({ number: 2, kind: "pr" })];
+    const board = buildBoard(issues, DASHBOARD);
+    expect(board.cells[cell("rest", "todo")]?.map((c) => c.kind)).toEqual(["pr", "issue"]);
+    const epicPr = makeIssue({ number: 3, kind: "pr", labels: [label("epic")] });
+    expect(buildBoard([epicPr], DASHBOARD).epics).toEqual([]);
+  });
+
+  it("epic filter keeps PRs linked to the epic or to an issue related to it", () => {
+    const epic = { repo: REPO, number: 10 };
+    const issues = [
+      makeIssue({ number: 1, parent: epic }),
+      makeIssue({ number: 2, kind: "pr", linked: [{ repo: REPO, number: 1 }] }),
+      makeIssue({ number: 3, kind: "pr", linked: [epic] }),
+      makeIssue({ number: 4, kind: "pr", linked: [{ repo: REPO, number: 5 }] }),
+      makeIssue({ number: 5 }),
+      makeIssue({ number: 10, labels: [label("epic")] }),
+    ];
+    expect(numbers(buildBoard(issues, DASHBOARD, { epic: "acme/app#10" }))).toEqual([3, 2, 1]);
   });
 
   it("epic filter keeps sub-issues and issues blocking or blocked by the epic", () => {
@@ -247,7 +279,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 10, labels: [label("epic")] }),
       makeIssue({ number: 11, repo: "acme/other", labels: [label("epic")] }),
     ];
-    const board = buildBoard(issues, TWO_REPOS, { repo: "acme/other" });
+    const board = buildBoard(issues, TWO_REPOS, { repo: ["acme/other"] });
     expect(board.epics.map((epic) => epic.key)).toEqual(["acme/other#11"]);
   });
 
@@ -256,7 +288,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 1 }),
       makeIssue({ number: 10, repo: "acme/other", labels: [label("epic")] }),
     ];
-    const board = buildBoard(issues, DASHBOARD, { repo: "acme/other" });
+    const board = buildBoard(issues, TWO_REPOS, { repo: ["acme/gone"] });
     expect(numbers(board)).toEqual([10, 1]);
     expect(board.epics.map((epic) => epic.key)).toEqual(["acme/other#10"]);
   });

@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 
-import { type Filters, TEXT_FILTER_KEYS } from "../schema";
+import { type Filters, parseRepoFilter, TEXT_FILTER_KEYS } from "../schema";
 import { filtersToQuery } from "./api";
 
 export function readFilters(search: string): Filters {
@@ -10,6 +10,8 @@ export function readFilters(search: string): Filters {
     const value = params.get(key);
     if (value) filters[key] = value;
   }
+  const repo = parseRepoFilter(params.get("repo"));
+  if (repo) filters.repo = repo;
   const sort = params.get("sort");
   if (sort === "created" || sort === "updated") filters.sort = sort;
   const dir = params.get("dir");
