@@ -109,7 +109,10 @@ export const SyncRequestSchema = z.object({
 });
 export type SyncRequest = z.infer<typeof SyncRequestSchema>;
 
-/** Free-text filters: set from the filter bar, cleared together by "Clear filters". */
+/**
+ * Free-text filters: set from the filter bar, cleared together by "Clear filters". `repo`
+ * is a comma-separated list of the repos to show.
+ */
 export const TEXT_FILTER_KEYS = ["q", "repo", "assignee", "label", "epic"] as const;
 export type TextFilterKey = (typeof TEXT_FILTER_KEYS)[number];
 

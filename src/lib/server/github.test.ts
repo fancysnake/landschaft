@@ -7,6 +7,7 @@ import {
   type IssueNode,
   removeLabel,
   toIssue,
+  toPull,
 } from "./github";
 
 const node: IssueNode = {
@@ -38,6 +39,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 describe("toIssue", () => {
   it("maps a GraphQL node to the cache shape", () => {
     expect(toIssue("acme/app", node)).toEqual({
+      kind: "issue",
       repo: "acme/app",
       number: 12,
       nodeId: "I_1",
@@ -55,6 +57,7 @@ describe("toIssue", () => {
       subIssues: { total: 2, completed: 1, percent: 50 },
       blockedBy: [{ repo: "acme/lib", number: 8, state: "CLOSED" }],
       blockedByTotal: 1,
+      linked: [],
     });
   });
 
@@ -63,6 +66,34 @@ describe("toIssue", () => {
     expect(issue.issueType).toBeNull();
     expect(issue.author).toBeNull();
     expect(issue.parent).toBeNull();
+  });
+});
+
+describe("toPull", () => {
+  it("maps a merged PR to a closed card with its closing issues", () => {
+    const pull = toPull("acme/app", {
+      id: "PR_1",
+      number: 30,
+      title: "Fix login",
+      state: "MERGED",
+      url: "https://github.com/acme/app/pull/30",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z",
+      closedAt: "2026-01-02T00:00:00Z",
+      author: { login: "bob" },
+      labels: { nodes: [] },
+      assignees: { nodes: [] },
+      closingIssuesReferences: {
+        nodes: [{ number: 12, repository: { nameWithOwner: "acme/app" } }],
+      },
+    });
+    expect(pull).toMatchObject({
+      kind: "pr",
+      state: "CLOSED",
+      author: "bob",
+      parent: null,
+      linked: [{ repo: "acme/app", number: 12 }],
+    });
   });
 });
 

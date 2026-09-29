@@ -102,8 +102,11 @@ Saving triggers the first sync; once labels are cached the pickers suggest them.
   (GitHub "blocked by" relationships).
 - Issues carrying the **epic label** appear in the strip above the board with sub-issue
   progress; clicking one filters the board to its sub-issues and to issues it blocks or is
-  blocked by; ↗ opens it on GitHub.
-- Filters (text, repo, assignee, label, epic, sort) live in the URL, so a view is a link.
+  blocked by; ↗ opens it on GitHub. Pull requests linked to any of those issues (or to the
+  epic) show up too.
+- Open **pull requests** are cards like issues. On multi-repo boards, chips above the board
+  switch each repository on or off.
+- Filters (text, repos, assignee, label, epic, sort) live in the URL, so a view is a link.
 
 <!-- --8<-- [end:placement] -->
 

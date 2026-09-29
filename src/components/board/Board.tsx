@@ -2,6 +2,7 @@ import { Fragment, useState } from "react";
 
 import type { DragPayload } from "../../lib/client/dnd";
 
+import { repoShortName } from "../../lib/client/labels";
 import { useBoard } from "../../lib/client/useBoard";
 import { useUrlFilters } from "../../lib/client/useUrlFilters";
 import { cellKey } from "../../lib/types";
@@ -9,6 +10,7 @@ import { Cell } from "./Cell";
 import { EpicStrip } from "./EpicStrip";
 import { FilterBar } from "./FilterBar";
 import { SyncStatus } from "./SyncStatus";
+import { Toggles } from "./Toggles";
 
 interface Props {
   dashboardId: string;
@@ -27,6 +29,8 @@ export default function Board({ dashboardId }: Props) {
   }
   const { dashboard, board, status } = data;
   const showRepo = dashboard.repos.length > 1;
+  const listedRepos = dashboard.repos.filter((repo) => filters.repo?.split(",").includes(repo));
+  const selectedRepos = listedRepos.length > 0 ? listedRepos : dashboard.repos;
   const columnTotals = Object.fromEntries(
     dashboard.columns.map((column) => [
       column.id,
@@ -75,6 +79,18 @@ export default function Board({ dashboardId }: Props) {
         </p>
       )}
 
+      {showRepo && (
+        <Toggles
+          label="Repositories"
+          options={dashboard.repos.map((repo) => ({ value: repo, label: repoShortName(repo) }))}
+          selected={selectedRepos}
+          onChange={(next) =>
+            updateFilters({
+              repo: next.length === dashboard.repos.length ? undefined : next.join(","),
+            })
+          }
+        />
+      )}
       {dashboard.epicLabel && (
         <EpicStrip
           epics={board.epics}
@@ -82,12 +98,7 @@ export default function Board({ dashboardId }: Props) {
           onSelect={(key) => updateFilters({ epic: key })}
         />
       )}
-      <FilterBar
-        filters={filters}
-        board={board}
-        repos={showRepo ? dashboard.repos : []}
-        onChange={updateFilters}
-      />
+      <FilterBar filters={filters} board={board} onChange={updateFilters} />
 
       <div className="min-h-0 flex-1 overflow-auto">
         <div

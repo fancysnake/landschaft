@@ -6,6 +6,7 @@ import { refreshMinutesByRepo } from "./config";
 import {
   fetchIssue,
   fetchIssuesPage,
+  fetchPullsPage,
   fetchRepoLabels,
   fetchViewer,
   type GithubClient,
@@ -118,24 +119,26 @@ export class Syncer {
 
       const seen = new Set<number>();
       let upserted = 0;
-      let after: string | null = null;
-      do {
-        const page = await fetchIssuesPage(this.gh, repo, {
-          since,
-          states: full ? ["OPEN"] : null,
-          after,
-        });
-        this.rateRemaining = page.rateRemaining;
-        this.db.upsertIssues(page.issues);
-        upserted += page.issues.length;
-        for (const issue of page.issues) seen.add(issue.number);
-        after = page.hasNextPage ? page.endCursor : null;
-        if (after && page.rateRemaining < RATE_FLOOR) {
-          throw new Error(
-            `GitHub rate limit nearly exhausted (${page.rateRemaining} left), sync aborted`,
-          );
-        }
-      } while (after);
+      for (const fetchPage of [fetchIssuesPage, fetchPullsPage]) {
+        let after: string | null = null;
+        do {
+          const page = await fetchPage(this.gh, repo, {
+            since,
+            states: full ? ["OPEN"] : null,
+            after,
+          });
+          this.rateRemaining = page.rateRemaining;
+          this.db.upsertIssues(page.issues);
+          upserted += page.issues.length;
+          for (const issue of page.issues) seen.add(issue.number);
+          after = page.hasNextPage ? page.endCursor : null;
+          if (after && page.rateRemaining < RATE_FLOOR) {
+            throw new Error(
+              `GitHub rate limit nearly exhausted (${page.rateRemaining} left), sync aborted`,
+            );
+          }
+        } while (after);
+      }
 
       const closed = full ? this.db.closeMissing(repo, seen) : 0;
       this.db.upsertLabels(repo, await fetchRepoLabels(this.gh, repo));

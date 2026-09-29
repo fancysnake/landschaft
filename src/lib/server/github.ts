@@ -122,11 +122,37 @@ query IssuesPage($owner: String!, $name: String!, $since: DateTime, $states: [Is
 }
 ${ISSUE_FIELDS}`;
 
+const PULL_FIELDS = `
+fragment PullFields on PullRequest {
+  id number title state url createdAt updatedAt closedAt
+  author { login }
+  labels(first: 50) { nodes { name color } }
+  assignees(first: 10) { nodes { login avatarUrl } }
+  closingIssuesReferences(first: 20) { nodes { number repository { nameWithOwner } } }
+}`;
+
+/** No `since` filter on pullRequests: newest first, the caller stops paging past `since`. */
+const PULLS_PAGE_QUERY = `
+query PullsPage($owner: String!, $name: String!, $states: [PullRequestState!], $after: String) {
+  rateLimit { remaining }
+  repository(owner: $owner, name: $name) {
+    pullRequests(first: 50, after: $after, states: $states,
+                 orderBy: { field: UPDATED_AT, direction: DESC }) {
+      pageInfo { hasNextPage endCursor }
+      nodes { ...PullFields }
+    }
+  }
+}
+${PULL_FIELDS}`;
+
 const ISSUE_QUERY = `
 query Issue($owner: String!, $name: String!, $number: Int!) {
-  repository(owner: $owner, name: $name) { issue(number: $number) { ...IssueFields } }
+  repository(owner: $owner, name: $name) {
+    issueOrPullRequest(number: $number) { type: __typename ...IssueFields ...PullFields }
+  }
 }
-${ISSUE_FIELDS}`;
+${ISSUE_FIELDS}
+${PULL_FIELDS}`;
 
 const VIEWER_QUERY = `query Viewer { viewer { login } }`;
 
@@ -161,6 +187,23 @@ export interface IssueNode {
   };
 }
 
+export interface PullNode {
+  id: string;
+  number: number;
+  title: string;
+  state: IssueState | "MERGED";
+  url: string;
+  createdAt: string;
+  updatedAt: string;
+  closedAt: string | null;
+  author: { login: string } | null;
+  labels: { nodes: { name: string; color: string }[] };
+  assignees: { nodes: { login: string; avatarUrl: string }[] };
+  closingIssuesReferences: {
+    nodes: { number: number; repository: { nameWithOwner: string } }[];
+  };
+}
+
 interface PageInfo {
   hasNextPage: boolean;
   endCursor: string | null;
@@ -171,8 +214,18 @@ interface IssuesPageData {
   repository: { issues: { pageInfo: PageInfo; nodes: IssueNode[] } } | null;
 }
 
+interface PullsPageData {
+  rateLimit: { remaining: number };
+  repository: { pullRequests: { pageInfo: PageInfo; nodes: PullNode[] } } | null;
+}
+
 interface IssueData {
-  repository: { issue: IssueNode | null } | null;
+  repository: {
+    issueOrPullRequest:
+      | (IssueNode & { type: "Issue" })
+      | (PullNode & { type: "PullRequest" })
+      | null;
+  } | null;
 }
 
 interface LabelsData {
@@ -186,6 +239,7 @@ interface LabelsData {
 
 export function toIssue(repo: string, node: IssueNode): Issue {
   return {
+    kind: "issue",
     repo,
     number: node.number,
     nodeId: node.id,
@@ -213,6 +267,35 @@ export function toIssue(repo: string, node: IssueNode): Issue {
       state: b.state,
     })),
     blockedByTotal: node.issueDependenciesSummary.totalBlockedBy,
+    linked: [],
+  };
+}
+
+/** A merged PR counts as closed. */
+export function toPull(repo: string, node: PullNode): Issue {
+  return {
+    kind: "pr",
+    repo,
+    number: node.number,
+    nodeId: node.id,
+    title: node.title,
+    state: node.state === "OPEN" ? "OPEN" : "CLOSED",
+    url: node.url,
+    issueType: null,
+    author: node.author?.login ?? null,
+    createdAt: node.createdAt,
+    updatedAt: node.updatedAt,
+    closedAt: node.closedAt,
+    labels: node.labels.nodes.map((l) => ({ name: l.name, color: l.color })),
+    assignees: node.assignees.nodes.map((a) => ({ login: a.login, avatarUrl: a.avatarUrl })),
+    parent: null,
+    subIssues: { total: 0, completed: 0, percent: 0 },
+    blockedBy: [],
+    blockedByTotal: 0,
+    linked: node.closingIssuesReferences.nodes.map((ref) => ({
+      repo: ref.repository.nameWithOwner,
+      number: ref.number,
+    })),
   };
 }
 
@@ -246,6 +329,31 @@ export async function fetchIssuesPage(
   };
 }
 
+/** Same contract as fetchIssuesPage; with `since`, paging ends at the first older PR. */
+export async function fetchPullsPage(
+  gh: GithubClient,
+  repo: string,
+  options: { since: string | null; states: IssueState[] | null; after: string | null },
+): Promise<IssuesPage> {
+  const data = await gh.gql<PullsPageData>(PULLS_PAGE_QUERY, {
+    ...splitRepo(repo),
+    states: options.states,
+    after: options.after,
+  });
+  if (!data.repository)
+    throw new GithubError(`repository ${repo} not found or not accessible`, 404);
+  const { pageInfo, nodes } = data.repository.pullRequests;
+  const since = options.since ? Date.parse(options.since) : null;
+  const fresh =
+    since === null ? nodes : nodes.filter((node) => Date.parse(node.updatedAt) >= since);
+  return {
+    issues: fresh.map((node) => toPull(repo, node)),
+    hasNextPage: pageInfo.hasNextPage && fresh.length === nodes.length,
+    endCursor: pageInfo.endCursor,
+    rateRemaining: data.rateLimit.remaining,
+  };
+}
+
 /** Login of the account the token belongs to. */
 export async function fetchViewer(gh: GithubClient): Promise<string> {
   const data = await gh.gql<{ viewer: { login: string } }>(VIEWER_QUERY, {});
@@ -258,8 +366,9 @@ export async function fetchIssue(
   number: number,
 ): Promise<Issue | null> {
   const data = await gh.gql<IssueData>(ISSUE_QUERY, { ...splitRepo(repo), number });
-  const node = data.repository?.issue;
-  return node ? toIssue(repo, node) : null;
+  const node = data.repository?.issueOrPullRequest;
+  if (!node) return null;
+  return node.type === "PullRequest" ? toPull(repo, node) : toIssue(repo, node);
 }
 
 export async function fetchRepoLabels(

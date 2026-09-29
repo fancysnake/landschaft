@@ -7,6 +7,17 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- Open pull requests appear on the board with a `PR` badge; an epic's view includes PRs
+  linked to it or to its related issues.
+
+### Changed
+
+- The repo filter is a row of chips; several repos can be switched off at once (`repo`
+  takes a comma-separated list).
+- Upgrading forces a full resync to pick up pull requests.
+
 ## [0.3.0] - 2026-09-27
 
 ### Added

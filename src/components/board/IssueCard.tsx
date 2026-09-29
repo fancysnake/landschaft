@@ -34,6 +34,7 @@ export function IssueCard({ card, laneId, colId, showRepo, onDragStart, onDragEn
           {showRepo ? `${repoShortName(card.repo)}#` : "#"}
           {card.number}
         </span>
+        {card.kind === "pr" && <span className="rounded bg-sky-100 px-1 text-sky-800">PR</span>}
         {card.isEpic && <span className="rounded bg-violet-100 px-1 text-violet-800">epic</span>}
         {card.blocked && <span className="rounded bg-red-100 px-1 text-red-800">blocked</span>}
         {card.assignees.length > 0 && (

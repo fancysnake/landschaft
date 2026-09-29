@@ -1,6 +1,12 @@
 import type { SortBy, SortDir } from "./schema";
 
 export type IssueState = "OPEN" | "CLOSED";
+export type IssueKind = "issue" | "pr";
+
+export interface IssueRef {
+  repo: string;
+  number: number;
+}
 
 export interface LabelRef {
   name: string;
@@ -29,7 +35,9 @@ export interface Progress {
   percent: number;
 }
 
+/** An issue or a pull request; PRs have no parent, sub-issues or blockers. */
 export interface Issue {
+  kind: IssueKind;
   repo: string;
   number: number;
   nodeId: string;
@@ -49,6 +57,8 @@ export interface Issue {
   blockedBy: Blocker[];
   /** Total from GitHub; larger than blockedBy.length when the list was truncated. */
   blockedByTotal: number;
+  /** Issues a PR closes when merged; empty for issues. */
+  linked: IssueRef[];
 }
 
 export function issueKey(repo: string, number: number): string {
@@ -63,6 +73,7 @@ export function parseIssueKey(key: string): { repo: string; number: number } | n
 
 export interface Card {
   key: string;
+  kind: IssueKind;
   repo: string;
   number: number;
   title: string;
