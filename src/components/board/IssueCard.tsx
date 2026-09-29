@@ -25,8 +25,14 @@ export function IssueCard({ card, laneId, colId, showRepo, onDragStart, onDragEn
       draggable
       onDragStart={start}
       onDragEnd={onDragEnd}
-      className={`cursor-grab rounded-md border bg-white p-2 text-sm shadow-xs active:cursor-grabbing ${
-        card.blocked ? "border-red-300" : card.isEpic ? "border-violet-300" : "border-neutral-200"
+      className={`cursor-grab rounded-md border border-l-4 p-2 text-sm shadow-xs active:cursor-grabbing ${
+        card.blocked
+          ? "border-red-300 border-l-red-500 bg-red-50"
+          : card.isEpic
+            ? "border-violet-300 border-l-violet-500 bg-violet-50"
+            : card.kind === "pr"
+              ? "border-sky-300 border-l-sky-500 bg-sky-50"
+              : "border-neutral-200 border-l-emerald-500 bg-white"
       }`}
     >
       <div className="mb-1 flex items-center gap-1.5 text-xs text-neutral-500">
