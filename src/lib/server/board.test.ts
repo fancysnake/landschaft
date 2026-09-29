@@ -44,16 +44,15 @@ describe("placeIn", () => {
     expect(placeIn([groups[0]!], new Set(["y"]))).toBeNull();
   });
 
-  it("skips groups of the other kind; a kind-only group is not a catch-all", () => {
+  it("matches a kind-only group in list order, not as the catch-all", () => {
     const groups = [
-      { id: "prs", labels: [], kind: "pr" as const },
-      { id: "bugs", labels: ["bug"], kind: "issue" as const },
+      { id: "bugs", labels: ["bug"] },
       { id: "rest", labels: [] },
+      { id: "prs", labels: [], kind: "pr" as const },
     ];
-    expect(placeIn(groups, new Set(["bug"]), "pr")?.id).toBe("prs");
-    expect(placeIn(groups, new Set(["bug"]), "issue")?.id).toBe("bugs");
-    expect(placeIn(groups, new Set(), "issue")?.id).toBe("rest");
-    expect(placeIn([groups[0]!], new Set(), "issue")).toBeNull();
+    expect(placeIn(groups, new Set(["bug"]))?.id).toBe("bugs");
+    expect(placeIn(groups, new Set())?.id).toBe("prs");
+    expect(placeIn([groups[0]!, groups[1]!], new Set())?.id).toBe("rest");
   });
 });
 

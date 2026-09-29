@@ -51,7 +51,7 @@ export async function moveIssue(
   const issue = deps.db.getIssue(request.repo, request.number);
   if (!issue)
     throw new MoveError(`${request.repo}#${request.number} is not in the cache, sync first`);
-  if (!fitsKind(to.lane, issue.kind))
+  if (!fitsKind(to.lane.kind, issue.kind))
     throw new MoveError(
       `swimlane "${to.lane.name}" takes no ${issue.kind === "pr" ? "PRs" : "issues"}`,
     );

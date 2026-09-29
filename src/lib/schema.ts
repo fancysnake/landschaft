@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { IssueKind } from "./types";
+
 const id = z
   .string()
   .min(1)
@@ -47,9 +49,9 @@ export function isCatchAll(group: { labels: string[]; kind?: KindFilter }): bool
   return group.labels.length === 0 && (group.kind ?? "any") === "any";
 }
 
-/** Whether a group's kind restriction lets an item of this kind in. */
-export function fitsKind(group: { kind?: KindFilter }, kind: "issue" | "pr"): boolean {
-  return (group.kind ?? "any") === "any" || group.kind === kind;
+/** Whether a swimlane's kind filter lets an item of this kind in. */
+export function fitsKind(filter: KindFilter, kind: IssueKind): boolean {
+  return filter === "any" || filter === kind;
 }
 
 /** "mine": only issues the viewer created or is assigned to; "all": every open issue. */
@@ -77,7 +79,7 @@ export const DashboardSchema = z
         ctx.addIssue({
           code: "custom",
           path: [axis],
-          message: "at most one catch-all (no labels) allowed",
+          message: `at most one catch-all (${axis === "swimlanes" ? "no labels, any kind" : "no labels"}) allowed`,
         });
       }
     }

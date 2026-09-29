@@ -16,7 +16,6 @@ import {
   type Epic,
   type Issue,
   issueKey,
-  type IssueKind,
   type IssueRef,
 } from "../types";
 
@@ -25,13 +24,13 @@ export interface Group {
   labels: string[];
   /** Defaults to "any". */
   match?: Match;
-  /** Defaults to "any"; swimlanes only. */
+  /** Swimlanes only; what tells a kind-only lane from the catch-all. */
   kind?: KindFilter;
 }
 
-function matches(group: Group, labelNames: Set<string>, kind: IssueKind): boolean {
-  if (!fitsKind(group, kind)) return false;
-  if (group.labels.length === 0) return !isCatchAll(group);
+function matches(group: Group, labelNames: Set<string>): boolean {
+  // A kind-only lane (no labels, a kind set) takes every item, in list order.
+  if (group.labels.length === 0) return (group.kind ?? "any") !== "any";
   return group.match === "all"
     ? group.labels.every((label) => labelNames.has(label))
     : group.labels.some((label) => labelNames.has(label));
@@ -43,16 +42,12 @@ function wantedLabels(group: Group): string[] {
 }
 
 /**
- * First group (in order) whose kind fits and whose labels the issue satisfies (any or all
- * of them, per `match`; a kind-only group needs none); otherwise the catch-all (no labels,
- * any kind), wherever it sits in the list; otherwise null.
+ * First group (in order) whose labels the issue satisfies (any or all of them, per `match`;
+ * a kind-only group needs none); otherwise the catch-all (no labels, any kind), wherever it
+ * sits in the list; otherwise null. Groups of the wrong kind are the caller's to drop.
  */
-export function placeIn<T extends Group>(
-  groups: T[],
-  labelNames: Set<string>,
-  kind: IssueKind = "issue",
-): T | null {
-  const labeled = groups.find((group) => matches(group, labelNames, kind));
+export function placeIn<T extends Group>(groups: T[], labelNames: Set<string>): T | null {
+  const labeled = groups.find((group) => matches(group, labelNames));
   if (labeled) return labeled;
   return groups.find(isCatchAll) ?? null;
 }
@@ -170,7 +165,8 @@ export function buildBoard(
     if (!wanted(issue)) continue;
 
     const names = new Set(issue.labels.map((label) => label.name));
-    const lane = placeIn(dashboard.swimlanes, names, issue.kind);
+    const lanes = dashboard.swimlanes.filter((lane) => fitsKind(lane.kind, issue.kind));
+    const lane = placeIn(lanes, names);
     const column = placeIn(dashboard.columns, names);
     if (!lane || !column) {
       board.unplaced += 1;

@@ -135,7 +135,7 @@ export function DashboardEditor({ dashboard, onChange }: Props) {
           hideBlocked: false,
         })}
         labels={catalog}
-        withHideBlocked
+        swimlanes
       />
       <LaneColumnEditor
         title="Columns"

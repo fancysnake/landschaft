@@ -133,7 +133,7 @@ export default function Board({ dashboardId }: Props) {
                   cards={board.cells[cellKey(lane.id, column.id)] ?? []}
                   showRepo={showRepo}
                   dragging={dragging}
-                  accepts={(kind) => fitsKind(lane, kind)}
+                  accepts={(kind) => fitsKind(lane.kind, kind)}
                   onDragStart={setDragging}
                   onDragEnd={() => setDragging(null)}
                   onDrop={(payload) => {

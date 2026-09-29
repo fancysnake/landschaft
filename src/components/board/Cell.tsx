@@ -30,11 +30,13 @@ export function Cell({
   onDrop,
 }: Props) {
   const [over, setOver] = useState(false);
-  const isSource = dragging?.laneId === laneId && dragging.colId === colId;
-  const canDrop = dragging !== null && !isSource && accepts(dragging.card.kind);
+  /** Not the cell the card came from, and a lane that takes its kind. */
+  const allows = (payload: DragPayload) =>
+    !(payload.laneId === laneId && payload.colId === colId) && accepts(payload.card.kind);
+  const canDrop = dragging !== null && allows(dragging);
 
   const dragOver = (event: DragEvent) => {
-    if (!hasPayload(event) || isSource || (dragging && !canDrop)) return;
+    if (!hasPayload(event) || (dragging && !allows(dragging))) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
     setOver(true);
@@ -43,12 +45,7 @@ export function Cell({
     event.preventDefault();
     setOver(false);
     const payload = readPayload(event);
-    if (
-      payload &&
-      !(payload.laneId === laneId && payload.colId === colId) &&
-      accepts(payload.card.kind)
-    )
-      onDrop(payload);
+    if (payload && allows(payload)) onDrop(payload);
   };
 
   return (
