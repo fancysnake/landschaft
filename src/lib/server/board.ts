@@ -1,6 +1,20 @@
-import type { Dashboard, Filters, Match, SortBy, SortDir } from "../schema";
-
-import { type Board, type Card, cellKey, type Epic, type Issue, issueKey } from "../types";
+import {
+  type Dashboard,
+  type Filters,
+  type Match,
+  selectedRepos,
+  type SortBy,
+  type SortDir,
+} from "../schema";
+import {
+  type Board,
+  type Card,
+  cellKey,
+  type Epic,
+  type Issue,
+  issueKey,
+  type IssueRef,
+} from "../types";
 
 export interface Group {
   id: string;
@@ -49,33 +63,25 @@ const keyOf = (ref: { repo: string; number: number }): string => issueKey(ref.re
  */
 function relatedTo(epicKey: string, byKey: Map<string, Issue>): Set<string> {
   const issues = [...byKey.values()];
-  const related = new Set([
+  const base = new Set([
     ...(byKey.get(epicKey)?.blockedBy ?? []).map(keyOf),
     ...issues.filter((issue) => issue.parent && keyOf(issue.parent) === epicKey).map(keyOf),
     ...issues.filter((issue) => issue.blockedBy.some((b) => keyOf(b) === epicKey)).map(keyOf),
   ]);
-  for (const pr of issues) {
-    if (pr.linked.some((ref) => keyOf(ref) === epicKey || related.has(keyOf(ref)))) {
-      related.add(keyOf(pr));
-    }
-  }
-  return related;
+  const hits = (ref: IssueRef) => keyOf(ref) === epicKey || base.has(keyOf(ref));
+  const linked = issues.filter((issue) => issue.linked.some(hits)).map(keyOf);
+  return new Set([...base, ...linked]);
 }
 
 /**
- * Text, repo, assignee, label and epic filters as one predicate; an unset filter
- * passes everything. `repos` is the parsed repo filter.
+ * Text, assignee, label and epic filters as one predicate; an unset filter passes
+ * everything.
  */
-function issueFilter(
-  filters: Filters,
-  repos: Set<string> | null,
-  byKey: Map<string, Issue>,
-): (issue: Issue) => boolean {
+function issueFilter(filters: Filters, byKey: Map<string, Issue>): (issue: Issue) => boolean {
   const query = filters.q?.trim().toLowerCase();
   const related = filters.epic ? relatedTo(filters.epic, byKey) : null;
   return (issue) =>
     (!query || `${issue.number} ${issue.title}`.toLowerCase().includes(query)) &&
-    (!repos || repos.has(issue.repo)) &&
     (!filters.assignee || issue.assignees.some((a) => a.login === filters.assignee)) &&
     (!filters.label || issue.labels.some((l) => l.name === filters.label)) &&
     (!related || related.has(keyOf(issue)));
@@ -109,10 +115,8 @@ export function buildBoard(
 ): Board {
   const byKey = new Map(issues.map((issue) => [issueKey(issue.repo, issue.number), issue]));
   const mine = inScope(dashboard, viewer);
-  // A repo not on the dashboard (stale URL) would filter with no control to clear it.
-  const listed = (filters.repo ?? "").split(",").filter((name) => dashboard.repos.includes(name));
-  const repos = listed.length > 0 ? new Set(listed) : null;
-  const wanted = issueFilter(filters, repos, byKey);
+  const repos = new Set(selectedRepos(filters.repo, dashboard.repos));
+  const wanted = issueFilter(filters, byKey);
   const open = issues.filter((issue) => issue.state === "OPEN" && mine(issue));
   const structural = new Set<string>([
     ...dashboard.swimlanes.flatMap((lane) => lane.labels),
@@ -144,12 +148,13 @@ export function buildBoard(
   for (const issue of open) {
     for (const assignee of issue.assignees) assignees.add(assignee.login);
     for (const label of issue.labels) if (!structural.has(label.name)) labels.add(label.name);
+    if (!repos.has(issue.repo)) continue;
 
     const isEpic =
       issue.kind === "issue" &&
       dashboard.epicLabel !== undefined &&
       issue.labels.some((label) => label.name === dashboard.epicLabel);
-    if (isEpic && (!repos || repos.has(issue.repo))) epicIssues.push(issue);
+    if (isEpic) epicIssues.push(issue);
 
     if (!wanted(issue)) continue;
 

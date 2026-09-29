@@ -131,7 +131,7 @@ describe("createGithubClient", () => {
     const gh = createGithubClient(async () => "tok", fetchImpl);
     const page = await fetchIssuesPage(gh, "acme/app", {
       since: "2026-01-01T00:00:00Z",
-      states: null,
+      openOnly: false,
       after: "c1",
     });
     expect(page).toMatchObject({ hasNextPage: true, endCursor: "c2", rateRemaining: 4900 });
@@ -156,7 +156,7 @@ describe("createGithubClient", () => {
       async () => jsonResponse({ data: { rateLimit: { remaining: 1 }, repository: null } }),
     );
     await expect(
-      fetchIssuesPage(gh, "acme/gone", { since: null, states: null, after: null }),
+      fetchIssuesPage(gh, "acme/gone", { since: null, openOnly: false, after: null }),
     ).rejects.toThrow(/not found/);
   });
 });

@@ -201,17 +201,17 @@ describe("buildBoard", () => {
 
   it("repo filter keeps only that repo's issues", () => {
     const issues = [makeIssue({ number: 1 }), makeIssue({ number: 2, repo: "acme/other" })];
-    expect(numbers(buildBoard(issues, TWO_REPOS, { repo: "acme/other" }))).toEqual([2]);
+    expect(numbers(buildBoard(issues, TWO_REPOS, { repo: ["acme/other"] }))).toEqual([2]);
   });
 
-  it("repo filter takes a comma-separated list and skips repos not on the dashboard", () => {
+  it("repo filter takes a list and skips repos not on the dashboard", () => {
     const three = { ...DASHBOARD, repos: [REPO, "acme/other", "acme/third"] };
     const issues = [
       makeIssue({ number: 1 }),
       makeIssue({ number: 2, repo: "acme/other" }),
       makeIssue({ number: 3, repo: "acme/third" }),
     ];
-    const repo = "acme/third,acme/gone,acme/app";
+    const repo = ["acme/third", "acme/gone", "acme/app"];
     expect(numbers(buildBoard(issues, three, { repo }))).toEqual([3, 1]);
   });
 
@@ -279,7 +279,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 10, labels: [label("epic")] }),
       makeIssue({ number: 11, repo: "acme/other", labels: [label("epic")] }),
     ];
-    const board = buildBoard(issues, TWO_REPOS, { repo: "acme/other" });
+    const board = buildBoard(issues, TWO_REPOS, { repo: ["acme/other"] });
     expect(board.epics.map((epic) => epic.key)).toEqual(["acme/other#11"]);
   });
 
@@ -288,7 +288,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 1 }),
       makeIssue({ number: 10, repo: "acme/other", labels: [label("epic")] }),
     ];
-    const board = buildBoard(issues, DASHBOARD, { repo: "acme/other" });
+    const board = buildBoard(issues, TWO_REPOS, { repo: ["acme/gone"] });
     expect(numbers(board)).toEqual([10, 1]);
     expect(board.epics.map((epic) => epic.key)).toEqual(["acme/other#10"]);
   });

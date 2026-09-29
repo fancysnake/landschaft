@@ -21,7 +21,6 @@ CREATE TABLE IF NOT EXISTS issues (
   state TEXT NOT NULL,
   url TEXT NOT NULL,
   issue_type TEXT,
-  author TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   closed_at TEXT,
@@ -33,8 +32,6 @@ CREATE TABLE IF NOT EXISTS issues (
   sub_completed INTEGER NOT NULL DEFAULT 0,
   sub_percent INTEGER NOT NULL DEFAULT 0,
   blocked_by_total INTEGER NOT NULL DEFAULT 0,
-  kind TEXT NOT NULL DEFAULT 'issue',
-  linked_json TEXT NOT NULL DEFAULT '[]',
   PRIMARY KEY (repo, number)
 );
 CREATE INDEX IF NOT EXISTS issues_repo_state ON issues (repo, state);
@@ -140,7 +137,10 @@ function rowToIssue(row: IssueRow, blockedBy: Blocker[]): Issue {
   };
 }
 
-/** Columns added after the first release, with their definitions. */
+/**
+ * Columns added after the first release, with their definitions. `SCHEMA` keeps the
+ * first-release table; `migrate()` adds these on every database, fresh or old.
+ */
 const ADDED_COLUMNS = [
   ["author", "TEXT"],
   ["kind", "TEXT NOT NULL DEFAULT 'issue'"],
@@ -170,10 +170,13 @@ export class Db {
       ),
     );
     const missing = ADDED_COLUMNS.filter(([name]) => !columns.has(name));
-    for (const [name, definition] of missing) {
-      this.db.exec(`ALTER TABLE issues ADD COLUMN ${name} ${definition}`);
-    }
-    if (missing.length > 0) this.db.exec("DELETE FROM sync_state");
+    if (missing.length === 0) return;
+    this.transaction(() => {
+      for (const [name, definition] of missing) {
+        this.db.exec(`ALTER TABLE issues ADD COLUMN ${name} ${definition}`);
+      }
+      this.db.exec("DELETE FROM sync_state");
+    });
   }
 
   close(): void {

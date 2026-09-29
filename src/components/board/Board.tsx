@@ -5,6 +5,7 @@ import type { DragPayload } from "../../lib/client/dnd";
 import { repoShortName } from "../../lib/client/labels";
 import { useBoard } from "../../lib/client/useBoard";
 import { useUrlFilters } from "../../lib/client/useUrlFilters";
+import { repoFilter, selectedRepos } from "../../lib/schema";
 import { cellKey } from "../../lib/types";
 import { Cell } from "./Cell";
 import { EpicStrip } from "./EpicStrip";
@@ -29,8 +30,6 @@ export default function Board({ dashboardId }: Props) {
   }
   const { dashboard, board, status } = data;
   const showRepo = dashboard.repos.length > 1;
-  const listedRepos = dashboard.repos.filter((repo) => filters.repo?.split(",").includes(repo));
-  const selectedRepos = listedRepos.length > 0 ? listedRepos : dashboard.repos;
   const columnTotals = Object.fromEntries(
     dashboard.columns.map((column) => [
       column.id,
@@ -83,12 +82,8 @@ export default function Board({ dashboardId }: Props) {
         <Toggles
           label="Repositories"
           options={dashboard.repos.map((repo) => ({ value: repo, label: repoShortName(repo) }))}
-          selected={selectedRepos}
-          onChange={(next) =>
-            updateFilters({
-              repo: next.length === dashboard.repos.length ? undefined : next.join(","),
-            })
-          }
+          selected={selectedRepos(filters.repo, dashboard.repos)}
+          onChange={(next) => updateFilters({ repo: repoFilter(next, dashboard.repos) })}
         />
       )}
       {dashboard.epicLabel && (

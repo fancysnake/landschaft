@@ -109,17 +109,36 @@ export const SyncRequestSchema = z.object({
 });
 export type SyncRequest = z.infer<typeof SyncRequestSchema>;
 
-/**
- * Free-text filters: set from the filter bar, cleared together by "Clear filters". `repo`
- * is a comma-separated list of the repos to show.
- */
-export const TEXT_FILTER_KEYS = ["q", "repo", "assignee", "label", "epic"] as const;
+/** Free-text filters: set from the filter bar, cleared together by "Clear filters". */
+export const TEXT_FILTER_KEYS = ["q", "assignee", "label", "epic"] as const;
 export type TextFilterKey = (typeof TEXT_FILTER_KEYS)[number];
 
 export type Filters = { [K in TextFilterKey]?: string } & {
+  /** Repos to show, set by the repo chips; unset shows all. */
+  repo?: string[];
   sort?: SortBy;
   dir?: SortDir;
 };
+
+/** The `repo` query value (`owner/a,owner/b`) as a list; empty means unset. */
+export function parseRepoFilter(value: string | null | undefined): string[] | undefined {
+  const repos = value?.split(",").filter(Boolean) ?? [];
+  return repos.length > 0 ? repos : undefined;
+}
+
+/**
+ * The dashboard repos a repo filter selects: those it lists, or all of them when it lists
+ * none on the dashboard (a stale URL would otherwise filter with no control to clear it).
+ */
+export function selectedRepos(filter: string[] | undefined, dashboardRepos: string[]): string[] {
+  const listed = dashboardRepos.filter((repo) => filter?.includes(repo));
+  return listed.length > 0 ? listed : dashboardRepos;
+}
+
+/** Inverse of `selectedRepos`: every dashboard repo selected is no filter. */
+export function repoFilter(selected: string[], dashboardRepos: string[]): string[] | undefined {
+  return dashboardRepos.every((repo) => selected.includes(repo)) ? undefined : selected;
+}
 
 const optionalText = z
   .string()
@@ -132,6 +151,7 @@ export const FiltersSchema: z.ZodType<Filters, Record<string, unknown>> = z.obje
     TextFilterKey,
     typeof optionalText
   >),
+  repo: z.string().optional().transform(parseRepoFilter),
   sort: SortBySchema.optional(),
   dir: SortDirSchema.optional(),
 });

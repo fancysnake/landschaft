@@ -10,6 +10,7 @@ import {
   fetchRepoLabels,
   fetchViewer,
   type GithubClient,
+  type PageOptions,
 } from "./github";
 
 const FULL_SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -118,26 +119,10 @@ export class Syncer {
           : new Date(Date.parse(state.lastSyncAt) - SINCE_OVERLAP_MS).toISOString();
 
       const seen = new Set<number>();
+      const query = { since, openOnly: full };
       let upserted = 0;
       for (const fetchPage of [fetchIssuesPage, fetchPullsPage]) {
-        let after: string | null = null;
-        do {
-          const page = await fetchPage(this.gh, repo, {
-            since,
-            states: full ? ["OPEN"] : null,
-            after,
-          });
-          this.rateRemaining = page.rateRemaining;
-          this.db.upsertIssues(page.issues);
-          upserted += page.issues.length;
-          for (const issue of page.issues) seen.add(issue.number);
-          after = page.hasNextPage ? page.endCursor : null;
-          if (after && page.rateRemaining < RATE_FLOOR) {
-            throw new Error(
-              `GitHub rate limit nearly exhausted (${page.rateRemaining} left), sync aborted`,
-            );
-          }
-        } while (after);
+        upserted += await this.drain(fetchPage, repo, query, seen);
       }
 
       const closed = full ? this.db.closeMissing(repo, seen) : 0;
@@ -162,6 +147,34 @@ export class Syncer {
       this.inFlight.delete(repo);
       this.bump();
     }
+  }
+
+  /**
+   * Upserts every page `fetchPage` returns, adding the numbers to `seen`; stops short when
+   * the rate limit runs low. Returns how many issues it upserted.
+   */
+  private async drain(
+    fetchPage: typeof fetchIssuesPage,
+    repo: string,
+    query: Omit<PageOptions, "after">,
+    seen: Set<number>,
+  ): Promise<number> {
+    let upserted = 0;
+    let after: string | null = null;
+    do {
+      const page = await fetchPage(this.gh, repo, { ...query, after });
+      this.rateRemaining = page.rateRemaining;
+      this.db.upsertIssues(page.issues);
+      upserted += page.issues.length;
+      for (const issue of page.issues) seen.add(issue.number);
+      after = page.hasNextPage ? page.endCursor : null;
+      if (after && page.rateRemaining < RATE_FLOOR) {
+        throw new Error(
+          `GitHub rate limit nearly exhausted (${page.rateRemaining} left), sync aborted`,
+        );
+      }
+    } while (after);
+    return upserted;
   }
 
   async syncIssue(repo: string, number: number): Promise<Issue | null> {
