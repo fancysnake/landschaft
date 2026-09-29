@@ -126,9 +126,16 @@ export function DashboardEditor({ dashboard, onChange }: Props) {
         title="Swimlanes"
         items={dashboard.swimlanes}
         onChange={(swimlanes) => patch({ swimlanes })}
-        create={(id) => ({ id, name: "New lane", labels: [], match: "any", hideBlocked: false })}
+        create={(id) => ({
+          id,
+          name: "New lane",
+          labels: [],
+          match: "any",
+          kind: "any",
+          hideBlocked: false,
+        })}
         labels={catalog}
-        withHideBlocked
+        swimlanes
       />
       <LaneColumnEditor
         title="Columns"

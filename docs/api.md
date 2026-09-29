@@ -26,7 +26,9 @@ localhost only. Errors are `{ "error": "message" }` with a matching status.
 ```
 
 The server recomputes the diff from the dashboard definition, so a stale client cannot add
-labels the target entry does not ask for. GitHub writes go through REST by label name.
+labels the target entry does not ask for. It rejects a move into a swimlane of the other kind,
+or one where the new labels would land the card in an earlier swimlane or column. GitHub writes
+go through REST by label name.
 
 ## Board
 

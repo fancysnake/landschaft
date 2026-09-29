@@ -1,6 +1,6 @@
 import { type DragEvent, useState } from "react";
 
-import type { Card } from "../../lib/types";
+import type { Card, IssueKind } from "../../lib/types";
 
 import { type DragPayload, hasPayload, readPayload } from "../../lib/client/dnd";
 import { IssueCard } from "./IssueCard";
@@ -11,6 +11,8 @@ interface Props {
   cards: Card[];
   showRepo: boolean;
   dragging: DragPayload | null;
+  /** Whether the lane takes a card of this kind. */
+  accepts(kind: IssueKind): boolean;
   onDragStart(payload: DragPayload): void;
   onDragEnd(): void;
   onDrop(payload: DragPayload): void;
@@ -22,16 +24,19 @@ export function Cell({
   cards,
   showRepo,
   dragging,
+  accepts,
   onDragStart,
   onDragEnd,
   onDrop,
 }: Props) {
   const [over, setOver] = useState(false);
-  const isSource = dragging?.laneId === laneId && dragging.colId === colId;
-  const canDrop = dragging !== null && !isSource;
+  /** Not the cell the card came from, and a lane that takes its kind. */
+  const allows = (payload: DragPayload) =>
+    !(payload.laneId === laneId && payload.colId === colId) && accepts(payload.card.kind);
+  const canDrop = dragging !== null && allows(dragging);
 
   const dragOver = (event: DragEvent) => {
-    if (!hasPayload(event) || isSource) return;
+    if (!hasPayload(event) || (dragging && !allows(dragging))) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
     setOver(true);
@@ -40,7 +45,7 @@ export function Cell({
     event.preventDefault();
     setOver(false);
     const payload = readPayload(event);
-    if (payload && !(payload.laneId === laneId && payload.colId === colId)) onDrop(payload);
+    if (payload && allows(payload)) onDrop(payload);
   };
 
   return (

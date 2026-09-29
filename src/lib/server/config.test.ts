@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { ConfigSchema } from "../schema";
 import { allRepos, findDashboard, loadConfig, refreshMinutesByRepo, saveConfig } from "./config";
 
 const minimal = {
@@ -48,7 +49,7 @@ describe("config file", () => {
       sort: { by: "updated", dir: "desc" },
       refreshMinutes: 5,
       scope: "mine",
-      swimlanes: [{ id: "all", labels: [], match: "any", hideBlocked: false }],
+      swimlanes: [{ id: "all", labels: [], match: "any", kind: "any", hideBlocked: false }],
       columns: [{ id: "todo", labels: [], match: "any" }],
     });
     expect(loadConfig(file)).toEqual(saved);
@@ -99,6 +100,21 @@ describe("config schema rules", () => {
       ],
     };
     expect(() => saveConfig(twoCatchAlls, "/dev/null/never")).toThrow(/catch-all/);
+  });
+
+  it("does not count a kind-only swimlane as a catch-all", () => {
+    const prLane = {
+      dashboards: [
+        {
+          ...base,
+          swimlanes: [
+            { id: "prs", name: "PRs", kind: "pr" },
+            { id: "rest", name: "Rest" },
+          ],
+        },
+      ],
+    };
+    expect(ConfigSchema.safeParse(prLane).success).toBe(true);
   });
 
   it("rejects malformed repo names", () => {

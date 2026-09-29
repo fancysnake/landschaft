@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { IssueKind } from "./types";
+
 const id = z
   .string()
   .min(1)
@@ -10,12 +12,16 @@ const labelList = z.array(z.string().min(1)).default([]);
 /** "any": the issue carries at least one of the labels; "all": it carries every one. */
 export const MatchSchema = z.enum(["any", "all"]);
 export type Match = z.infer<typeof MatchSchema>;
+/** Which items a swimlane takes: both, only issues, or only pull requests. */
+export const KindFilterSchema = z.enum(["any", "issue", "pr"]);
+export type KindFilter = z.infer<typeof KindFilterSchema>;
 
 export const SwimlaneSchema = z.object({
   id,
   name: z.string().min(1),
   labels: labelList,
   match: MatchSchema.default("any"),
+  kind: KindFilterSchema.default("any"),
   hideBlocked: z.boolean().default(false),
 });
 
@@ -38,8 +44,14 @@ function hasUniqueIds(items: { id: string }[]): boolean {
   return new Set(items.map((item) => item.id)).size === items.length;
 }
 
-function countCatchAlls(items: { labels: string[] }[]): number {
-  return items.filter((item) => item.labels.length === 0).length;
+/** No labels and no kind restriction: takes whatever no other entry does. */
+export function isCatchAll(group: { labels: string[]; kind?: KindFilter }): boolean {
+  return group.labels.length === 0 && (group.kind ?? "any") === "any";
+}
+
+/** Whether a swimlane's kind filter lets an item of this kind in. */
+export function fitsKind(filter: KindFilter, kind: IssueKind): boolean {
+  return filter === "any" || filter === kind;
 }
 
 /** "mine": only issues the viewer created or is assigned to; "all": every open issue. */
@@ -63,11 +75,11 @@ export const DashboardSchema = z
       if (!hasUniqueIds(dashboard[axis])) {
         ctx.addIssue({ code: "custom", path: [axis], message: "ids must be unique" });
       }
-      if (countCatchAlls(dashboard[axis]) > 1) {
+      if (dashboard[axis].filter(isCatchAll).length > 1) {
         ctx.addIssue({
           code: "custom",
           path: [axis],
-          message: "at most one catch-all (no labels) allowed",
+          message: `at most one catch-all (${axis === "swimlanes" ? "no labels, any kind" : "no labels"}) allowed`,
         });
       }
     }

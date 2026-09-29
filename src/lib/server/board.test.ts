@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import type { Swimlane } from "../schema";
+
 import { cellKey } from "../types";
 import { DASHBOARD, label, makeIssue, REPO } from "./__fixtures__/issues";
-import { buildBoard, isBlocked, labelDiffForMove, placeIn } from "./board";
+import { buildBoard, isBlocked, labelDiffForMove, placeCard, placeIn } from "./board";
 
 const cell = (laneId: string, colId: string) => cellKey(laneId, colId);
 const TWO_REPOS = { ...DASHBOARD, repos: [REPO, "acme/other"] };
@@ -42,6 +44,45 @@ describe("placeIn", () => {
     expect(placeIn(groups, new Set(["x"]))?.id).toBe("either");
     expect(placeIn(groups, new Set(["z"]))?.id).toBe("rest");
     expect(placeIn([groups[0]!], new Set(["y"]))).toBeNull();
+  });
+
+  it("matches a kind-only group in list order, not as the catch-all", () => {
+    const groups = [
+      { id: "bugs", labels: ["bug"] },
+      { id: "rest", labels: [] },
+      { id: "prs", labels: [], kind: "pr" as const },
+    ];
+    expect(placeIn(groups, new Set(["bug"]))?.id).toBe("bugs");
+    expect(placeIn(groups, new Set())?.id).toBe("prs");
+    expect(placeIn([groups[0]!, groups[1]!], new Set())?.id).toBe("rest");
+  });
+});
+
+describe("placeCard", () => {
+  const prs: Swimlane = {
+    id: "prs",
+    name: "PRs",
+    labels: [],
+    match: "any",
+    kind: "pr",
+    hideBlocked: false,
+  };
+  const dashboard = { ...DASHBOARD, swimlanes: [prs, ...DASHBOARD.swimlanes] };
+
+  it("lets a PR-only lane shadow the labeled lanes after it for PRs only", () => {
+    expect(placeCard(dashboard, "issue", new Set(["prio:high", "phase:doing"]))).toMatchObject({
+      lane: { id: "high" },
+      column: { id: "doing" },
+    });
+    expect(placeCard(dashboard, "pr", new Set(["prio:high"]))).toMatchObject({
+      lane: { id: "prs" },
+      column: { id: "todo" },
+    });
+  });
+
+  it("returns null when no column takes the labels", () => {
+    const columns = DASHBOARD.columns.filter((column) => column.labels.length > 0);
+    expect(placeCard({ ...DASHBOARD, columns }, "issue", new Set())).toBeNull();
   });
 });
 
@@ -117,6 +158,30 @@ describe("buildBoard", () => {
     expect(mine.assignees).toEqual(["me"]);
     expect(numbers(buildBoard(issues, dashboard, {}, null))).toEqual([4, 3, 2, 1]);
     expect(numbers(buildBoard(issues, DASHBOARD, {}, "me"))).toEqual([4, 3, 2, 1]);
+  });
+
+  it("puts pull requests in a PR swimlane", () => {
+    const dashboard = {
+      ...DASHBOARD,
+      swimlanes: [
+        {
+          id: "prs",
+          name: "PRs",
+          labels: [],
+          match: "any" as const,
+          kind: "pr" as const,
+          hideBlocked: false,
+        },
+        ...DASHBOARD.swimlanes,
+      ],
+    };
+    const issues = [
+      makeIssue({ number: 1, kind: "pr", labels: [label("prio:high")] }),
+      makeIssue({ number: 2, labels: [label("prio:high")] }),
+    ];
+    const board = buildBoard(issues, dashboard);
+    expect(board.cells[cell("prs", "todo")]?.map((c) => c.number)).toEqual([1]);
+    expect(board.cells[cell("high", "todo")]?.map((c) => c.number)).toEqual([2]);
   });
 
   it("counts issues that fit no group when an axis has no catch-all", () => {
