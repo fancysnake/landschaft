@@ -90,12 +90,13 @@ Saving triggers the first sync; once labels are cached the pickers suggest them.
 - A dashboard shows only open issues **you created or are assigned to** (scope `mine`, the
   default; "you" is the account behind the token). Switch a dashboard to `all` in settings to
   see everyone's.
-- Each swimlane and column lists the labels it matches. An issue lands in the **first** entry
-  (in order) it satisfies: by default carrying **any** of the labels; an entry set to **all**
-  needs every one of them (`"match": "all"` in the config).
-- A swimlane can take **only issues or only pull requests** (`"kind": "issue"` / `"pr"`, default
-  `"any"`); with no labels it takes every item of that kind.
-- An entry with **no labels (and any kind) is the catch-all** for issues matching nothing else.
+- Each swimlane and column lists the labels it matches. An issue lands in the **first**
+  swimlane and the **last** column (in order) it satisfies, so a card carrying two stages'
+  labels sits in the later one: by default carrying **any** of the labels; an entry set to
+  **all** needs every one of them (`"match": "all"` in the config).
+- `is:issue` or `is:pr` in an entry's labels takes **only issues or only pull requests**, on
+  top of the other labels whatever the match; alone it takes every item of that kind.
+- An entry with **no labels is the catch-all** for issues matching nothing else.
   At most one per axis. Issues that fit neither are counted as "unplaced" on the board.
 - Dragging an issue removes the source entry's labels it carries and adds what the target
   entry needs: its first label, or every label for an "all" entry. Dropping on a catch-all

@@ -46,11 +46,11 @@ describe("placeIn", () => {
     expect(placeIn([groups[0]!], new Set(["y"]))).toBeNull();
   });
 
-  it("matches a kind-only group in list order, not as the catch-all", () => {
+  it("matches an is:-only group in list order, not as the catch-all", () => {
     const groups = [
       { id: "bugs", labels: ["bug"] },
       { id: "rest", labels: [] },
-      { id: "prs", labels: [], kind: "pr" as const },
+      { id: "prs", labels: ["is:pr"] },
     ];
     expect(placeIn(groups, new Set(["bug"]))?.id).toBe("bugs");
     expect(placeIn(groups, new Set())?.id).toBe("prs");
@@ -62,9 +62,8 @@ describe("placeCard", () => {
   const prs: Swimlane = {
     id: "prs",
     name: "PRs",
-    labels: [],
+    labels: ["is:pr"],
     match: "any",
-    kind: "pr",
     hideBlocked: false,
   };
   const dashboard = { ...DASHBOARD, swimlanes: [prs, ...DASHBOARD.swimlanes] };
@@ -78,6 +77,23 @@ describe("placeCard", () => {
       lane: { id: "prs" },
       column: { id: "todo" },
     });
+  });
+
+  it("puts a card carrying two columns' labels in the later column", () => {
+    expect(placeCard(DASHBOARD, "issue", new Set(["phase:done", "phase:doing"]))).toMatchObject({
+      column: { id: "done" },
+    });
+  });
+
+  it("ands is: tokens with the labels, whatever the match", () => {
+    const lanes = [
+      { ...prs, id: "pr-high", labels: ["is:pr", "prio:high", "prio:low"] },
+      ...DASHBOARD.swimlanes,
+    ];
+    const withLanes = { ...DASHBOARD, swimlanes: lanes };
+    expect(placeCard(withLanes, "pr", new Set(["prio:low"]))?.lane.id).toBe("pr-high");
+    expect(placeCard(withLanes, "pr", new Set())?.lane.id).toBe("rest");
+    expect(placeCard(withLanes, "issue", new Set(["prio:low"]))?.lane.id).toBe("low");
   });
 
   it("returns null when no column takes the labels", () => {
@@ -127,8 +143,8 @@ describe("buildBoard", () => {
       ...DASHBOARD,
       columns: [
         { id: "todo", name: "Todo", labels: [], match: "any" as const },
-        { id: "waiting", name: "Waiting", labels: ["phase:doing", "wait"], match: "all" as const },
         { id: "doing", name: "Doing", labels: ["phase:doing"], match: "any" as const },
+        { id: "waiting", name: "Waiting", labels: ["phase:doing", "wait"], match: "all" as const },
       ],
     };
     const issues = [
@@ -167,9 +183,8 @@ describe("buildBoard", () => {
         {
           id: "prs",
           name: "PRs",
-          labels: [],
+          labels: ["is:pr"],
           match: "any" as const,
-          kind: "pr" as const,
           hideBlocked: false,
         },
         ...DASHBOARD.swimlanes,
@@ -382,6 +397,19 @@ describe("labelDiffForMove", () => {
         { lane: high, col: done },
       ),
     ).toEqual({ add: ["phase:done"], remove: ["phase:doing"] });
+  });
+
+  it("never adds an is: token as a label", () => {
+    const prs = { id: "prs", labels: ["is:pr"] };
+    const review = { id: "review", labels: ["is:pr", "review"] };
+    expect(labelDiffForMove([], { lane: rest, col: todo }, { lane: prs, col: todo })).toEqual({
+      add: [],
+      remove: [],
+    });
+    expect(labelDiffForMove([], { lane: prs, col: todo }, { lane: review, col: todo })).toEqual({
+      add: ["review"],
+      remove: [],
+    });
   });
 
   it("swaps the lane label when only the lane changes", () => {

@@ -49,7 +49,7 @@ describe("config file", () => {
       sort: { by: "updated", dir: "desc" },
       refreshMinutes: 5,
       scope: "mine",
-      swimlanes: [{ id: "all", labels: [], match: "any", kind: "any", hideBlocked: false }],
+      swimlanes: [{ id: "all", labels: [], match: "any", hideBlocked: false }],
       columns: [{ id: "todo", labels: [], match: "any" }],
     });
     expect(loadConfig(file)).toEqual(saved);
@@ -102,13 +102,13 @@ describe("config schema rules", () => {
     expect(() => saveConfig(twoCatchAlls, "/dev/null/never")).toThrow(/catch-all/);
   });
 
-  it("does not count a kind-only swimlane as a catch-all", () => {
+  it("does not count an is:pr swimlane as a catch-all", () => {
     const prLane = {
       dashboards: [
         {
           ...base,
           swimlanes: [
-            { id: "prs", name: "PRs", kind: "pr" },
+            { id: "prs", name: "PRs", labels: ["is:pr"] },
             { id: "rest", name: "Rest" },
           ],
         },

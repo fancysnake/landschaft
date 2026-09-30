@@ -4,8 +4,8 @@ import {
   type Filters,
   fitsKind,
   isCatchAll,
-  type KindFilter,
   type Match,
+  realLabels,
   selectedRepos,
   type SortBy,
   type SortDir,
@@ -27,26 +27,26 @@ export interface Group {
   labels: string[];
   /** Defaults to "any". */
   match?: Match;
-  /** Swimlanes only; what tells a kind-only lane from the catch-all. */
-  kind?: KindFilter;
 }
 
 function matches(group: Group, labelNames: Set<string>): boolean {
-  // A kind-only lane (no labels, a kind set) takes every item, in list order.
-  if (group.labels.length === 0) return (group.kind ?? "any") !== "any";
+  const labels = realLabels(group.labels);
+  // Only `is:` tokens: takes every item (of that kind), in list order.
+  if (labels.length === 0) return group.labels.length > 0;
   return group.match === "all"
-    ? group.labels.every((label) => labelNames.has(label))
-    : group.labels.some((label) => labelNames.has(label));
+    ? labels.every((label) => labelNames.has(label))
+    : labels.some((label) => labelNames.has(label));
 }
 
 /** The labels a group needs an issue to carry: all of them, or just the first. */
 function wantedLabels(group: Group): string[] {
-  return group.match === "all" ? group.labels : group.labels.slice(0, 1);
+  const labels = realLabels(group.labels);
+  return group.match === "all" ? labels : labels.slice(0, 1);
 }
 
 /**
  * First group (in order) whose labels the issue satisfies (any or all of them, per `match`;
- * a kind-only group needs none); otherwise the catch-all (no labels, any kind), wherever it
+ * a group of only `is:` tokens needs none); otherwise the catch-all (no labels), wherever it
  * sits in the list; otherwise null. Groups of the wrong kind are the caller's to drop.
  */
 export function placeIn<T extends Group>(groups: T[], labelNames: Set<string>): T | null {
@@ -55,15 +55,19 @@ export function placeIn<T extends Group>(groups: T[], labelNames: Set<string>): 
   return groups.find(isCatchAll) ?? null;
 }
 
-/** The lane (among those taking `kind`) and column an item carrying `labelNames` lands in. */
+/**
+ * The lane and column (among those taking `kind`) an item carrying `labelNames` lands in:
+ * the first matching lane, but the last matching column, so a card carrying two stages'
+ * labels sits in the later one.
+ */
 export function placeCard(
   dashboard: Pick<Dashboard, "swimlanes" | "columns">,
   kind: IssueKind,
   labelNames: Set<string>,
 ): { lane: Swimlane; column: Column } | null {
-  const lanes = dashboard.swimlanes.filter((lane) => fitsKind(lane.kind, kind));
-  const lane = placeIn(lanes, labelNames);
-  const column = placeIn(dashboard.columns, labelNames);
+  const takes = (group: Group) => fitsKind(group.labels, kind);
+  const lane = placeIn(dashboard.swimlanes.filter(takes), labelNames);
+  const column = placeIn(dashboard.columns.filter(takes).toReversed(), labelNames);
   return lane && column ? { lane, column } : null;
 }
 

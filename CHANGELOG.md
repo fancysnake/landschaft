@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- A card carrying the labels of several columns sits in the last of them, not the first;
+  swimlanes still take the first match.
+- Swimlanes and columns take only issues or only pull requests with `is:issue` / `is:pr` in
+  their labels, replacing the swimlane `"kind"` field.
+
 ## [0.5.0] - 2026-09-29
 
 ### Added

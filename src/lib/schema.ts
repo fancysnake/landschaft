@@ -12,16 +12,12 @@ const labelList = z.array(z.string().min(1)).default([]);
 /** "any": the issue carries at least one of the labels; "all": it carries every one. */
 export const MatchSchema = z.enum(["any", "all"]);
 export type Match = z.infer<typeof MatchSchema>;
-/** Which items a swimlane takes: both, only issues, or only pull requests. */
-export const KindFilterSchema = z.enum(["any", "issue", "pr"]);
-export type KindFilter = z.infer<typeof KindFilterSchema>;
 
 export const SwimlaneSchema = z.object({
   id,
   name: z.string().min(1),
   labels: labelList,
   match: MatchSchema.default("any"),
-  kind: KindFilterSchema.default("any"),
   hideBlocked: z.boolean().default(false),
 });
 
@@ -44,14 +40,24 @@ function hasUniqueIds(items: { id: string }[]): boolean {
   return new Set(items.map((item) => item.id)).size === items.length;
 }
 
-/** No labels and no kind restriction: takes whatever no other entry does. */
-export function isCatchAll(group: { labels: string[]; kind?: KindFilter }): boolean {
-  return group.labels.length === 0 && (group.kind ?? "any") === "any";
+/** Swimlane label-list tokens that take only issues or only pull requests, as on GitHub. */
+export const KIND_TOKENS = ["is:issue", "is:pr"] as const;
+const isKindToken = (label: string): boolean => (KIND_TOKENS as readonly string[]).includes(label);
+
+/** The labels without the `is:` tokens. */
+export function realLabels(labels: string[]): string[] {
+  return labels.filter((label) => !isKindToken(label));
 }
 
-/** Whether a swimlane's kind filter lets an item of this kind in. */
-export function fitsKind(filter: KindFilter, kind: IssueKind): boolean {
-  return filter === "any" || filter === kind;
+/** Nothing in the label list, not even an `is:` token: takes whatever no other entry does. */
+export function isCatchAll(group: { labels: string[] }): boolean {
+  return group.labels.length === 0;
+}
+
+/** Whether a swimlane's `is:` tokens let this kind in; none (or both) take either kind. */
+export function fitsKind(labels: string[], kind: IssueKind): boolean {
+  const tokens = labels.filter(isKindToken);
+  return tokens.length === 0 || tokens.includes(`is:${kind}`);
 }
 
 /** "mine": only issues the viewer created or is assigned to; "all": every open issue. */
@@ -79,7 +85,7 @@ export const DashboardSchema = z
         ctx.addIssue({
           code: "custom",
           path: [axis],
-          message: `at most one catch-all (${axis === "swimlanes" ? "no labels, any kind" : "no labels"}) allowed`,
+          message: "at most one catch-all (no labels) allowed",
         });
       }
     }

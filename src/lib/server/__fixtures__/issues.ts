@@ -46,11 +46,10 @@ export const DASHBOARD: Dashboard = {
       name: "High",
       labels: ["prio:high"],
       match: "any",
-      kind: "any",
       hideBlocked: false,
     },
-    { id: "low", name: "Low", labels: ["prio:low"], match: "any", kind: "any", hideBlocked: true },
-    { id: "rest", name: "Rest", labels: [], match: "any", kind: "any", hideBlocked: false },
+    { id: "low", name: "Low", labels: ["prio:low"], match: "any", hideBlocked: true },
+    { id: "rest", name: "Rest", labels: [], match: "any", hideBlocked: false },
   ],
   columns: [
     { id: "todo", name: "Todo", labels: [], match: "any" },

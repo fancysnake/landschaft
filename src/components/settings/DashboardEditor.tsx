@@ -131,7 +131,6 @@ export function DashboardEditor({ dashboard, onChange }: Props) {
           name: "New lane",
           labels: [],
           match: "any",
-          kind: "any",
           hideBlocked: false,
         })}
         labels={catalog}

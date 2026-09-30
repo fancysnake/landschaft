@@ -1,6 +1,6 @@
 import type { LabelDef } from "../../lib/types";
 
-import { isCatchAll, type KindFilter, type Match } from "../../lib/schema";
+import { isCatchAll, KIND_TOKENS, type Match, realLabels } from "../../lib/schema";
 import { LabelPicker } from "./LabelPicker";
 
 interface Group {
@@ -8,7 +8,6 @@ interface Group {
   name: string;
   labels: string[];
   match: Match;
-  kind?: KindFilter;
   hideBlocked?: boolean;
 }
 
@@ -18,7 +17,7 @@ interface Props<T extends Group> {
   onChange(items: T[]): void;
   create(id: string): T;
   labels: LabelDef[];
-  /** Swimlanes get the kind select and the "hide blocked" toggle. */
+  /** Swimlanes get the "hide blocked" toggle. */
   swimlanes?: boolean;
 }
 
@@ -53,19 +52,23 @@ export function LaneColumnEditor<T extends Group>({
     onChange(next);
   };
   const catchAlls = items.filter(isCatchAll).length;
-  const catchAll = swimlanes ? "no labels, any kind" : "no labels";
+  const options = [
+    ...labels,
+    ...KIND_TOKENS.map((name) => ({ name, color: "e5e5e5", repo: "", description: null })),
+  ];
 
   return (
     <section>
       <div className="mb-2 flex items-baseline justify-between">
         <h3 className="font-medium">{title}</h3>
         <span className="text-xs text-neutral-500">
-          first matching entry wins · any or all of its labels · one catch-all ({catchAll})
+          {swimlanes ? "first" : "last"} matching entry wins · any or all of its labels · is:issue /
+          is:pr · one catch-all (no labels)
         </span>
       </div>
       {catchAlls > 1 && (
         <p className="mb-2 text-xs text-red-700">
-          Only one {title.toLowerCase()} entry may be a catch-all ({catchAll}).
+          Only one {title.toLowerCase()} entry may be a catch-all (no labels).
         </p>
       )}
       <ol className="space-y-2">
@@ -79,34 +82,20 @@ export function LaneColumnEditor<T extends Group>({
               />
               <div className="mt-0.5 font-mono text-[10px] text-neutral-400">{item.id}</div>
               {swimlanes && (
-                <>
-                  <select
-                    value={item.kind ?? "any"}
+                <label className="mt-1 flex items-center gap-1 text-xs text-neutral-700">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(item.hideBlocked)}
                     onChange={(event) =>
-                      replace(index, { ...item, kind: event.target.value as KindFilter })
+                      replace(index, { ...item, hideBlocked: event.target.checked })
                     }
-                    title="Take issues, pull requests, or both"
-                    className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-1.5 py-1 text-xs"
-                  >
-                    <option value="any">issues and PRs</option>
-                    <option value="issue">issues only</option>
-                    <option value="pr">PRs only</option>
-                  </select>
-                  <label className="mt-1 flex items-center gap-1 text-xs text-neutral-700">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(item.hideBlocked)}
-                      onChange={(event) =>
-                        replace(index, { ...item, hideBlocked: event.target.checked })
-                      }
-                    />
-                    hide blocked
-                  </label>
-                </>
+                  />
+                  hide blocked
+                </label>
               )}
             </div>
             <div className="flex items-start gap-2">
-              {item.labels.length >= 2 && (
+              {realLabels(item.labels).length >= 2 && (
                 <select
                   value={item.match}
                   onChange={(event) =>
@@ -123,7 +112,7 @@ export function LaneColumnEditor<T extends Group>({
                 <LabelPicker
                   value={item.labels}
                   onChange={(value) => replace(index, { ...item, labels: value })}
-                  options={labels}
+                  options={options}
                 />
               </div>
             </div>

@@ -11,7 +11,7 @@ interface Props {
   cards: Card[];
   showRepo: boolean;
   dragging: DragPayload | null;
-  /** Whether the lane takes a card of this kind. */
+  /** Whether the lane and column take a card of this kind. */
   accepts(kind: IssueKind): boolean;
   onDragStart(payload: DragPayload): void;
   onDragEnd(): void;
@@ -30,7 +30,7 @@ export function Cell({
   onDrop,
 }: Props) {
   const [over, setOver] = useState(false);
-  /** Not the cell the card came from, and a lane that takes its kind. */
+  /** Not the cell the card came from, and one that takes its kind. */
   const allows = (payload: DragPayload) =>
     !(payload.laneId === laneId && payload.colId === colId) && accepts(payload.card.kind);
   const canDrop = dragging !== null && allows(dragging);
