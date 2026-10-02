@@ -7,9 +7,11 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-02
+
 ### Added
 
-- Columns take only issues or only pull requests too (`"kind"`), like swimlanes.
+- A column takes only issues or only pull requests with `"kind": "issue"` or `"pr"`.
 
 ### Changed
 
@@ -79,7 +81,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v0.5.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/fancysnake/landschaft/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/fancysnake/landschaft/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/fancysnake/landschaft/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/fancysnake/landschaft/compare/v0.2.0...v0.3.0
