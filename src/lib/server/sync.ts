@@ -12,6 +12,7 @@ import {
   fetchViewer,
   type GithubClient,
   type PageOptions,
+  STATUS_BATCH,
 } from "./github";
 
 const FULL_SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -127,8 +128,7 @@ export class Syncer {
       }
 
       const closed = full ? this.db.closeMissing(repo, seen) : 0;
-      const pulls = this.db.openPullNumbers(repo);
-      this.db.setPullStatuses(repo, await fetchPullStatuses(this.gh, repo, pulls));
+      await this.refreshPullStatuses(repo);
       this.db.upsertLabels(repo, await fetchRepoLabels(this.gh, repo));
 
       const stamp = startedAt.toISOString();
@@ -166,25 +166,40 @@ export class Syncer {
     let after: string | null = null;
     do {
       const page = await fetchPage(this.gh, repo, { ...query, after });
-      this.rateRemaining = page.rateRemaining;
       this.db.upsertIssues(page.issues);
       upserted += page.issues.length;
       for (const issue of page.issues) seen.add(issue.number);
       after = page.hasNextPage ? page.endCursor : null;
-      if (after && page.rateRemaining < RATE_FLOOR) {
-        throw new Error(
-          `GitHub rate limit nearly exhausted (${page.rateRemaining} left), sync aborted`,
-        );
-      }
+      this.spend(page.rateRemaining, Boolean(after));
     } while (after);
     return upserted;
   }
 
+  /** Stores the statuses of every open PR in the cache, `STATUS_BATCH` PRs per query. */
+  private async refreshPullStatuses(repo: string): Promise<void> {
+    const numbers = this.db.openPullNumbers(repo);
+    for (let start = 0; start < numbers.length; start += STATUS_BATCH) {
+      const batch = numbers.slice(start, start + STATUS_BATCH);
+      const page = await fetchPullStatuses(this.gh, repo, batch);
+      this.db.setPullStatuses(repo, page.statuses);
+      this.spend(page.rateRemaining, start + STATUS_BATCH < numbers.length);
+    }
+  }
+
+  /** Records the rate limit left; aborts the sync when it runs low and `more` requests follow. */
+  private spend(rateRemaining: number, more: boolean): void {
+    this.rateRemaining = rateRemaining;
+    if (more && rateRemaining < RATE_FLOOR) {
+      throw new Error(`GitHub rate limit nearly exhausted (${rateRemaining} left), sync aborted`);
+    }
+  }
+
+  /** Refetches one item; returns it as cached, PR statuses included. */
   async syncIssue(repo: string, number: number): Promise<Issue | null> {
     const issue = await fetchIssue(this.gh, repo, number);
     if (issue) this.db.upsertIssues([issue]);
     this.bump();
-    return issue;
+    return issue && this.db.getIssue(repo, number);
   }
 }
 

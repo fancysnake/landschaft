@@ -252,11 +252,11 @@ describe("buildBoard", () => {
       ],
     };
     const issues = [
-      makeIssue({ number: 1, kind: "pr", conflicting: true }),
-      makeIssue({ number: 2, kind: "pr", ciNotOk: true }),
-      makeIssue({ number: 3, kind: "pr", unanswered: true }),
+      makeIssue({ number: 1, kind: "pr", statuses: ["is:conflicting"] }),
+      makeIssue({ number: 2, kind: "pr", statuses: ["is:ci-not-ok"] }),
+      makeIssue({ number: 3, kind: "pr", statuses: ["is:unanswered"] }),
       makeIssue({ number: 4, kind: "pr" }),
-      makeIssue({ number: 5, labels: [label("is:conflicting")] }),
+      makeIssue({ number: 5, kind: "pr", labels: [label("is:conflicting")] }),
     ];
     const board = buildBoard(issues, dashboard);
     expect(board.cells[cell("fix", "todo")]?.map((c) => c.number)).toEqual([3, 2, 1]);

@@ -1,7 +1,9 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-import type { Issue, IssueState, LabelDef } from "../types";
+import type { FetchedIssue, IssueState, LabelDef, PullStatus } from "../types";
+
+import { STATUS_LABEL_NAMES, type StatusLabel } from "../schema";
 
 const execFileAsync = promisify(execFile);
 
@@ -251,14 +253,10 @@ function baseFields(repo: string, node: IssueNode | PullNode) {
     closedAt: node.closedAt,
     labels: node.labels.nodes.map((l) => ({ name: l.name, color: l.color })),
     assignees: node.assignees.nodes.map((a) => ({ login: a.login, avatarUrl: a.avatarUrl })),
-    // Set for open PRs by `fetchPullStatuses`; never true for issues.
-    conflicting: false,
-    ciNotOk: false,
-    unanswered: false,
   };
 }
 
-export function toIssue(repo: string, node: IssueNode): Issue {
+export function toIssue(repo: string, node: IssueNode): FetchedIssue {
   return {
     ...baseFields(repo, node),
     kind: "issue",
@@ -283,7 +281,7 @@ export function toIssue(repo: string, node: IssueNode): Issue {
 }
 
 /** A merged PR counts as closed. */
-export function toPull(repo: string, node: PullNode): Issue {
+export function toPull(repo: string, node: PullNode): FetchedIssue {
   return {
     ...baseFields(repo, node),
     kind: "pr",
@@ -307,7 +305,7 @@ function splitRepo(repo: string): { owner: string; name: string } {
 }
 
 export interface IssuesPage {
-  issues: Issue[];
+  issues: FetchedIssue[];
   hasNextPage: boolean;
   endCursor: string | null;
   rateRemaining: number;
@@ -369,27 +367,20 @@ export async function fetchPullsPage(
 
 /** A commit status rollup entry: a check run, or a commit status. */
 export type CheckContext =
-  | { status: string; conclusion: string | null; isRequired: boolean }
-  | { state: string; isRequired: boolean };
+  | { type: "CheckRun"; status: string; conclusion: string | null; isRequired: boolean }
+  | { type: "StatusContext"; state: string; isRequired: boolean };
 
 const PASSED = new Set(["SUCCESS", "NEUTRAL", "SKIPPED"]);
 
 /** A required check failed or has not finished; checks not required to merge are ignored. */
-export function ciNotOk(contexts: CheckContext[]): boolean {
+function ciNotOk(contexts: CheckContext[]): boolean {
   return contexts.some(
     (check) =>
       check.isRequired &&
-      ("state" in check
+      (check.type === "StatusContext"
         ? check.state !== "SUCCESS"
         : check.status !== "COMPLETED" || !PASSED.has(check.conclusion ?? "")),
   );
-}
-
-export interface PullStatus {
-  number: number;
-  conflicting: boolean;
-  ciNotOk: boolean;
-  unanswered: boolean;
 }
 
 interface Login {
@@ -411,17 +402,18 @@ export interface PullStatusNode {
 /** Unanswered: an unresolved review thread whose last comment is not the PR author's. */
 export function toPullStatus(node: PullStatusNode): PullStatus {
   const author = node.author?.login;
-  return {
-    number: node.number,
-    conflicting: node.mergeable === "CONFLICTING",
-    ciNotOk: ciNotOk(node.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? []),
-    unanswered: node.reviewThreads.nodes.some(
+  const holds: Record<StatusLabel, boolean> = {
+    "is:conflicting": node.mergeable === "CONFLICTING",
+    "is:ci-not-ok": ciNotOk(node.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? []),
+    "is:unanswered": node.reviewThreads.nodes.some(
       (thread) => !thread.isResolved && thread.comments.nodes[0]?.author?.login !== author,
     ),
   };
+  return { number: node.number, statuses: STATUS_LABEL_NAMES.filter((name) => holds[name]) };
 }
 
-const STATUS_BATCH = 50;
+/** PRs per status query; the caller splits the open PRs into batches this size. */
+export const STATUS_BATCH = 50;
 
 /**
  * `isRequired` takes the PR number as an argument, so each PR is its own aliased field.
@@ -432,6 +424,7 @@ function pullStatusField(number: number): string {
   return `pr${number}: pullRequest(number: ${number}) {
     number mergeable author { login }
     commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {
+      type: __typename
       ... on CheckRun { status conclusion isRequired(pullRequestNumber: ${number}) }
       ... on StatusContext { state isRequired(pullRequestNumber: ${number}) }
     } } } } } }
@@ -439,34 +432,34 @@ function pullStatusField(number: number): string {
   }`;
 }
 
+export interface PullStatusPage {
+  statuses: PullStatus[];
+  rateRemaining: number;
+}
+
 /**
- * Merge conflicts, required checks and review threads of the given PRs. Not all of it bumps a
- * PR's `updatedAt`, so the sync asks for every open PR each time.
+ * Merge conflicts, required checks and review threads of up to `STATUS_BATCH` PRs, in one
+ * query. Not all of it bumps a PR's `updatedAt`, so the sync asks for every open PR each time.
  */
 export async function fetchPullStatuses(
   gh: GithubClient,
   repo: string,
   numbers: number[],
-): Promise<PullStatus[]> {
-  const statuses: PullStatus[] = [];
-  for (let start = 0; start < numbers.length; start += STATUS_BATCH) {
-    const fields = numbers
-      .slice(start, start + STATUS_BATCH)
-      .map(pullStatusField)
-      .join("\n");
-    const data = await gh.gql<{ repository: Record<string, PullStatusNode | null> | null }>(
-      `query PullStatus($owner: String!, $name: String!) {
-        repository(owner: $owner, name: $name) { ${fields} }
-      }`,
-      splitRepo(repo),
-    );
-    if (!data.repository)
-      throw new GithubError(`repository ${repo} not found or not accessible`, 404);
-    for (const node of Object.values(data.repository)) {
-      if (node) statuses.push(toPullStatus(node));
-    }
-  }
-  return statuses;
+): Promise<PullStatusPage> {
+  const data = await gh.gql<{
+    rateLimit: { remaining: number };
+    repository: Record<string, PullStatusNode | null> | null;
+  }>(
+    `query PullStatus($owner: String!, $name: String!) {
+      rateLimit { remaining }
+      repository(owner: $owner, name: $name) { ${numbers.map(pullStatusField).join("\n")} }
+    }`,
+    splitRepo(repo),
+  );
+  if (!data.repository)
+    throw new GithubError(`repository ${repo} not found or not accessible`, 404);
+  const nodes = Object.values(data.repository).filter((node) => node !== null);
+  return { statuses: nodes.map(toPullStatus), rateRemaining: data.rateLimit.remaining };
 }
 
 /** Login of the account the token belongs to. */
@@ -479,7 +472,7 @@ export async function fetchIssue(
   gh: GithubClient,
   repo: string,
   number: number,
-): Promise<Issue | null> {
+): Promise<FetchedIssue | null> {
   const data = await gh.gql<IssueData>(ISSUE_QUERY, { ...splitRepo(repo), number });
   const node = data.repository?.issueOrPullRequest;
   if (!node) return null;

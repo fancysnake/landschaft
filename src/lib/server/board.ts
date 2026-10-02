@@ -8,7 +8,6 @@ import {
   isStatusLabel,
   type KindFilter,
   type Match,
-  matchLabels,
   type Precedence,
   selectedRepos,
   type SortBy,
@@ -33,6 +32,15 @@ export interface Group {
   match?: Match;
   /** Defaults to "any"; what tells a kind-only group from the catch-all. */
   kind?: KindFilter;
+}
+
+/**
+ * The item's label names plus the PR status labels that hold for it; a real GitHub label
+ * named like a status does not count as one.
+ */
+export function matchLabels(issue: Pick<Issue, "labels" | "statuses">): Set<string> {
+  const names = issue.labels.map((label) => label.name).filter((name) => !isStatusLabel(name));
+  return new Set([...names, ...issue.statuses]);
 }
 
 function matches(group: Group, labelNames: Set<string>): boolean {

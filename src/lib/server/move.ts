@@ -2,8 +2,8 @@ import type { Issue, LabelRef } from "../types";
 import type { Db } from "./db";
 import type { Syncer } from "./sync";
 
-import { cellTakes, type Dashboard, matchLabels, type MoveRequest } from "../schema";
-import { labelDiffForMove, placeCard } from "./board";
+import { cellTakes, type Dashboard, type MoveRequest } from "../schema";
+import { labelDiffForMove, matchLabels, placeCard } from "./board";
 import { addLabels, type GithubClient, removeLabel } from "./github";
 
 export class MoveError extends Error {

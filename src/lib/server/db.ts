@@ -3,15 +3,16 @@ import { DatabaseSync } from "node:sqlite";
 import type {
   Assignee,
   Blocker,
+  FetchedIssue,
   Issue,
   IssueKind,
   IssueRef,
   IssueState,
   LabelDef,
   LabelRef,
+  PullStatus,
   SyncState,
 } from "../types";
-import type { PullStatus } from "./github";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS issues (
@@ -82,9 +83,7 @@ interface IssueRow {
   blocked_by_total: number;
   kind: string;
   linked_json: string;
-  conflicting: number;
-  ci_not_ok: number;
-  unanswered: number;
+  status_json: string;
 }
 
 interface BlockerRow {
@@ -138,9 +137,7 @@ function rowToIssue(row: IssueRow, blockedBy: Blocker[]): Issue {
     blockedBy,
     blockedByTotal: row.blocked_by_total,
     linked: JSON.parse(row.linked_json) as IssueRef[],
-    conflicting: row.conflicting === 1,
-    ciNotOk: row.ci_not_ok === 1,
-    unanswered: row.unanswered === 1,
+    statuses: JSON.parse(row.status_json) as Issue["statuses"],
   };
 }
 
@@ -152,9 +149,7 @@ const ADDED_COLUMNS = [
   ["author", "TEXT"],
   ["kind", "TEXT NOT NULL DEFAULT 'issue'"],
   ["linked_json", "TEXT NOT NULL DEFAULT '[]'"],
-  ["conflicting", "INTEGER NOT NULL DEFAULT 0"],
-  ["ci_not_ok", "INTEGER NOT NULL DEFAULT 0"],
-  ["unanswered", "INTEGER NOT NULL DEFAULT 0"],
+  ["status_json", "TEXT NOT NULL DEFAULT '[]'"],
 ] as const;
 
 export function dbPath(): string {
@@ -205,8 +200,8 @@ export class Db {
     }
   }
 
-  /** Leaves the PR status columns alone; `setPullStatuses` owns them. */
-  upsertIssues(issues: Issue[]): void {
+  /** Leaves `status_json` alone; `setPullStatuses` owns it. */
+  upsertIssues(issues: FetchedIssue[]): void {
     if (issues.length === 0) return;
     const upsert = this.db.prepare(`
       INSERT INTO issues (repo, number, node_id, title, state, url, issue_type, author, created_at,
@@ -326,11 +321,10 @@ export class Db {
 
   setPullStatuses(repo: string, statuses: PullStatus[]): void {
     const update = this.db.prepare(
-      "UPDATE issues SET conflicting = ?, ci_not_ok = ?, unanswered = ? WHERE repo = ? AND number = ?",
+      "UPDATE issues SET status_json = ? WHERE repo = ? AND number = ?",
     );
     this.transaction(() => {
-      for (const s of statuses)
-        update.run(Number(s.conflicting), Number(s.ciNotOk), Number(s.unanswered), repo, s.number);
+      for (const s of statuses) update.run(JSON.stringify(s.statuses), repo, s.number);
     });
   }
 

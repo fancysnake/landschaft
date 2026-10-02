@@ -96,7 +96,7 @@ export function LaneColumnEditor<T extends Group>({
         <h3 className="font-medium">{title}</h3>
         <span className="text-xs text-neutral-500">
           {AXIS_PRECEDENCE[axis]} matching entry wins · any or all of its labels · is:issue / is:pr
-          · is:conflicting / is:ci-not-ok / is:unanswered · one catch-all (no labels)
+          · {STATUS_LABEL_NAMES.join(" / ")} · one catch-all (no labels)
         </span>
       </div>
       {catchAlls > 1 && (

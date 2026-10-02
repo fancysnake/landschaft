@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { Issue, IssueKind } from "./types";
+import type { IssueKind } from "./types";
 
 const id = z
   .string()
@@ -8,7 +8,27 @@ const id = z
   .max(32)
   .regex(/^[a-z0-9_-]+$/i, "letters, digits, - and _ only");
 export const repoName = z.string().regex(/^[\w.-]+\/[\w.-]+$/, "expected owner/repo");
-const labelList = z.array(z.string().min(1)).default([]);
+
+/**
+ * PR states an entry lists among its labels and matches like labels; they are read from
+ * GitHub, never written to it.
+ */
+export const STATUS_LABEL_NAMES = ["is:conflicting", "is:ci-not-ok", "is:unanswered"] as const;
+export type StatusLabel = (typeof STATUS_LABEL_NAMES)[number];
+
+export function isStatusLabel(name: string): name is StatusLabel {
+  return (STATUS_LABEL_NAMES as readonly string[]).includes(name);
+}
+
+/** `is:issue` / `is:pr` live in `kind`, so the only `is:` labels are statuses. */
+const label = z
+  .string()
+  .min(1)
+  .refine(
+    (name) => !name.startsWith("is:") || isStatusLabel(name),
+    `not a PR status label; expected one of ${STATUS_LABEL_NAMES.join(", ")}`,
+  );
+const labelList = z.array(label).default([]);
 /** "any": the issue carries at least one of the labels; "all": it carries every one. */
 export const MatchSchema = z.enum(["any", "all"]);
 export type Match = z.infer<typeof MatchSchema>;
@@ -43,28 +63,6 @@ export const SortSchema = z.object({
 
 function hasUniqueIds(items: { id: string }[]): boolean {
   return new Set(items.map((item) => item.id)).size === items.length;
-}
-
-/**
- * PR states an entry lists among its labels and matches like labels; they are read from
- * GitHub, never written to it.
- */
-const STATUS_LABELS = {
-  "is:conflicting": (issue: StatusFacts) => issue.conflicting,
-  "is:ci-not-ok": (issue: StatusFacts) => issue.ciNotOk,
-  "is:unanswered": (issue: StatusFacts) => issue.unanswered,
-} as const;
-type StatusFacts = Pick<Issue, "conflicting" | "ciNotOk" | "unanswered">;
-export const STATUS_LABEL_NAMES = Object.keys(STATUS_LABELS);
-
-export function isStatusLabel(name: string): boolean {
-  return Object.hasOwn(STATUS_LABELS, name);
-}
-
-/** The item's label names plus the status labels that hold for it. */
-export function matchLabels(issue: StatusFacts & Pick<Issue, "labels">): Set<string> {
-  const held = Object.entries(STATUS_LABELS).filter(([, holds]) => holds(issue));
-  return new Set([...issue.labels.map((label) => label.name), ...held.map(([name]) => name)]);
 }
 
 /** No labels and no kind restriction: takes whatever no other entry does. */

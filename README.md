@@ -101,7 +101,8 @@ Saving triggers the first sync; once labels are cached the pickers suggest them.
   `is:conflicting` (merge conflicts), `is:ci-not-ok` (a check required to merge failed or is
   still running; optional checks are ignored) and `is:unanswered` (an unresolved review thread
   whose last comment is not the PR author's). One "any of" swimlane with all three gathers the
-  PRs waiting on their author. A move never adds or removes them.
+  PRs waiting on their author. A move never adds or removes them. The config rejects any other
+  `is:` label.
 - An entry with **no labels (and any kind) is the catch-all** for issues matching nothing else.
   At most one per axis. Issues that fit neither are counted as "unplaced" on the board.
 - Dragging an issue removes the source entry's labels it carries and adds what the target

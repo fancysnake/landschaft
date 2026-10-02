@@ -1,4 +1,4 @@
-import type { SortBy, SortDir } from "./schema";
+import type { SortBy, SortDir, StatusLabel } from "./schema";
 
 export type IssueState = "OPEN" | "CLOSED";
 export type IssueKind = "issue" | "pr";
@@ -59,12 +59,16 @@ export interface Issue {
   blockedByTotal: number;
   /** Issues a PR closes when merged; empty for issues. */
   linked: IssueRef[];
-  /** PR has merge conflicts with its base; false for issues. */
-  conflicting: boolean;
-  /** A required check on the PR's head failed or has not finished; false for issues. */
-  ciNotOk: boolean;
-  /** An unresolved review thread whose last comment is not the PR author's; false for issues. */
-  unanswered: boolean;
+  /** PR status labels that hold for a PR, set by the sync's status query; empty for issues. */
+  statuses: StatusLabel[];
+}
+
+/** An issue or PR as GitHub's issue and PR queries return it, without the PR statuses. */
+export type FetchedIssue = Omit<Issue, "statuses">;
+
+export interface PullStatus {
+  number: number;
+  statuses: StatusLabel[];
 }
 
 export function issueKey(repo: string, number: number): string {
