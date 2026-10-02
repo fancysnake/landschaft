@@ -17,8 +17,10 @@ function newDashboard(): Dashboard {
     scope: "mine",
     sort: { by: "updated", dir: "desc" },
     refreshMinutes: 5,
-    swimlanes: [{ id: "all", name: "Everything", labels: [], match: "any", hideBlocked: false }],
-    columns: [{ id: "todo", name: "Todo", labels: [], match: "any" }],
+    swimlanes: [
+      { id: "all", name: "Everything", labels: [], match: "any", kind: "any", hideBlocked: false },
+    ],
+    columns: [{ id: "todo", name: "Todo", labels: [], match: "any", kind: "any" }],
   };
 }
 

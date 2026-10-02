@@ -94,9 +94,10 @@ Saving triggers the first sync; once labels are cached the pickers suggest them.
   swimlane and the **last** column (in order) it satisfies, so a card carrying two stages'
   labels sits in the later one: by default carrying **any** of the labels; an entry set to
   **all** needs every one of them (`"match": "all"` in the config).
-- `is:issue` or `is:pr` in an entry's labels takes **only issues or only pull requests**, on
-  top of the other labels whatever the match; alone it takes every item of that kind.
-- An entry with **no labels is the catch-all** for issues matching nothing else.
+- A swimlane or column can take **only issues or only pull requests** (`"kind": "issue"` /
+  `"pr"`, default `"any"`; an `is:issue` / `is:pr` chip in the settings editor), on top of its
+  labels whatever the match; with no labels it takes every item of that kind.
+- An entry with **no labels (and any kind) is the catch-all** for issues matching nothing else.
   At most one per axis. Issues that fit neither are counted as "unplaced" on the board.
 - Dragging an issue removes the source entry's labels it carries and adds what the target
   entry needs: its first label, or every label for an "all" entry. Dropping on a catch-all

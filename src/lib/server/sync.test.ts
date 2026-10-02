@@ -297,8 +297,10 @@ describe("startScheduler", () => {
           scope: "all",
           sort: { by: "updated", dir: "desc" },
           refreshMinutes: 5,
-          swimlanes: [{ id: "a", name: "A", labels: [], match: "any", hideBlocked: false }],
-          columns: [{ id: "c", name: "C", labels: [], match: "any" }],
+          swimlanes: [
+            { id: "a", name: "A", labels: [], match: "any", kind: "any", hideBlocked: false },
+          ],
+          columns: [{ id: "c", name: "C", labels: [], match: "any", kind: "any" }],
         },
       ],
     };

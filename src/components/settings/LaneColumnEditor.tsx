@@ -1,6 +1,12 @@
-import type { LabelDef } from "../../lib/types";
+import type { IssueKind, LabelDef } from "../../lib/types";
 
-import { isCatchAll, KIND_TOKENS, type Match, realLabels } from "../../lib/schema";
+import {
+  AXIS_PRECEDENCE,
+  type Axis,
+  isCatchAll,
+  type KindFilter,
+  type Match,
+} from "../../lib/schema";
 import { LabelPicker } from "./LabelPicker";
 
 interface Group {
@@ -8,6 +14,7 @@ interface Group {
   name: string;
   labels: string[];
   match: Match;
+  kind: KindFilter;
   hideBlocked?: boolean;
 }
 
@@ -17,8 +24,31 @@ interface Props<T extends Group> {
   onChange(items: T[]): void;
   create(id: string): T;
   labels: LabelDef[];
-  /** Swimlanes get the "hide blocked" toggle. */
-  swimlanes?: boolean;
+  /** Sets the precedence shown; swimlanes also get the "hide blocked" toggle. */
+  axis: Axis;
+}
+
+/** The picker shows an entry's `kind` as an `is:issue` / `is:pr` chip, as on GitHub. */
+const KIND_CHIP_COLOR = "e5e5e5";
+const KIND_CHIPS: LabelDef[] = (["issue", "pr"] as const).map((kind) => ({
+  name: `is:${kind}`,
+  color: KIND_CHIP_COLOR,
+  repo: "",
+  description: null,
+}));
+const isKindChip = (name: string) => KIND_CHIPS.some((chip) => chip.name === name);
+
+function toChips(group: Group): string[] {
+  return group.kind === "any" ? group.labels : [`is:${group.kind}`, ...group.labels];
+}
+
+/** Picker chips back to labels and kind; the last `is:` chip picked wins. */
+function fromChips(value: string[]): Pick<Group, "labels" | "kind"> {
+  const chip = value.findLast(isKindChip);
+  return {
+    labels: value.filter((name) => !isKindChip(name)),
+    kind: chip ? (chip.slice("is:".length) as IssueKind) : "any",
+  };
 }
 
 function slug(name: string, taken: Set<string>): string {
@@ -41,7 +71,7 @@ export function LaneColumnEditor<T extends Group>({
   onChange,
   create,
   labels,
-  swimlanes,
+  axis,
 }: Props<T>) {
   const replace = (index: number, item: T) =>
     onChange(items.map((current, i) => (i === index ? item : current)));
@@ -52,18 +82,15 @@ export function LaneColumnEditor<T extends Group>({
     onChange(next);
   };
   const catchAlls = items.filter(isCatchAll).length;
-  const options = [
-    ...labels,
-    ...KIND_TOKENS.map((name) => ({ name, color: "e5e5e5", repo: "", description: null })),
-  ];
+  const options = [...labels, ...KIND_CHIPS];
 
   return (
     <section>
       <div className="mb-2 flex items-baseline justify-between">
         <h3 className="font-medium">{title}</h3>
         <span className="text-xs text-neutral-500">
-          {swimlanes ? "first" : "last"} matching entry wins · any or all of its labels · is:issue /
-          is:pr · one catch-all (no labels)
+          {AXIS_PRECEDENCE[axis]} matching entry wins · any or all of its labels · is:issue / is:pr
+          · one catch-all (no labels)
         </span>
       </div>
       {catchAlls > 1 && (
@@ -81,7 +108,7 @@ export function LaneColumnEditor<T extends Group>({
                 className="w-full rounded-md border border-neutral-300 px-2 py-1 text-sm"
               />
               <div className="mt-0.5 font-mono text-[10px] text-neutral-400">{item.id}</div>
-              {swimlanes && (
+              {axis === "swimlanes" && (
                 <label className="mt-1 flex items-center gap-1 text-xs text-neutral-700">
                   <input
                     type="checkbox"
@@ -95,7 +122,7 @@ export function LaneColumnEditor<T extends Group>({
               )}
             </div>
             <div className="flex items-start gap-2">
-              {realLabels(item.labels).length >= 2 && (
+              {item.labels.length >= 2 && (
                 <select
                   value={item.match}
                   onChange={(event) =>
@@ -110,8 +137,8 @@ export function LaneColumnEditor<T extends Group>({
               )}
               <div className="flex-1">
                 <LabelPicker
-                  value={item.labels}
-                  onChange={(value) => replace(index, { ...item, labels: value })}
+                  value={toChips(item)}
+                  onChange={(value) => replace(index, { ...item, ...fromChips(value) })}
                   options={options}
                 />
               </div>

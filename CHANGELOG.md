@@ -7,12 +7,16 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- Columns take only issues or only pull requests too (`"kind"`), like swimlanes.
+
 ### Changed
 
 - A card carrying the labels of several columns sits in the last of them, not the first;
   swimlanes still take the first match.
-- Swimlanes and columns take only issues or only pull requests with `is:issue` / `is:pr` in
-  their labels, replacing the swimlane `"kind"` field.
+- The settings editor sets a swimlane's or column's kind with an `is:issue` / `is:pr` chip in
+  its label picker, replacing the select.
 
 ## [0.5.0] - 2026-09-29
 
