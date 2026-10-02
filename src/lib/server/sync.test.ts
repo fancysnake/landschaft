@@ -300,7 +300,7 @@ describe("startScheduler", () => {
           swimlanes: [
             { id: "a", name: "A", labels: [], match: "any", kind: "any", hideBlocked: false },
           ],
-          columns: [{ id: "c", name: "C", labels: [], match: "any" }],
+          columns: [{ id: "c", name: "C", labels: [], match: "any", kind: "any" }],
         },
       ],
     };

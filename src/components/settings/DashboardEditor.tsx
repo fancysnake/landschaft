@@ -135,14 +135,15 @@ export function DashboardEditor({ dashboard, onChange }: Props) {
           hideBlocked: false,
         })}
         labels={catalog}
-        swimlanes
+        axis="swimlanes"
       />
       <LaneColumnEditor
         title="Columns"
         items={dashboard.columns}
         onChange={(columns) => patch({ columns })}
-        create={(id) => ({ id, name: "New column", labels: [], match: "any" })}
+        create={(id) => ({ id, name: "New column", labels: [], match: "any", kind: "any" })}
         labels={catalog}
+        axis="columns"
       />
     </div>
   );

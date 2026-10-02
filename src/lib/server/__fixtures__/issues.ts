@@ -53,8 +53,14 @@ export const DASHBOARD: Dashboard = {
     { id: "rest", name: "Rest", labels: [], match: "any", kind: "any", hideBlocked: false },
   ],
   columns: [
-    { id: "todo", name: "Todo", labels: [], match: "any" },
-    { id: "doing", name: "Doing", labels: ["phase:doing"], match: "any" },
-    { id: "done", name: "Done", labels: ["phase:done", "phase:shipped"], match: "any" },
+    { id: "todo", name: "Todo", labels: [], match: "any", kind: "any" },
+    { id: "doing", name: "Doing", labels: ["phase:doing"], match: "any", kind: "any" },
+    {
+      id: "done",
+      name: "Done",
+      labels: ["phase:done", "phase:shipped"],
+      match: "any",
+      kind: "any",
+    },
   ],
 };

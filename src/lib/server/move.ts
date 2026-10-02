@@ -2,7 +2,7 @@ import type { Issue, LabelRef } from "../types";
 import type { Db } from "./db";
 import type { Syncer } from "./sync";
 
-import { type Dashboard, fitsKind, type MoveRequest } from "../schema";
+import { cellTakes, type Dashboard, type MoveRequest } from "../schema";
 import { labelDiffForMove, placeCard } from "./board";
 import { addLabels, type GithubClient, removeLabel } from "./github";
 
@@ -51,9 +51,9 @@ export async function moveIssue(
   const issue = deps.db.getIssue(request.repo, request.number);
   if (!issue)
     throw new MoveError(`${request.repo}#${request.number} is not in the cache, sync first`);
-  if (!fitsKind(to.lane.kind, issue.kind))
+  if (!cellTakes(to.lane, to.col, issue.kind))
     throw new MoveError(
-      `swimlane "${to.lane.name}" takes no ${issue.kind === "pr" ? "PRs" : "issues"}`,
+      `"${to.lane.name}" / "${to.col.name}" takes no items of kind ${issue.kind}`,
     );
 
   const names = issue.labels.map((label) => label.name);
@@ -62,7 +62,7 @@ export async function moveIssue(
   const landed = placeCard(dashboard, issue.kind, after);
   if (landed?.lane.id !== to.lane.id || landed.column.id !== to.col.id)
     throw new MoveError(
-      `an earlier swimlane or column takes the card before "${to.lane.name}" / "${to.col.name}"`,
+      `another swimlane or column takes the card instead of "${to.lane.name}" / "${to.col.name}"`,
     );
   for (const name of diff.remove) await removeLabel(deps.gh, request.repo, request.number, name);
   await addLabels(deps.gh, request.repo, request.number, diff.add);

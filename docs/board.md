@@ -38,8 +38,8 @@ are kept as well.
 ## Pull requests
 
 Open pull requests are synced alongside issues and placed by the same label rules; dragging
-one edits its labels the same way. They carry a `PR` badge and a sky-blue tint (issues green, epics violet, blocked red). Set a swimlane to "PRs only" (or
-"issues only") to split them; cards cannot be dragged into a lane of the other kind.
+one edits its labels the same way. They carry a `PR` badge and a sky-blue tint (issues green, epics violet, blocked red). Set a swimlane or column to
+PRs only (or issues only) to split them, with an `is:pr` (or `is:issue`) chip in its label picker; cards cannot be dragged into a cell of the other kind.
 
 ## Filters
 

@@ -20,7 +20,7 @@ function newDashboard(): Dashboard {
     swimlanes: [
       { id: "all", name: "Everything", labels: [], match: "any", kind: "any", hideBlocked: false },
     ],
-    columns: [{ id: "todo", name: "Todo", labels: [], match: "any" }],
+    columns: [{ id: "todo", name: "Todo", labels: [], match: "any", kind: "any" }],
   };
 }
 

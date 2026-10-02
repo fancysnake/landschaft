@@ -1,4 +1,5 @@
 import {
+  AXIS_PRECEDENCE,
   type Column,
   type Dashboard,
   type Filters,
@@ -6,6 +7,7 @@ import {
   isCatchAll,
   type KindFilter,
   type Match,
+  type Precedence,
   selectedRepos,
   type SortBy,
   type SortDir,
@@ -27,12 +29,12 @@ export interface Group {
   labels: string[];
   /** Defaults to "any". */
   match?: Match;
-  /** Swimlanes only; what tells a kind-only lane from the catch-all. */
+  /** Defaults to "any"; what tells a kind-only group from the catch-all. */
   kind?: KindFilter;
 }
 
 function matches(group: Group, labelNames: Set<string>): boolean {
-  // A kind-only lane (no labels, a kind set) takes every item, in list order.
+  // A kind-only group (no labels, a kind set) takes every item, in list order.
   if (group.labels.length === 0) return (group.kind ?? "any") !== "any";
   return group.match === "all"
     ? group.labels.every((label) => labelNames.has(label))
@@ -45,25 +47,34 @@ function wantedLabels(group: Group): string[] {
 }
 
 /**
- * First group (in order) whose labels the issue satisfies (any or all of them, per `match`;
- * a kind-only group needs none); otherwise the catch-all (no labels, any kind), wherever it
- * sits in the list; otherwise null. Groups of the wrong kind are the caller's to drop.
+ * The `first` (or `last`) group in the list whose labels the issue satisfies (any or all of
+ * them, per `match`; a kind-only group needs none); otherwise the catch-all (no labels, any
+ * kind), wherever it sits in the list; otherwise null. Groups of the wrong kind are the
+ * caller's to drop.
  */
-export function placeIn<T extends Group>(groups: T[], labelNames: Set<string>): T | null {
-  const labeled = groups.find((group) => matches(group, labelNames));
+export function placeIn<T extends Group>(
+  groups: T[],
+  labelNames: Set<string>,
+  precedence: Precedence = "first",
+): T | null {
+  const hit = (group: T) => matches(group, labelNames);
+  const labeled = precedence === "first" ? groups.find(hit) : groups.findLast(hit);
   if (labeled) return labeled;
   return groups.find(isCatchAll) ?? null;
 }
 
-/** The lane (among those taking `kind`) and column an item carrying `labelNames` lands in. */
+/**
+ * The lane and column (among those taking `kind`) an item carrying `labelNames` lands in,
+ * each picked by its axis's `AXIS_PRECEDENCE`.
+ */
 export function placeCard(
   dashboard: Pick<Dashboard, "swimlanes" | "columns">,
   kind: IssueKind,
   labelNames: Set<string>,
 ): { lane: Swimlane; column: Column } | null {
-  const lanes = dashboard.swimlanes.filter((lane) => fitsKind(lane.kind, kind));
-  const lane = placeIn(lanes, labelNames);
-  const column = placeIn(dashboard.columns, labelNames);
+  const takes = (group: { kind: KindFilter }) => fitsKind(group.kind, kind);
+  const lane = placeIn(dashboard.swimlanes.filter(takes), labelNames, AXIS_PRECEDENCE.swimlanes);
+  const column = placeIn(dashboard.columns.filter(takes), labelNames, AXIS_PRECEDENCE.columns);
   return lane && column ? { lane, column } : null;
 }
 

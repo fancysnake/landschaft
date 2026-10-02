@@ -12,7 +12,7 @@ const labelList = z.array(z.string().min(1)).default([]);
 /** "any": the issue carries at least one of the labels; "all": it carries every one. */
 export const MatchSchema = z.enum(["any", "all"]);
 export type Match = z.infer<typeof MatchSchema>;
-/** Which items a swimlane takes: both, only issues, or only pull requests. */
+/** Which items a swimlane or column takes: both, only issues, or only pull requests. */
 export const KindFilterSchema = z.enum(["any", "issue", "pr"]);
 export type KindFilter = z.infer<typeof KindFilterSchema>;
 
@@ -30,6 +30,7 @@ export const ColumnSchema = z.object({
   name: z.string().min(1),
   labels: labelList,
   match: MatchSchema.default("any"),
+  kind: KindFilterSchema.default("any"),
 });
 
 export const SortBySchema = z.enum(["created", "updated"]);
@@ -49,10 +50,27 @@ export function isCatchAll(group: { labels: string[]; kind?: KindFilter }): bool
   return group.labels.length === 0 && (group.kind ?? "any") === "any";
 }
 
-/** Whether a swimlane's kind filter lets an item of this kind in. */
+/** Whether a kind filter lets an item of this kind in. */
 export function fitsKind(filter: KindFilter, kind: IssueKind): boolean {
   return filter === "any" || filter === kind;
 }
+
+/** Whether the cell at this swimlane and column takes an item of this kind. */
+export function cellTakes(
+  lane: { kind: KindFilter },
+  column: { kind: KindFilter },
+  kind: IssueKind,
+): boolean {
+  return fitsKind(lane.kind, kind) && fitsKind(column.kind, kind);
+}
+
+/**
+ * Which matching entry wins on each axis: the first swimlane, but the last column, so a card
+ * carrying two stages' labels sits in the later one.
+ */
+export const AXIS_PRECEDENCE = { swimlanes: "first", columns: "last" } as const;
+export type Axis = keyof typeof AXIS_PRECEDENCE;
+export type Precedence = (typeof AXIS_PRECEDENCE)[Axis];
 
 /** "mine": only issues the viewer created or is assigned to; "all": every open issue. */
 export const ScopeSchema = z.enum(["mine", "all"]);
@@ -79,7 +97,7 @@ export const DashboardSchema = z
         ctx.addIssue({
           code: "custom",
           path: [axis],
-          message: `at most one catch-all (${axis === "swimlanes" ? "no labels, any kind" : "no labels"}) allowed`,
+          message: "at most one catch-all (no labels, any kind) allowed",
         });
       }
     }

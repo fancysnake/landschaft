@@ -56,6 +56,17 @@ describe("placeIn", () => {
     expect(placeIn(groups, new Set())?.id).toBe("prs");
     expect(placeIn([groups[0]!, groups[1]!], new Set())?.id).toBe("rest");
   });
+
+  it("takes the last match when asked, the catch-all still only as a fallback", () => {
+    const groups = [
+      { id: "a", labels: ["x"] },
+      { id: "rest", labels: [] },
+      { id: "b", labels: ["y"] },
+    ];
+    expect(placeIn(groups, new Set(["x", "y"]), "last")?.id).toBe("b");
+    expect(placeIn(groups, new Set(["x"]), "last")?.id).toBe("a");
+    expect(placeIn(groups, new Set(), "last")?.id).toBe("rest");
+  });
 });
 
 describe("placeCard", () => {
@@ -78,6 +89,35 @@ describe("placeCard", () => {
       lane: { id: "prs" },
       column: { id: "todo" },
     });
+  });
+
+  it("puts a card carrying two columns' labels in the later column", () => {
+    expect(placeCard(DASHBOARD, "issue", new Set(["phase:done", "phase:doing"]))).toMatchObject({
+      column: { id: "done" },
+    });
+  });
+
+  it("ands the kind with the labels, whatever the match", () => {
+    const lanes = [
+      { ...prs, id: "pr-high", labels: ["prio:high", "prio:low"] },
+      ...DASHBOARD.swimlanes,
+    ];
+    const withLanes = { ...DASHBOARD, swimlanes: lanes };
+    expect(placeCard(withLanes, "pr", new Set(["prio:low"]))?.lane.id).toBe("pr-high");
+    expect(placeCard(withLanes, "pr", new Set())?.lane.id).toBe("rest");
+    expect(placeCard(withLanes, "issue", new Set(["prio:low"]))?.lane.id).toBe("low");
+  });
+
+  it("drops columns of the other kind", () => {
+    const review = {
+      ...DASHBOARD.columns[1]!,
+      id: "review",
+      labels: ["review"],
+      kind: "pr" as const,
+    };
+    const withReview = { ...DASHBOARD, columns: [...DASHBOARD.columns, review] };
+    expect(placeCard(withReview, "pr", new Set(["review"]))?.column.id).toBe("review");
+    expect(placeCard(withReview, "issue", new Set(["review"]))?.column.id).toBe("todo");
   });
 
   it("returns null when no column takes the labels", () => {
@@ -126,9 +166,21 @@ describe("buildBoard", () => {
     const dashboard = {
       ...DASHBOARD,
       columns: [
-        { id: "todo", name: "Todo", labels: [], match: "any" as const },
-        { id: "waiting", name: "Waiting", labels: ["phase:doing", "wait"], match: "all" as const },
-        { id: "doing", name: "Doing", labels: ["phase:doing"], match: "any" as const },
+        { id: "todo", name: "Todo", labels: [], match: "any" as const, kind: "any" as const },
+        {
+          id: "doing",
+          name: "Doing",
+          labels: ["phase:doing"],
+          match: "any" as const,
+          kind: "any" as const,
+        },
+        {
+          id: "waiting",
+          name: "Waiting",
+          labels: ["phase:doing", "wait"],
+          match: "all" as const,
+          kind: "any" as const,
+        },
       ],
     };
     const issues = [
@@ -187,7 +239,15 @@ describe("buildBoard", () => {
   it("counts issues that fit no group when an axis has no catch-all", () => {
     const dashboard = {
       ...DASHBOARD,
-      columns: [{ id: "doing", name: "Doing", labels: ["phase:doing"], match: "any" as const }],
+      columns: [
+        {
+          id: "doing",
+          name: "Doing",
+          labels: ["phase:doing"],
+          match: "any" as const,
+          kind: "any" as const,
+        },
+      ],
     };
     const board = buildBoard([makeIssue({ number: 1 })], dashboard);
     expect(board.unplaced).toBe(1);

@@ -7,6 +7,19 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-02
+
+### Added
+
+- A column takes only issues or only pull requests with `"kind": "issue"` or `"pr"`.
+
+### Changed
+
+- A card carrying the labels of several columns sits in the last of them, not the first;
+  swimlanes still take the first match.
+- The settings editor sets a swimlane's or column's kind with an `is:issue` / `is:pr` chip in
+  its label picker, replacing the select.
+
 ## [0.5.0] - 2026-09-29
 
 ### Added
@@ -68,7 +81,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v0.5.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/fancysnake/landschaft/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/fancysnake/landschaft/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/fancysnake/landschaft/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/fancysnake/landschaft/compare/v0.2.0...v0.3.0
