@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { IssueKind } from "./types";
+import type { Issue, IssueKind } from "./types";
 
 const id = z
   .string()
@@ -43,6 +43,28 @@ export const SortSchema = z.object({
 
 function hasUniqueIds(items: { id: string }[]): boolean {
   return new Set(items.map((item) => item.id)).size === items.length;
+}
+
+/**
+ * PR states an entry lists among its labels and matches like labels; they are read from
+ * GitHub, never written to it.
+ */
+const STATUS_LABELS = {
+  "is:conflicting": (issue: StatusFacts) => issue.conflicting,
+  "is:ci-not-ok": (issue: StatusFacts) => issue.ciNotOk,
+  "is:unanswered": (issue: StatusFacts) => issue.unanswered,
+} as const;
+type StatusFacts = Pick<Issue, "conflicting" | "ciNotOk" | "unanswered">;
+export const STATUS_LABEL_NAMES = Object.keys(STATUS_LABELS);
+
+export function isStatusLabel(name: string): boolean {
+  return Object.hasOwn(STATUS_LABELS, name);
+}
+
+/** The item's label names plus the status labels that hold for it. */
+export function matchLabels(issue: StatusFacts & Pick<Issue, "labels">): Set<string> {
+  const held = Object.entries(STATUS_LABELS).filter(([, holds]) => holds(issue));
+  return new Set([...issue.labels.map((label) => label.name), ...held.map(([name]) => name)]);
 }
 
 /** No labels and no kind restriction: takes whatever no other entry does. */

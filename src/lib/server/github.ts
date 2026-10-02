@@ -251,6 +251,10 @@ function baseFields(repo: string, node: IssueNode | PullNode) {
     closedAt: node.closedAt,
     labels: node.labels.nodes.map((l) => ({ name: l.name, color: l.color })),
     assignees: node.assignees.nodes.map((a) => ({ login: a.login, avatarUrl: a.avatarUrl })),
+    // Set for open PRs by `fetchPullStatuses`; never true for issues.
+    conflicting: false,
+    ciNotOk: false,
+    unanswered: false,
   };
 }
 
@@ -361,6 +365,108 @@ export async function fetchPullsPage(
     endCursor: pageInfo.endCursor,
     rateRemaining: data.rateLimit.remaining,
   };
+}
+
+/** A commit status rollup entry: a check run, or a commit status. */
+export type CheckContext =
+  | { status: string; conclusion: string | null; isRequired: boolean }
+  | { state: string; isRequired: boolean };
+
+const PASSED = new Set(["SUCCESS", "NEUTRAL", "SKIPPED"]);
+
+/** A required check failed or has not finished; checks not required to merge are ignored. */
+export function ciNotOk(contexts: CheckContext[]): boolean {
+  return contexts.some(
+    (check) =>
+      check.isRequired &&
+      ("state" in check
+        ? check.state !== "SUCCESS"
+        : check.status !== "COMPLETED" || !PASSED.has(check.conclusion ?? "")),
+  );
+}
+
+export interface PullStatus {
+  number: number;
+  conflicting: boolean;
+  ciNotOk: boolean;
+  unanswered: boolean;
+}
+
+interface Login {
+  login: string;
+}
+
+export interface PullStatusNode {
+  number: number;
+  mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN";
+  author: Login | null;
+  commits: {
+    nodes: { commit: { statusCheckRollup: { contexts: { nodes: CheckContext[] } } | null } }[];
+  };
+  reviewThreads: {
+    nodes: { isResolved: boolean; comments: { nodes: { author: Login | null }[] } }[];
+  };
+}
+
+/** Unanswered: an unresolved review thread whose last comment is not the PR author's. */
+export function toPullStatus(node: PullStatusNode): PullStatus {
+  const author = node.author?.login;
+  return {
+    number: node.number,
+    conflicting: node.mergeable === "CONFLICTING",
+    ciNotOk: ciNotOk(node.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? []),
+    unanswered: node.reviewThreads.nodes.some(
+      (thread) => !thread.isResolved && thread.comments.nodes[0]?.author?.login !== author,
+    ),
+  };
+}
+
+const STATUS_BATCH = 50;
+
+/**
+ * `isRequired` takes the PR number as an argument, so each PR is its own aliased field.
+ * ponytail: first 100 checks and review threads; a required check that never reported is
+ * missed until it does.
+ */
+function pullStatusField(number: number): string {
+  return `pr${number}: pullRequest(number: ${number}) {
+    number mergeable author { login }
+    commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {
+      ... on CheckRun { status conclusion isRequired(pullRequestNumber: ${number}) }
+      ... on StatusContext { state isRequired(pullRequestNumber: ${number}) }
+    } } } } } }
+    reviewThreads(first: 100) { nodes { isResolved comments(last: 1) { nodes { author { login } } } } }
+  }`;
+}
+
+/**
+ * Merge conflicts, required checks and review threads of the given PRs. Not all of it bumps a
+ * PR's `updatedAt`, so the sync asks for every open PR each time.
+ */
+export async function fetchPullStatuses(
+  gh: GithubClient,
+  repo: string,
+  numbers: number[],
+): Promise<PullStatus[]> {
+  const statuses: PullStatus[] = [];
+  for (let start = 0; start < numbers.length; start += STATUS_BATCH) {
+    const fields = numbers
+      .slice(start, start + STATUS_BATCH)
+      .map(pullStatusField)
+      .join("\n");
+    const data = await gh.gql<{ repository: Record<string, PullStatusNode | null> | null }>(
+      `query PullStatus($owner: String!, $name: String!) {
+        repository(owner: $owner, name: $name) { ${fields} }
+      }`,
+      splitRepo(repo),
+    );
+    if (!data.repository)
+      throw new GithubError(`repository ${repo} not found or not accessible`, 404);
+    for (const node of Object.values(data.repository)) {
+      if (node) statuses.push(toPullStatus(node));
+    }
+  }
+  return statuses;
 }
 
 /** Login of the account the token belongs to. */

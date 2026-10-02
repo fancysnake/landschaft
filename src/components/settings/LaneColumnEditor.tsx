@@ -6,6 +6,7 @@ import {
   isCatchAll,
   type KindFilter,
   type Match,
+  STATUS_LABEL_NAMES,
 } from "../../lib/schema";
 import { LabelPicker } from "./LabelPicker";
 
@@ -28,21 +29,26 @@ interface Props<T extends Group> {
   axis: Axis;
 }
 
-/** The picker shows an entry's `kind` as an `is:issue` / `is:pr` chip, as on GitHub. */
-const KIND_CHIP_COLOR = "e5e5e5";
-const KIND_CHIPS: LabelDef[] = (["issue", "pr"] as const).map((kind) => ({
-  name: `is:${kind}`,
-  color: KIND_CHIP_COLOR,
+/**
+ * The picker shows an entry's `kind` as an `is:issue` / `is:pr` chip, as on GitHub, and
+ * offers the PR status labels (`is:conflicting`, ...), which stay in `labels`.
+ */
+const CHIP_COLOR = "e5e5e5";
+const pickerOption = (name: string): LabelDef => ({
+  name,
+  color: CHIP_COLOR,
   repo: "",
   description: null,
-}));
-const isKindChip = (name: string) => KIND_CHIPS.some((chip) => chip.name === name);
+});
+const KIND_CHIPS = (["issue", "pr"] as const).map((kind) => pickerOption(`is:${kind}`));
+const STATUS_CHIPS = STATUS_LABEL_NAMES.map(pickerOption);
+const isKindChip = (name: string) => KIND_CHIPS.some((c) => c.name === name);
 
 function toChips(group: Group): string[] {
   return group.kind === "any" ? group.labels : [`is:${group.kind}`, ...group.labels];
 }
 
-/** Picker chips back to labels and kind; the last `is:` chip picked wins. */
+/** Picker chips back to labels and kind; the last kind chip picked wins; status chips stay labels. */
 function fromChips(value: string[]): Pick<Group, "labels" | "kind"> {
   const chip = value.findLast(isKindChip);
   return {
@@ -82,7 +88,7 @@ export function LaneColumnEditor<T extends Group>({
     onChange(next);
   };
   const catchAlls = items.filter(isCatchAll).length;
-  const options = [...labels, ...KIND_CHIPS];
+  const options = [...labels, ...KIND_CHIPS, ...STATUS_CHIPS];
 
   return (
     <section>
@@ -90,7 +96,7 @@ export function LaneColumnEditor<T extends Group>({
         <h3 className="font-medium">{title}</h3>
         <span className="text-xs text-neutral-500">
           {AXIS_PRECEDENCE[axis]} matching entry wins · any or all of its labels · is:issue / is:pr
-          · one catch-all (no labels)
+          · is:conflicting / is:ci-not-ok / is:unanswered · one catch-all (no labels)
         </span>
       </div>
       {catchAlls > 1 && (

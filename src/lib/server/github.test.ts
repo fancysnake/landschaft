@@ -1,13 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  type CheckContext,
   createGithubClient,
   fetchIssuesPage,
+  fetchPullStatuses,
   GithubError,
   type IssueNode,
+  type PullStatusNode,
   removeLabel,
   toIssue,
   toPull,
+  toPullStatus,
 } from "./github";
 
 const node: IssueNode = {
@@ -58,6 +62,9 @@ describe("toIssue", () => {
       blockedBy: [{ repo: "acme/lib", number: 8, state: "CLOSED" }],
       blockedByTotal: 1,
       linked: [],
+      conflicting: false,
+      ciNotOk: false,
+      unanswered: false,
     });
   });
 
@@ -94,6 +101,104 @@ describe("toPull", () => {
       parent: null,
       linked: [{ repo: "acme/app", number: 12 }],
     });
+  });
+});
+
+function statusNode(overrides: Partial<PullStatusNode> = {}): PullStatusNode {
+  return {
+    number: 30,
+    mergeable: "MERGEABLE",
+    author: { login: "bob" },
+    commits: { nodes: [] },
+    reviewThreads: { nodes: [] },
+    ...overrides,
+  };
+}
+
+const rollup = (nodes: CheckContext[]) => ({
+  nodes: [{ commit: { statusCheckRollup: { contexts: { nodes } } } }],
+});
+
+const thread = (isResolved: boolean, last: string | null) => ({
+  isResolved,
+  comments: { nodes: [{ author: last === null ? null : { login: last } }] },
+});
+
+describe("toPullStatus", () => {
+  it("is clean without checks, threads or conflicts", () => {
+    expect(toPullStatus(statusNode())).toEqual({
+      number: 30,
+      conflicting: false,
+      ciNotOk: false,
+      unanswered: false,
+    });
+  });
+
+  it("flags merge conflicts only when GitHub says CONFLICTING", () => {
+    expect(toPullStatus(statusNode({ mergeable: "CONFLICTING" })).conflicting).toBe(true);
+    expect(toPullStatus(statusNode({ mergeable: "UNKNOWN" })).conflicting).toBe(false);
+  });
+
+  it.each<[string, CheckContext, boolean]>([
+    ["passed run", { status: "COMPLETED", conclusion: "SUCCESS", isRequired: true }, false],
+    ["skipped run", { status: "COMPLETED", conclusion: "SKIPPED", isRequired: true }, false],
+    ["failed run", { status: "COMPLETED", conclusion: "FAILURE", isRequired: true }, true],
+    ["running run", { status: "IN_PROGRESS", conclusion: null, isRequired: true }, true],
+    [
+      "optional failed run",
+      { status: "COMPLETED", conclusion: "FAILURE", isRequired: false },
+      false,
+    ],
+    ["pending status", { state: "PENDING", isRequired: true }, true],
+    ["successful status", { state: "SUCCESS", isRequired: true }, false],
+    ["optional errored status", { state: "ERROR", isRequired: false }, false],
+  ])("CI with a %s is not ok: %s", (_, check, expected) => {
+    expect(toPullStatus(statusNode({ commits: rollup([check]) })).ciNotOk).toBe(expected);
+  });
+
+  it("counts unresolved threads the PR author has not answered last", () => {
+    const unanswered = (nodes: ReturnType<typeof thread>[]) =>
+      toPullStatus(statusNode({ reviewThreads: { nodes } })).unanswered;
+    expect(unanswered([thread(false, "carol")])).toBe(true);
+    expect(unanswered([thread(false, null)])).toBe(true);
+    expect(unanswered([thread(false, "bob")])).toBe(false);
+    expect(unanswered([thread(true, "carol")])).toBe(false);
+  });
+});
+
+describe("fetchPullStatuses", () => {
+  it("asks for 50 PRs per query, each aliased with its own number", async () => {
+    const queries: string[] = [];
+    const fetchImpl = vi.fn(async (_: string, init: RequestInit) => {
+      const { query } = JSON.parse(init.body as string) as { query: string };
+      queries.push(query);
+      const numbers = [...query.matchAll(/pr(\d+): pullRequest/g)].map((m) => Number(m[1]));
+      const repository = Object.fromEntries(
+        numbers.map((n) => [`pr${n}`, statusNode({ number: n, mergeable: "CONFLICTING" })]),
+      );
+      return jsonResponse({ data: { repository } });
+    });
+    const gh = createGithubClient(async () => "tok", fetchImpl);
+    const numbers = Array.from({ length: 51 }, (_, i) => i + 1);
+
+    const statuses = await fetchPullStatuses(gh, "acme/app", numbers);
+
+    expect(queries).toHaveLength(2);
+    expect(queries[1]).toContain("isRequired(pullRequestNumber: 51)");
+    expect(statuses.map((s) => s.number)).toEqual(numbers);
+    expect(statuses.every((s) => s.conflicting)).toBe(true);
+  });
+
+  it("makes no request without PRs", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({}));
+    expect(
+      await fetchPullStatuses(
+        createGithubClient(async () => "tok", fetchImpl),
+        "a/b",
+        [],
+      ),
+    ).toEqual([]);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
 

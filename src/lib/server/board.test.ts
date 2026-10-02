@@ -236,6 +236,33 @@ describe("buildBoard", () => {
     expect(board.cells[cell("high", "todo")]?.map((c) => c.number)).toEqual([2]);
   });
 
+  it("matches PR status labels like labels, so one lane gathers unfinished PRs", () => {
+    const dashboard = {
+      ...DASHBOARD,
+      swimlanes: [
+        {
+          id: "fix",
+          name: "To fix",
+          labels: ["is:conflicting", "is:ci-not-ok", "is:unanswered"],
+          match: "any" as const,
+          kind: "pr" as const,
+          hideBlocked: false,
+        },
+        ...DASHBOARD.swimlanes,
+      ],
+    };
+    const issues = [
+      makeIssue({ number: 1, kind: "pr", conflicting: true }),
+      makeIssue({ number: 2, kind: "pr", ciNotOk: true }),
+      makeIssue({ number: 3, kind: "pr", unanswered: true }),
+      makeIssue({ number: 4, kind: "pr" }),
+      makeIssue({ number: 5, labels: [label("is:conflicting")] }),
+    ];
+    const board = buildBoard(issues, dashboard);
+    expect(board.cells[cell("fix", "todo")]?.map((c) => c.number)).toEqual([3, 2, 1]);
+    expect(numbers(board)).toEqual([5, 4]);
+  });
+
   it("counts issues that fit no group when an axis has no catch-all", () => {
     const dashboard = {
       ...DASHBOARD,
@@ -433,6 +460,20 @@ describe("labelDiffForMove", () => {
   const todo = { id: "todo", labels: [] };
   const doing = { id: "doing", labels: ["phase:doing"] };
   const done = { id: "done", labels: ["phase:done", "phase:shipped"] };
+
+  it("never adds a status label, only the first real one", () => {
+    const fix = { id: "fix", labels: ["is:ci-not-ok", "needs-fix"] };
+    expect(
+      labelDiffForMove(["prio:high"], { lane: high, col: todo }, { lane: fix, col: todo }),
+    ).toEqual({ add: ["needs-fix"], remove: ["prio:high"] });
+    expect(
+      labelDiffForMove(
+        [],
+        { lane: rest, col: todo },
+        { lane: { ...fix, match: "all" }, col: todo },
+      ),
+    ).toEqual({ add: ["needs-fix"], remove: [] });
+  });
 
   it("swaps the column label when only the column changes", () => {
     expect(

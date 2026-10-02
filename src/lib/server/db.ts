@@ -11,6 +11,7 @@ import type {
   LabelRef,
   SyncState,
 } from "../types";
+import type { PullStatus } from "./github";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS issues (
@@ -81,6 +82,9 @@ interface IssueRow {
   blocked_by_total: number;
   kind: string;
   linked_json: string;
+  conflicting: number;
+  ci_not_ok: number;
+  unanswered: number;
 }
 
 interface BlockerRow {
@@ -134,6 +138,9 @@ function rowToIssue(row: IssueRow, blockedBy: Blocker[]): Issue {
     blockedBy,
     blockedByTotal: row.blocked_by_total,
     linked: JSON.parse(row.linked_json) as IssueRef[],
+    conflicting: row.conflicting === 1,
+    ciNotOk: row.ci_not_ok === 1,
+    unanswered: row.unanswered === 1,
   };
 }
 
@@ -145,6 +152,9 @@ const ADDED_COLUMNS = [
   ["author", "TEXT"],
   ["kind", "TEXT NOT NULL DEFAULT 'issue'"],
   ["linked_json", "TEXT NOT NULL DEFAULT '[]'"],
+  ["conflicting", "INTEGER NOT NULL DEFAULT 0"],
+  ["ci_not_ok", "INTEGER NOT NULL DEFAULT 0"],
+  ["unanswered", "INTEGER NOT NULL DEFAULT 0"],
 ] as const;
 
 export function dbPath(): string {
@@ -195,6 +205,7 @@ export class Db {
     }
   }
 
+  /** Leaves the PR status columns alone; `setPullStatuses` owns them. */
   upsertIssues(issues: Issue[]): void {
     if (issues.length === 0) return;
     const upsert = this.db.prepare(`
@@ -304,6 +315,23 @@ export class Db {
       for (const number of stale) close.run(repo, number);
     });
     return stale.length;
+  }
+
+  openPullNumbers(repo: string): number[] {
+    const rows = this.db
+      .prepare("SELECT number FROM issues WHERE repo = ? AND state = 'OPEN' AND kind = 'pr'")
+      .all(repo) as unknown as { number: number }[];
+    return rows.map((row) => row.number);
+  }
+
+  setPullStatuses(repo: string, statuses: PullStatus[]): void {
+    const update = this.db.prepare(
+      "UPDATE issues SET conflicting = ?, ci_not_ok = ?, unanswered = ? WHERE repo = ? AND number = ?",
+    );
+    this.transaction(() => {
+      for (const s of statuses)
+        update.run(Number(s.conflicting), Number(s.ciNotOk), Number(s.unanswered), repo, s.number);
+    });
   }
 
   patchLabels(repo: string, number: number, labels: LabelRef[]): void {

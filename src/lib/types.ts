@@ -59,6 +59,12 @@ export interface Issue {
   blockedByTotal: number;
   /** Issues a PR closes when merged; empty for issues. */
   linked: IssueRef[];
+  /** PR has merge conflicts with its base; false for issues. */
+  conflicting: boolean;
+  /** A required check on the PR's head failed or has not finished; false for issues. */
+  ciNotOk: boolean;
+  /** An unresolved review thread whose last comment is not the PR author's; false for issues. */
+  unanswered: boolean;
 }
 
 export function issueKey(repo: string, number: number): string {

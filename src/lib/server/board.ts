@@ -5,8 +5,10 @@ import {
   type Filters,
   fitsKind,
   isCatchAll,
+  isStatusLabel,
   type KindFilter,
   type Match,
+  matchLabels,
   type Precedence,
   selectedRepos,
   type SortBy,
@@ -41,9 +43,10 @@ function matches(group: Group, labelNames: Set<string>): boolean {
     : group.labels.some((label) => labelNames.has(label));
 }
 
-/** The labels a group needs an issue to carry: all of them, or just the first. */
+/** The labels a move adds for a group: all of them, or just the first; never status labels. */
 function wantedLabels(group: Group): string[] {
-  return group.match === "all" ? group.labels : group.labels.slice(0, 1);
+  const real = group.labels.filter((label) => !isStatusLabel(label));
+  return group.match === "all" ? real : real.slice(0, 1);
 }
 
 /**
@@ -190,7 +193,7 @@ export function buildBoard(
 
     if (!wanted(issue)) continue;
 
-    const placed = placeCard(dashboard, issue.kind, new Set(issue.labels.map((l) => l.name)));
+    const placed = placeCard(dashboard, issue.kind, matchLabels(issue));
     if (!placed) {
       board.unplaced += 1;
       continue;
@@ -242,8 +245,8 @@ export interface Position {
 
 /**
  * Labels to add/remove so the issue lands in `to`. Per axis that changed: drop the
- * source group's labels the issue carries, add what the target group needs (its first
- * label, or every label for an "all" group; nothing for a catch-all). A label that the
+ * source group's labels the issue carries, add what the target group needs (its first real
+ * label, or every one for an "all" group; nothing for a catch-all). A label that the
  * target still needs is never removed.
  */
 export function labelDiffForMove(

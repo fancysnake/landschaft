@@ -55,6 +55,7 @@ function fakeGithub(
   pages: IssueNode[][],
   remaining = 5000,
   pulls: PullNode[][] = [],
+  conflicting: number[] = [],
 ): { gh: GithubClient; calls: Call[] } {
   const calls: Call[] = [];
   const gh: GithubClient = {
@@ -72,6 +73,22 @@ function fakeGithub(
       }
       if (query.includes("query Viewer")) {
         return { viewer: { login: "me" } } as T;
+      }
+      if (query.includes("query PullStatus")) {
+        const numbers = [...query.matchAll(/pr(\d+): pullRequest/g)].map((m) => Number(m[1]));
+        const repository = Object.fromEntries(
+          numbers.map((number) => [
+            `pr${number}`,
+            {
+              number,
+              mergeable: conflicting.includes(number) ? "CONFLICTING" : "MERGEABLE",
+              author: null,
+              commits: { nodes: [] },
+              reviewThreads: { nodes: [] },
+            },
+          ]),
+        );
+        return { repository } as T;
       }
       if (query.includes("query Issue(")) {
         const node = { type: "Issue", ...toNode(variables.number as number) };
@@ -185,6 +202,35 @@ describe("Syncer", () => {
     const syncer = new Syncer({ db, gh, now: () => now });
     expect(await syncer.syncRepo(REPO)).toMatchObject({ full: true, upserted: 2, closed: 0 });
     expect(db.getIssue(REPO, 2)?.state).toBe("OPEN");
+  });
+
+  it("refreshes the status of every open PR, also those an incremental sync did not page", async () => {
+    db.setSyncState(REPO, {
+      lastSyncAt: "2026-05-01T11:00:00.000Z",
+      lastFullSyncAt: "2026-05-01T11:00:00.000Z",
+    });
+    db.upsertIssues([makeIssue({ number: 7, kind: "pr" }), makeIssue({ number: 8 })]);
+    const { gh, calls } = fakeGithub([[]], 5000, [], [7]);
+    const syncer = new Syncer({ db, gh, now: () => now });
+
+    await syncer.syncRepo(REPO);
+
+    expect(db.getIssue(REPO, 7)?.conflicting).toBe(true);
+    const status = calls.find((c) => c.query.includes("query PullStatus"));
+    expect(status?.query).toContain("pr7:");
+    expect(status?.query).not.toContain("pr8:");
+  });
+
+  it("keeps a PR's status when a page upserts it again", async () => {
+    db.upsertIssues([makeIssue({ number: 7, kind: "pr" })]);
+    db.setPullStatuses(REPO, [{ number: 7, conflicting: true, ciNotOk: true, unanswered: true }]);
+    db.upsertIssues([makeIssue({ number: 7, kind: "pr", title: "renamed" })]);
+    expect(db.getIssue(REPO, 7)).toMatchObject({
+      title: "renamed",
+      conflicting: true,
+      ciNotOk: true,
+      unanswered: true,
+    });
   });
 
   it("falls back to a full sync when the last one is older than a day", async () => {

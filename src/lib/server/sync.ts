@@ -6,6 +6,7 @@ import { refreshMinutesByRepo } from "./config";
 import {
   fetchIssue,
   fetchIssuesPage,
+  fetchPullStatuses,
   fetchPullsPage,
   fetchRepoLabels,
   fetchViewer,
@@ -126,6 +127,8 @@ export class Syncer {
       }
 
       const closed = full ? this.db.closeMissing(repo, seen) : 0;
+      const pulls = this.db.openPullNumbers(repo);
+      this.db.setPullStatuses(repo, await fetchPullStatuses(this.gh, repo, pulls));
       this.db.upsertLabels(repo, await fetchRepoLabels(this.gh, repo));
 
       const stamp = startedAt.toISOString();

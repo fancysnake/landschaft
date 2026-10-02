@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- PR status labels `is:conflicting`, `is:ci-not-ok` (required checks only) and `is:unanswered`
+  (unresolved review threads the author has not answered), matched like labels; the sync
+  refreshes them for every open PR.
+
 ## [0.6.0] - 2026-10-02
 
 ### Added
