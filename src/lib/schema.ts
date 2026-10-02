@@ -8,7 +8,27 @@ const id = z
   .max(32)
   .regex(/^[a-z0-9_-]+$/i, "letters, digits, - and _ only");
 export const repoName = z.string().regex(/^[\w.-]+\/[\w.-]+$/, "expected owner/repo");
-const labelList = z.array(z.string().min(1)).default([]);
+
+/**
+ * PR states an entry lists among its labels and matches like labels; they are read from
+ * GitHub, never written to it.
+ */
+export const STATUS_LABEL_NAMES = ["is:conflicting", "is:ci-not-ok", "is:unanswered"] as const;
+export type StatusLabel = (typeof STATUS_LABEL_NAMES)[number];
+
+export function isStatusLabel(name: string): name is StatusLabel {
+  return (STATUS_LABEL_NAMES as readonly string[]).includes(name);
+}
+
+/** `is:issue` / `is:pr` live in `kind`, so the only `is:` labels are statuses. */
+const label = z
+  .string()
+  .min(1)
+  .refine(
+    (name) => !name.startsWith("is:") || isStatusLabel(name),
+    `not a PR status label; expected one of ${STATUS_LABEL_NAMES.join(", ")}`,
+  );
+const labelList = z.array(label).default([]);
 /** "any": the issue carries at least one of the labels; "all": it carries every one. */
 export const MatchSchema = z.enum(["any", "all"]);
 export type Match = z.infer<typeof MatchSchema>;

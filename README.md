@@ -97,6 +97,12 @@ Saving triggers the first sync; once labels are cached the pickers suggest them.
 - A swimlane or column can take **only issues or only pull requests** (`"kind": "issue"` /
   `"pr"`, default `"any"`; an `is:issue` / `is:pr` chip in the settings editor), on top of its
   labels whatever the match; with no labels it takes every item of that kind.
+- Three **PR status labels** match like labels but come from GitHub, not from the PR's labels:
+  `is:conflicting` (merge conflicts), `is:ci-not-ok` (a check required to merge failed or is
+  still running; optional checks are ignored) and `is:unanswered` (an unresolved review thread
+  whose last comment is not the PR author's). One "any of" swimlane with all three gathers the
+  PRs waiting on their author. A move never adds or removes them. The config rejects any other
+  `is:` label.
 - An entry with **no labels (and any kind) is the catch-all** for issues matching nothing else.
   At most one per axis. Issues that fit neither are counted as "unplaced" on the board.
 - Dragging an issue removes the source entry's labels it carries and adds what the target

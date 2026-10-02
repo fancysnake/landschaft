@@ -67,6 +67,10 @@ describe("config file", () => {
   });
 });
 
+const withLaneLabels = (labels: string[]) => ({
+  dashboards: [{ ...minimal.dashboards[0]!, swimlanes: [{ id: "a", name: "A", labels }] }],
+});
+
 describe("config schema rules", () => {
   const base = minimal.dashboards[0]!;
 
@@ -100,6 +104,14 @@ describe("config schema rules", () => {
       ],
     };
     expect(() => saveConfig(twoCatchAlls, "/dev/null/never")).toThrow(/catch-all/);
+  });
+
+  it("takes the PR status labels but no other is: label", () => {
+    expect(ConfigSchema.safeParse(withLaneLabels(["is:ci-not-ok", "bug"])).success).toBe(true);
+    for (const typo of ["is:conflict", "is:pr"])
+      expect(() => saveConfig(withLaneLabels([typo]), "/dev/null/never")).toThrow(
+        /not a PR status label/,
+      );
   });
 
   it("does not count a kind-only swimlane or column as a catch-all", () => {

@@ -7,6 +7,19 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-02
+
+### Added
+
+- PR status labels `is:conflicting`, `is:ci-not-ok` (required checks only) and `is:unanswered`
+  (unresolved review threads the author has not answered) match like labels; each sync
+  refreshes them for every open PR.
+
+### Changed
+
+- The config rejects any `is:` label other than the PR status labels, and a GitHub label named
+  like a status no longer matches it.
+
 ## [0.6.0] - 2026-10-02
 
 ### Added
@@ -81,7 +94,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v0.6.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/fancysnake/landschaft/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/fancysnake/landschaft/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/fancysnake/landschaft/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/fancysnake/landschaft/compare/v0.3.0...v0.4.0

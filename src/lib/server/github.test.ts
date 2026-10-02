@@ -1,13 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { StatusLabel } from "../schema";
+
 import {
+  type CheckContext,
   createGithubClient,
   fetchIssuesPage,
+  fetchPullStatuses,
   GithubError,
   type IssueNode,
+  type PullStatusNode,
   removeLabel,
   toIssue,
   toPull,
+  toPullStatus,
 } from "./github";
 
 const node: IssueNode = {
@@ -93,6 +99,108 @@ describe("toPull", () => {
       author: "bob",
       parent: null,
       linked: [{ repo: "acme/app", number: 12 }],
+    });
+  });
+});
+
+function statusNode(overrides: Partial<PullStatusNode> = {}): PullStatusNode {
+  return {
+    number: 30,
+    mergeable: "MERGEABLE",
+    author: { login: "bob" },
+    commits: { nodes: [] },
+    reviewThreads: { nodes: [] },
+    ...overrides,
+  };
+}
+
+const rollup = (nodes: CheckContext[]) => ({
+  nodes: [{ commit: { statusCheckRollup: { contexts: { nodes } } } }],
+});
+
+const run = (status: string, conclusion: string | null, isRequired: boolean): CheckContext => ({
+  type: "CheckRun",
+  status,
+  conclusion,
+  isRequired,
+});
+
+const commitStatus = (state: string, isRequired: boolean): CheckContext => ({
+  type: "StatusContext",
+  state,
+  isRequired,
+});
+
+const thread = (isResolved: boolean, last: string | null) => ({
+  isResolved,
+  comments: { nodes: [{ author: last === null ? null : { login: last } }] },
+});
+
+const holds = (status: StatusLabel, overrides: Partial<PullStatusNode>) =>
+  toPullStatus(statusNode(overrides)).statuses.includes(status);
+
+describe("toPullStatus", () => {
+  it("is clean without checks, threads or conflicts", () => {
+    expect(toPullStatus(statusNode())).toEqual({ number: 30, statuses: [] });
+  });
+
+  it("lists every status that holds", () => {
+    const pull = statusNode({
+      mergeable: "CONFLICTING",
+      reviewThreads: { nodes: [thread(false, "carol")] },
+    });
+    expect(toPullStatus(pull).statuses).toEqual(["is:conflicting", "is:unanswered"]);
+  });
+
+  it("flags merge conflicts only when GitHub says CONFLICTING", () => {
+    expect(holds("is:conflicting", { mergeable: "CONFLICTING" })).toBe(true);
+    expect(holds("is:conflicting", { mergeable: "UNKNOWN" })).toBe(false);
+  });
+
+  it.each<[string, CheckContext, boolean]>([
+    ["passed run", run("COMPLETED", "SUCCESS", true), false],
+    ["skipped run", run("COMPLETED", "SKIPPED", true), false],
+    ["failed run", run("COMPLETED", "FAILURE", true), true],
+    ["running run", run("IN_PROGRESS", null, true), true],
+    ["optional failed run", run("COMPLETED", "FAILURE", false), false],
+    ["pending status", commitStatus("PENDING", true), true],
+    ["successful status", commitStatus("SUCCESS", true), false],
+    ["optional errored status", commitStatus("ERROR", false), false],
+  ])("CI with a %s is not ok: %s", (_, check, expected) => {
+    expect(holds("is:ci-not-ok", { commits: rollup([check]) })).toBe(expected);
+  });
+
+  it("counts unresolved threads the PR author has not answered last", () => {
+    const unanswered = (nodes: ReturnType<typeof thread>[]) =>
+      holds("is:unanswered", { reviewThreads: { nodes } });
+    expect(unanswered([thread(false, "carol")])).toBe(true);
+    expect(unanswered([thread(false, null)])).toBe(true);
+    expect(unanswered([thread(false, "bob")])).toBe(false);
+    expect(unanswered([thread(true, "carol")])).toBe(false);
+  });
+});
+
+describe("fetchPullStatuses", () => {
+  it("asks for every PR in one query, each aliased with its own number", async () => {
+    const queries: string[] = [];
+    const fetchImpl = vi.fn(async (_: string, init: RequestInit) => {
+      const { query } = JSON.parse(init.body as string) as { query: string };
+      queries.push(query);
+      const repository = {
+        pr7: statusNode({ number: 7, mergeable: "CONFLICTING" }),
+        pr8: null,
+      };
+      return jsonResponse({ data: { rateLimit: { remaining: 4321 }, repository } });
+    });
+    const gh = createGithubClient(async () => "tok", fetchImpl);
+
+    const page = await fetchPullStatuses(gh, "acme/app", [7, 8]);
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toContain("isRequired(pullRequestNumber: 8)");
+    expect(page).toEqual({
+      statuses: [{ number: 7, statuses: ["is:conflicting"] }],
+      rateRemaining: 4321,
     });
   });
 });

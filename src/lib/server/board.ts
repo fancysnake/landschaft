@@ -5,6 +5,7 @@ import {
   type Filters,
   fitsKind,
   isCatchAll,
+  isStatusLabel,
   type KindFilter,
   type Match,
   type Precedence,
@@ -33,6 +34,15 @@ export interface Group {
   kind?: KindFilter;
 }
 
+/**
+ * The item's label names plus the PR status labels that hold for it; a real GitHub label
+ * named like a status does not count as one.
+ */
+export function matchLabels(issue: Pick<Issue, "labels" | "statuses">): Set<string> {
+  const names = issue.labels.map((label) => label.name).filter((name) => !isStatusLabel(name));
+  return new Set([...names, ...issue.statuses]);
+}
+
 function matches(group: Group, labelNames: Set<string>): boolean {
   // A kind-only group (no labels, a kind set) takes every item, in list order.
   if (group.labels.length === 0) return (group.kind ?? "any") !== "any";
@@ -41,9 +51,10 @@ function matches(group: Group, labelNames: Set<string>): boolean {
     : group.labels.some((label) => labelNames.has(label));
 }
 
-/** The labels a group needs an issue to carry: all of them, or just the first. */
+/** The labels a move adds for a group: all of them, or just the first; never status labels. */
 function wantedLabels(group: Group): string[] {
-  return group.match === "all" ? group.labels : group.labels.slice(0, 1);
+  const real = group.labels.filter((label) => !isStatusLabel(label));
+  return group.match === "all" ? real : real.slice(0, 1);
 }
 
 /**
@@ -190,7 +201,7 @@ export function buildBoard(
 
     if (!wanted(issue)) continue;
 
-    const placed = placeCard(dashboard, issue.kind, new Set(issue.labels.map((l) => l.name)));
+    const placed = placeCard(dashboard, issue.kind, matchLabels(issue));
     if (!placed) {
       board.unplaced += 1;
       continue;
@@ -242,8 +253,8 @@ export interface Position {
 
 /**
  * Labels to add/remove so the issue lands in `to`. Per axis that changed: drop the
- * source group's labels the issue carries, add what the target group needs (its first
- * label, or every label for an "all" group; nothing for a catch-all). A label that the
+ * source group's labels the issue carries, add what the target group needs (its first real
+ * label, or every one for an "all" group; nothing for a catch-all). A label that the
  * target still needs is never removed.
  */
 export function labelDiffForMove(

@@ -3,12 +3,14 @@ import { DatabaseSync } from "node:sqlite";
 import type {
   Assignee,
   Blocker,
+  FetchedIssue,
   Issue,
   IssueKind,
   IssueRef,
   IssueState,
   LabelDef,
   LabelRef,
+  PullStatus,
   SyncState,
 } from "../types";
 
@@ -81,6 +83,7 @@ interface IssueRow {
   blocked_by_total: number;
   kind: string;
   linked_json: string;
+  status_json: string;
 }
 
 interface BlockerRow {
@@ -134,6 +137,7 @@ function rowToIssue(row: IssueRow, blockedBy: Blocker[]): Issue {
     blockedBy,
     blockedByTotal: row.blocked_by_total,
     linked: JSON.parse(row.linked_json) as IssueRef[],
+    statuses: JSON.parse(row.status_json) as Issue["statuses"],
   };
 }
 
@@ -145,6 +149,7 @@ const ADDED_COLUMNS = [
   ["author", "TEXT"],
   ["kind", "TEXT NOT NULL DEFAULT 'issue'"],
   ["linked_json", "TEXT NOT NULL DEFAULT '[]'"],
+  ["status_json", "TEXT NOT NULL DEFAULT '[]'"],
 ] as const;
 
 export function dbPath(): string {
@@ -195,7 +200,8 @@ export class Db {
     }
   }
 
-  upsertIssues(issues: Issue[]): void {
+  /** Leaves `status_json` alone; `setPullStatuses` owns it. */
+  upsertIssues(issues: FetchedIssue[]): void {
     if (issues.length === 0) return;
     const upsert = this.db.prepare(`
       INSERT INTO issues (repo, number, node_id, title, state, url, issue_type, author, created_at,
@@ -304,6 +310,22 @@ export class Db {
       for (const number of stale) close.run(repo, number);
     });
     return stale.length;
+  }
+
+  openPullNumbers(repo: string): number[] {
+    const rows = this.db
+      .prepare("SELECT number FROM issues WHERE repo = ? AND state = 'OPEN' AND kind = 'pr'")
+      .all(repo) as unknown as { number: number }[];
+    return rows.map((row) => row.number);
+  }
+
+  setPullStatuses(repo: string, statuses: PullStatus[]): void {
+    const update = this.db.prepare(
+      "UPDATE issues SET status_json = ? WHERE repo = ? AND number = ?",
+    );
+    this.transaction(() => {
+      for (const s of statuses) update.run(JSON.stringify(s.statuses), repo, s.number);
+    });
   }
 
   patchLabels(repo: string, number: number, labels: LabelRef[]): void {
