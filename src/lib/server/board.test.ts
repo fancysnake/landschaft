@@ -260,6 +260,11 @@ describe("buildBoard", () => {
     ];
     const board = buildBoard(issues, dashboard);
     expect(board.cells[cell("fix", "todo")]?.map((c) => c.number)).toEqual([3, 2, 1]);
+    expect(board.cells[cell("fix", "todo")]?.map((c) => c.statuses)).toEqual([
+      ["is:unanswered"],
+      ["is:ci:failed"],
+      ["is:conflicting"],
+    ]);
     expect(numbers(board)).toEqual([5, 4]);
   });
 
