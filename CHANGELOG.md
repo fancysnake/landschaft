@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- `is:ci:failed` and `is:ci:running` count `codecov/*` checks even when they are not required to
+  merge.
+
 ## [0.8.0] - 2026-10-03
 
 ### Added

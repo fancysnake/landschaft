@@ -366,17 +366,21 @@ export async function fetchPullsPage(
 }
 
 /** A commit status rollup entry: a check run, or a commit status. */
-export type CheckContext =
-  | { type: "CheckRun"; status: string; conclusion: string | null; isRequired: boolean }
-  | { type: "StatusContext"; state: string; isRequired: boolean };
+export type CheckContext = { name: string; isRequired: boolean } & (
+  | { type: "CheckRun"; status: string; conclusion: string | null }
+  | { type: "StatusContext"; state: string }
+);
+
+/** Checks not required to merge that still count toward the CI labels. */
+const COUNTED_OPTIONAL = /^codecov\//;
+
+const counted = (check: CheckContext) => check.isRequired || COUNTED_OPTIONAL.test(check.name);
 
 const PASSED = new Set(["SUCCESS", "NEUTRAL", "SKIPPED"]);
 
 const RUNNING = new Set(["PENDING", "EXPECTED"]);
 
-/** Checks not required to merge count as passed. */
 function ciState(check: CheckContext): "passed" | "failed" | "running" {
-  if (!check.isRequired) return "passed";
   const outcome =
     check.type === "StatusContext"
       ? check.state
@@ -407,7 +411,9 @@ export interface PullStatusNode {
 export function toPullStatus(node: PullStatusNode): PullStatus {
   const author = node.author?.login;
   const ci = new Set(
-    (node.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? []).map(ciState),
+    (node.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? [])
+      .filter(counted)
+      .map(ciState),
   );
   const holds: Record<StatusLabel, boolean> = {
     "is:conflicting": node.mergeable === "CONFLICTING",
@@ -433,8 +439,8 @@ function pullStatusField(number: number): string {
     number mergeable author { login }
     commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {
       type: __typename
-      ... on CheckRun { status conclusion isRequired(pullRequestNumber: ${number}) }
-      ... on StatusContext { state isRequired(pullRequestNumber: ${number}) }
+      ... on CheckRun { name status conclusion isRequired(pullRequestNumber: ${number}) }
+      ... on StatusContext { name: context state isRequired(pullRequestNumber: ${number}) }
     } } } } } }
     reviewThreads(first: 100) { nodes { isResolved comments(last: 1) { nodes { author { login } } } } }
   }`;

@@ -118,15 +118,16 @@ const rollup = (nodes: CheckContext[]) => ({
   nodes: [{ commit: { statusCheckRollup: { contexts: { nodes } } } }],
 });
 
-const run = (status: string, conclusion: string | null, isRequired: boolean): CheckContext => ({
-  type: "CheckRun",
-  status,
-  conclusion,
-  isRequired,
-});
+const run = (
+  status: string,
+  conclusion: string | null,
+  isRequired: boolean,
+  name = "build",
+): CheckContext => ({ type: "CheckRun", name, status, conclusion, isRequired });
 
-const commitStatus = (state: string, isRequired: boolean): CheckContext => ({
+const commitStatus = (state: string, isRequired: boolean, name = "ci/build"): CheckContext => ({
   type: "StatusContext",
+  name,
   state,
   isRequired,
 });
@@ -174,6 +175,21 @@ describe("toPullStatus", () => {
     ["errored status", commitStatus("ERROR", true), ["is:ci:failed"]],
     ["successful status", commitStatus("SUCCESS", true), []],
     ["optional errored status", commitStatus("ERROR", false), []],
+    [
+      "optional failed codecov status",
+      commitStatus("FAILURE", false, "codecov/patch"),
+      ["is:ci:failed"],
+    ],
+    [
+      "optional pending codecov status",
+      commitStatus("PENDING", false, "codecov/project"),
+      ["is:ci:running"],
+    ],
+    [
+      "optional failed codecov run",
+      run("COMPLETED", "FAILURE", false, "codecov/patch"),
+      ["is:ci:failed"],
+    ],
   ])("CI with a %s: %j", (_, check, expected) => {
     expect(ci([check])).toEqual(expected);
   });
