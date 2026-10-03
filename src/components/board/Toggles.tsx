@@ -10,10 +10,12 @@ interface Props {
   onChange(selected: string[]): void;
 }
 
-/** On/off chips; the last chip still on cannot be switched off. */
+/** On/off chips, plus a switch that turns them all on, or all off once they are all on. */
 export function Toggles({ label, options, selected, onChange }: Props) {
+  const allOn = options.every((option) => selected.includes(option.value));
+
   return (
-    <div role="group" aria-label={label} className="flex flex-wrap gap-1">
+    <div role="group" aria-label={label} className="flex flex-wrap items-center gap-1">
       {options.map((option) => {
         const on = selected.includes(option.value);
         return (
@@ -21,18 +23,15 @@ export function Toggles({ label, options, selected, onChange }: Props) {
             key={option.value}
             type="button"
             aria-pressed={on}
-            disabled={on && selected.length === 1}
             title={option.value}
             onClick={() =>
               onChange(
-                on
-                  ? selected.filter((value) => value !== option.value)
-                  : [...selected, option.value],
+                on ? selected.filter((v) => v !== option.value) : [...selected, option.value],
               )
             }
             className={`rounded-full border px-2.5 py-0.5 text-sm ${
               on
-                ? "border-sky-500 bg-sky-50 text-sky-900 disabled:cursor-default"
+                ? "border-sky-500 bg-sky-50 text-sky-900"
                 : "border-neutral-200 bg-white text-neutral-400 hover:border-sky-300"
             }`}
           >
@@ -40,6 +39,13 @@ export function Toggles({ label, options, selected, onChange }: Props) {
           </button>
         );
       })}
+      <button
+        type="button"
+        onClick={() => onChange(allOn ? [] : options.map((option) => option.value))}
+        className="px-1.5 text-xs text-neutral-500 hover:text-neutral-900 hover:underline"
+      >
+        {allOn ? "none" : "all"}
+      </button>
     </div>
   );
 }
