@@ -57,7 +57,7 @@ A PR card shows a pill for each status that holds, whatever lane it is in: `conf
 ## Filters
 
 On multi-repo boards, chips above the board switch each repository on or off
-(`repo=owner/a,owner/b`). The last chip still on cannot be switched off.
+(`repo=owner/a,owner/b`); `all` turns every chip on and, once all are on, `none` turns them off.
 
 Text, repos, assignee, label, epic and sort live in the query string, so a filtered view is a link
 you can bookmark or send. Empty values count as unset.

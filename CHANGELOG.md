@@ -7,18 +7,20 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-03
+
 ### Added
 
-- Epics can be marked as in active development with the ☆ on their tile; marked epics lead
-  the strip with an amber accent. The marks live per dashboard in the local database.
+- The ☆ on an epic tile marks it as in active development; marked epics lead the strip with an
+  amber accent, kept per dashboard in the local database.
+- Repo chips get an `all` / `none` switch, and the last chip on can be switched off too.
 
 ### Changed
 
-- `is:ci:failed` and `is:ci:running` count `codecov/*` checks even when they are not required to
-  merge.
+- `is:ci:failed` and `is:ci:running` count `codecov/*` checks even when they are optional.
 - A dashboard's `users` (GitHub logins, `@me` for the token's account) choose whose issues and
-  pull requests it shows, in place of `scope`. Configs with `scope` still load: `mine` reads as
-  `["@me"]`, `all` as `[]`.
+  pull requests it shows, replacing `scope`; `scope` still loads, `mine` as `["@me"]` and `all`
+  as `[]`.
 
 ## [0.8.0] - 2026-10-03
 
@@ -119,7 +121,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v0.8.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/fancysnake/landschaft/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/fancysnake/landschaft/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/fancysnake/landschaft/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/fancysnake/landschaft/compare/v0.5.0...v0.6.0
