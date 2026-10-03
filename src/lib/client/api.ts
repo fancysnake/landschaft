@@ -59,7 +59,8 @@ async function request<T>(input: string, init: RequestInit = {}): Promise<T> {
 export function filtersToQuery(filters: Filters): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
-    if (value?.length) params.set(key, Array.isArray(value) ? value.join(",") : value);
+    if (Array.isArray(value)) params.set(key, value.join(","));
+    else if (value) params.set(key, value);
   }
   return params.toString();
 }

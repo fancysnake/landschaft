@@ -169,23 +169,24 @@ export const TEXT_FILTER_KEYS = ["q", "assignee", "label", "epic"] as const;
 export type TextFilterKey = (typeof TEXT_FILTER_KEYS)[number];
 
 export type Filters = { [K in TextFilterKey]?: string } & {
-  /** Repos to show, set by the repo chips; unset shows all. */
+  /** Repos to show, set by the repo chips; unset shows all, empty shows none. */
   repo?: string[];
   sort?: SortBy;
   dir?: SortDir;
 };
 
-/** The `repo` query value (`owner/a,owner/b`) as a list; empty means unset. */
+/** The `repo` query value (`owner/a,owner/b`) as a list; absent is unset, `repo=` is empty. */
 export function parseRepoFilter(value: string | null | undefined): string[] | undefined {
-  const repos = value?.split(",").filter(Boolean) ?? [];
-  return repos.length > 0 ? repos : undefined;
+  return value?.split(",").filter(Boolean);
 }
 
 /**
  * The dashboard repos a repo filter selects: those it lists, or all of them when it lists
  * none on the dashboard (a stale URL would otherwise filter with no control to clear it).
+ * An empty filter selects none, unless a single-repo dashboard hides the chips.
  */
 export function selectedRepos(filter: string[] | undefined, dashboardRepos: string[]): string[] {
+  if (filter?.length === 0 && dashboardRepos.length > 1) return [];
   const listed = dashboardRepos.filter((repo) => filter?.includes(repo));
   return listed.length > 0 ? listed : dashboardRepos;
 }
