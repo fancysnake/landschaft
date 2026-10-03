@@ -33,6 +33,22 @@ describe("Db migration", () => {
     db.close();
     rmSync(dir, { recursive: true, force: true });
   });
+
+  it("drops cached statuses that are no longer status labels", () => {
+    const dir = mkdtempSync(join(tmpdir(), "landschaft-db-"));
+    const file = join(dir, "old.db");
+    const first = new Db(file);
+    first.upsertIssues([makeIssue({ number: 1, kind: "pr" })]);
+    first.close();
+    const raw = new DatabaseSync(file);
+    raw.exec(`UPDATE issues SET status_json = '["is:ci-not-ok","is:conflicting"]'`);
+    raw.close();
+
+    const db = new Db(file);
+    expect(db.getIssue(REPO, 1)?.statuses).toEqual(["is:conflicting"]);
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
 });
 
 describe("Db", () => {

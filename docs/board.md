@@ -47,6 +47,9 @@ threads awaiting the author; each sync
 refreshes them for every open PR. Dragging cannot change them, so a card stays in such a lane until
 the PR is fixed.
 
+A PR card shows a pill for each status that holds, whatever lane it is in: `conflict`, `CI ✗`,
+`CI …` or `comments`.
+
 ## Filters
 
 On multi-repo boards, chips above the board switch each repository on or off
