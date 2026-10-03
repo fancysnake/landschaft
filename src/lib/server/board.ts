@@ -6,6 +6,7 @@ import {
   fitsKind,
   isCatchAll,
   isStatusLabel,
+  ME,
   type KindFilter,
   type Match,
   type Precedence,
@@ -141,14 +142,21 @@ function compareBy(by: SortBy, dir: SortDir) {
 }
 
 function inScope(dashboard: Dashboard, viewer: string | null): (issue: Issue) => boolean {
-  if (dashboard.scope !== "mine" || viewer === null) return () => true;
-  return (issue) =>
-    issue.author === viewer || issue.assignees.some((assignee) => assignee.login === viewer);
+  const users = new Set(
+    dashboard.users
+      .map((user) => (user === ME ? viewer : user))
+      .filter((user) => user !== null)
+      .map((user) => user.toLowerCase()),
+  );
+  if (users.size === 0) return () => true;
+  const listed = (login: string | null) => login !== null && users.has(login.toLowerCase());
+  return (issue) => listed(issue.author) || issue.assignees.some(({ login }) => listed(login));
 }
 
 /**
- * Lays the open issues out on the dashboard's grid. `viewer` is the token's login; with
- * scope "mine" only issues they authored or are assigned to take part.
+ * Lays the open issues out on the dashboard's grid. `viewer` is the token's login, which
+ * `@me` in the dashboard's users stands for; with users set, only issues one of them
+ * authored or is assigned to take part.
  */
 export function buildBoard(
   issues: Issue[],

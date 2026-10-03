@@ -5,7 +5,7 @@ import type { DragPayload } from "../../lib/client/dnd";
 import { repoShortName } from "../../lib/client/labels";
 import { useBoard } from "../../lib/client/useBoard";
 import { useUrlFilters } from "../../lib/client/useUrlFilters";
-import { cellTakes, repoFilter, selectedRepos } from "../../lib/schema";
+import { cellTakes, ME, repoFilter, selectedRepos } from "../../lib/schema";
 import { cellKey } from "../../lib/types";
 import { Cell } from "./Cell";
 import { EpicStrip } from "./EpicStrip";
@@ -48,10 +48,13 @@ export default function Board({ dashboardId }: Props) {
           {dashboard.name}
           <span className="ml-2 text-sm font-normal text-neutral-500">
             {total} issues
-            {dashboard.scope === "mine" && (
-              <span title="Created by or assigned to you">
+            {dashboard.users.length > 0 && (
+              <span title="Created by or assigned to">
                 {" "}
-                · mine{status.viewer ? ` (${status.viewer})` : ""}
+                ·{" "}
+                {dashboard.users
+                  .map((user) => (user === ME && status.viewer ? `${ME} (${status.viewer})` : user))
+                  .join(", ")}
               </span>
             )}
           </span>

@@ -48,7 +48,7 @@ describe("config file", () => {
     expect(saved.dashboards[0]).toMatchObject({
       sort: { by: "updated", dir: "desc" },
       refreshMinutes: 5,
-      scope: "mine",
+      users: ["@me"],
       swimlanes: [{ id: "all", labels: [], match: "any", kind: "any", hideBlocked: false }],
       columns: [{ id: "todo", labels: [], match: "any", kind: "any" }],
     });
@@ -66,6 +66,9 @@ describe("config file", () => {
     expect(loadConfig(file).dashboards).toHaveLength(2);
   });
 });
+
+const parseDashboard = (extra: object) =>
+  ConfigSchema.parse({ dashboards: [{ ...minimal.dashboards[0]!, ...extra }] }).dashboards[0]!;
 
 const withLaneLabels = (labels: string[]) => ({
   dashboards: [{ ...minimal.dashboards[0]!, swimlanes: [{ id: "a", name: "A", labels }] }],
@@ -138,6 +141,22 @@ describe("config schema rules", () => {
   it("rejects malformed repo names", () => {
     const bad = { dashboards: [{ ...base, repos: ["not a repo"] }] };
     expect(() => saveConfig(bad, "/dev/null/never")).toThrow(/owner\/repo/);
+  });
+
+  it("reads the legacy scope as users", () => {
+    expect(parseDashboard({ scope: "mine" })).toMatchObject({ users: ["@me"] });
+    expect(parseDashboard({ scope: "all" })).toMatchObject({ users: [] });
+    expect(parseDashboard({ scope: "all", users: ["ann"] })).toMatchObject({ users: ["ann"] });
+    expect(parseDashboard({ scope: "all" })).not.toHaveProperty("scope");
+  });
+
+  it("takes GitHub logins and @me as users", () => {
+    const ok = { dashboards: [{ ...base, users: ["@me", "ann-b", "renovate[bot]"] }] };
+    expect(ConfigSchema.safeParse(ok).success).toBe(true);
+    for (const bad of ["@ann", "ann b", "-ann", ""])
+      expect(() =>
+        saveConfig({ dashboards: [{ ...base, users: [bad] }] }, "/dev/null/never"),
+      ).toThrow(/GitHub login/);
   });
 });
 

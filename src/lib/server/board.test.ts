@@ -195,8 +195,21 @@ describe("buildBoard", () => {
     expect(board.labels).toEqual([]);
   });
 
-  it('keeps only the viewer\'s authored or assigned issues under scope "mine"', () => {
-    const dashboard = { ...DASHBOARD, scope: "mine" as const };
+  it("keeps only issues the listed users authored or are assigned to", () => {
+    const issues = [
+      makeIssue({ number: 1, author: "Ann" }),
+      makeIssue({ number: 2, author: "bob", assignees: [{ login: "cid", avatarUrl: "" }] }),
+      makeIssue({ number: 3, author: "dan" }),
+    ];
+    const users = (list: string[], viewer: string | null = null) =>
+      numbers(buildBoard(issues, { ...DASHBOARD, users: list }, {}, viewer));
+    expect(users(["ann", "cid"])).toEqual([2, 1]);
+    expect(users(["@me", "ann"], "dan")).toEqual([3, 1]);
+    expect(users(["@me", "ann"])).toEqual([1]);
+  });
+
+  it("keeps only the viewer's authored or assigned issues under @me", () => {
+    const dashboard = { ...DASHBOARD, users: ["@me"] };
     const me = { login: "me", avatarUrl: "" };
     const issues = [
       makeIssue({ number: 1, author: "me" }),
