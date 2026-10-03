@@ -87,9 +87,9 @@ Saving triggers the first sync; once labels are cached the pickers suggest them.
 
 <!-- --8<-- [start:placement] -->
 
-- A dashboard shows only open issues **you created or are assigned to** (scope `mine`, the
-  default; "you" is the account behind the token). Switch a dashboard to `all` in settings to
-  see everyone's.
+- A dashboard shows only open issues **its users created or are assigned to**. The default is
+  `@me`, the account behind the token; list other GitHub logins in settings to follow them too,
+  or remove every user to see everyone's.
 - Each swimlane and column lists the labels it matches. An issue lands in the **first**
   swimlane and the **last** column (in order) it satisfies, so a card carrying two stages'
   labels sits in the later one: by default carrying **any** of the labels; an entry set to

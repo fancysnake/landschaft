@@ -28,7 +28,7 @@ export default function Board({ dashboardId }: Props) {
   if (!data) {
     return <p className="p-6 text-sm text-neutral-500">{loading ? "Loading board…" : error}</p>;
   }
-  const { dashboard, board, status } = data;
+  const { dashboard, users, board, status } = data;
   const showRepo = dashboard.repos.length > 1;
   const columnTotals = Object.fromEntries(
     dashboard.columns.map((column) => [
@@ -48,11 +48,8 @@ export default function Board({ dashboardId }: Props) {
           {dashboard.name}
           <span className="ml-2 text-sm font-normal text-neutral-500">
             {total} issues
-            {dashboard.scope === "mine" && (
-              <span title="Created by or assigned to you">
-                {" "}
-                · mine{status.viewer ? ` (${status.viewer})` : ""}
-              </span>
+            {dashboard.users.length > 0 && (
+              <span title="Created by or assigned to"> · {users.join(", ") || "nobody"}</span>
             )}
           </span>
         </h1>

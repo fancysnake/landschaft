@@ -1,25 +1,29 @@
+import type { z } from "zod";
+
 import { type KeyboardEvent, useState } from "react";
 
 interface Props {
-  repos: string[];
-  onChange(repos: string[]): void;
+  items: string[];
+  onChange(items: string[]): void;
+  /** Validates a new entry; its first error message shows when it fails. */
+  schema: z.ZodType<string>;
+  placeholder: string;
 }
 
-const REPO = /^[\w.-]+\/[\w.-]+$/;
-
-export function RepoList({ repos, onChange }: Props) {
+export function ChipList({ items, onChange, schema, placeholder }: Props) {
   const [text, setText] = useState("");
-  const [invalid, setInvalid] = useState(false);
+  const [invalid, setInvalid] = useState<string | null>(null);
 
   const add = () => {
     const trimmed = text.trim();
-    if (!REPO.test(trimmed)) {
-      setInvalid(trimmed !== "");
+    const parsed = schema.safeParse(trimmed);
+    if (!parsed.success) {
+      setInvalid(trimmed === "" ? null : (parsed.error.issues[0]?.message ?? "invalid"));
       return;
     }
-    if (!repos.includes(trimmed)) onChange([...repos, trimmed]);
+    if (!items.includes(parsed.data)) onChange([...items, parsed.data]);
     setText("");
-    setInvalid(false);
+    setInvalid(null);
   };
   const keyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") {
@@ -31,16 +35,16 @@ export function RepoList({ repos, onChange }: Props) {
   return (
     <div className="space-y-2">
       <ul className="flex flex-wrap gap-1">
-        {repos.map((repo) => (
+        {items.map((item) => (
           <li
-            key={repo}
+            key={item}
             className="flex items-center gap-1 rounded-full bg-neutral-200 px-2 text-sm leading-6"
           >
-            {repo}
+            {item}
             <button
               type="button"
-              onClick={() => onChange(repos.filter((r) => r !== repo))}
-              aria-label={`Remove ${repo}`}
+              onClick={() => onChange(items.filter((i) => i !== item))}
+              aria-label={`Remove ${item}`}
               className="text-neutral-500 hover:text-neutral-900"
             >
               ×
@@ -53,7 +57,7 @@ export function RepoList({ repos, onChange }: Props) {
           value={text}
           onChange={(event) => setText(event.target.value)}
           onKeyDown={keyDown}
-          placeholder="owner/repo"
+          placeholder={placeholder}
           className={`w-64 rounded-md border px-2 py-1 text-sm ${
             invalid ? "border-red-400" : "border-neutral-300"
           }`}
@@ -65,7 +69,7 @@ export function RepoList({ repos, onChange }: Props) {
         >
           Add
         </button>
-        {invalid && <span className="self-center text-xs text-red-700">expected owner/repo</span>}
+        {invalid && <span className="self-center text-xs text-red-700">{invalid}</span>}
       </div>
     </div>
   );

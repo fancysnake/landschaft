@@ -37,7 +37,7 @@ export const DASHBOARD: Dashboard = {
   id: "main",
   name: "Main",
   repos: [REPO],
-  scope: "all",
+  users: [],
   epicLabel: "epic",
   sort: { by: "updated", dir: "desc" },
   refreshMinutes: 5,

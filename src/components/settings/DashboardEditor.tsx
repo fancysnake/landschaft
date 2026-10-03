@@ -1,12 +1,12 @@
 import { type ReactNode, useEffect, useState } from "react";
 
-import type { Dashboard, Scope, SortBy, SortDir } from "../../lib/schema";
 import type { LabelDef } from "../../lib/types";
 
 import { api } from "../../lib/client/api";
+import { type Dashboard, repoName, type SortBy, type SortDir, userName } from "../../lib/schema";
+import { ChipList } from "./ChipList";
 import { LabelPicker } from "./LabelPicker";
 import { LaneColumnEditor } from "./LaneColumnEditor";
-import { RepoList } from "./RepoList";
 
 interface Props {
   dashboard: Dashboard;
@@ -70,20 +70,27 @@ export function DashboardEditor({ dashboard, onChange }: Props) {
         label="Repositories"
         hint="Labels below are suggested from these repos once they have synced (saving triggers the first sync)."
       >
-        <RepoList repos={dashboard.repos} onChange={(repos) => patch({ repos })} />
+        <ChipList
+          items={dashboard.repos}
+          onChange={(repos) => patch({ repos })}
+          schema={repoName}
+          placeholder="owner/repo"
+        />
       </Field>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Issues" hint="Who the issues belong to.">
-          <select
-            value={dashboard.scope}
-            onChange={(event) => patch({ scope: event.target.value as Scope })}
-            className={`${input} w-full`}
-          >
-            <option value="mine">created by or assigned to me</option>
-            <option value="all">everyone's</option>
-          </select>
-        </Field>
+      <Field
+        label="Users"
+        hint="Only issues and pull requests these users created or are assigned to; @me is you (the token's account). Empty shows everyone's."
+      >
+        <ChipList
+          items={dashboard.users}
+          onChange={(users) => patch({ users })}
+          schema={userName}
+          placeholder="login or @me"
+        />
+      </Field>
+
+      <div className="grid gap-4 sm:grid-cols-2">
         <Field
           label="Epic label"
           hint="Issues with this label appear in the epic strip with sub-issue progress."

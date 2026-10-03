@@ -4,7 +4,7 @@ import type { Swimlane } from "../schema";
 
 import { cellKey } from "../types";
 import { DASHBOARD, label, makeIssue, REPO } from "./__fixtures__/issues";
-import { buildBoard, isBlocked, labelDiffForMove, placeCard, placeIn } from "./board";
+import { buildBoard, isBlocked, labelDiffForMove, placeCard, placeIn, resolveUsers } from "./board";
 
 const cell = (laneId: string, colId: string) => cellKey(laneId, colId);
 const TWO_REPOS = { ...DASHBOARD, repos: [REPO, "acme/other"] };
@@ -195,8 +195,23 @@ describe("buildBoard", () => {
     expect(board.labels).toEqual([]);
   });
 
-  it('keeps only the viewer\'s authored or assigned issues under scope "mine"', () => {
-    const dashboard = { ...DASHBOARD, scope: "mine" as const };
+  it("keeps only issues the listed users authored or are assigned to", () => {
+    const issues = [
+      makeIssue({ number: 1, author: "Ann" }),
+      makeIssue({ number: 2, author: "bob", assignees: [{ login: "cid", avatarUrl: "" }] }),
+      makeIssue({ number: 3, author: "dan" }),
+    ];
+    const users = (list: string[], viewer: string | null = null) =>
+      numbers(buildBoard(issues, { ...DASHBOARD, users: list }, {}, resolveUsers(list, viewer)));
+    expect(users(["ann", "cid"])).toEqual([2, 1]);
+    expect(users(["@me", "ann"], "dan")).toEqual([3, 1]);
+    expect(users(["@me", "ann"])).toEqual([1]);
+    expect(users(["@me"])).toEqual([]);
+    expect(users([])).toEqual([3, 2, 1]);
+  });
+
+  it("keeps only the viewer's authored or assigned issues under @me", () => {
+    const dashboard = { ...DASHBOARD, users: ["@me"] };
     const me = { login: "me", avatarUrl: "" };
     const issues = [
       makeIssue({ number: 1, author: "me" }),
@@ -204,12 +219,22 @@ describe("buildBoard", () => {
       makeIssue({ number: 3, author: "ann", labels: [label("epic")] }),
       makeIssue({ number: 4, author: null }),
     ];
-    const mine = buildBoard(issues, dashboard, {}, "me");
+    const mine = buildBoard(issues, dashboard, {}, ["me"]);
     expect(numbers(mine)).toEqual([2, 1]);
     expect(mine.epics).toEqual([]);
     expect(mine.assignees).toEqual(["me"]);
-    expect(numbers(buildBoard(issues, dashboard, {}, null))).toEqual([4, 3, 2, 1]);
-    expect(numbers(buildBoard(issues, DASHBOARD, {}, "me"))).toEqual([4, 3, 2, 1]);
+    expect(numbers(buildBoard(issues, dashboard, {}, []))).toEqual([]);
+    expect(numbers(buildBoard(issues, DASHBOARD, {}, ["me"]))).toEqual([4, 3, 2, 1]);
+  });
+
+  it("resolves @me to the viewer and drops the [bot] suffix", () => {
+    expect(resolveUsers(["@me", "@ME", "Ann", "renovate[bot]"], "dan")).toEqual([
+      "dan",
+      "dan",
+      "Ann",
+      "renovate",
+    ]);
+    expect(resolveUsers(["@me", "ann"], null)).toEqual(["ann"]);
   });
 
   it("puts pull requests in a PR swimlane", () => {
@@ -434,7 +459,7 @@ describe("buildBoard", () => {
   it("lists starred epics first, each group in sort order", () => {
     const issues = [10, 11, 12, 13].map((number) => makeIssue({ number, labels: [label("epic")] }));
     const starred = new Set(["acme/app#10", "acme/app#12", "acme/app#99"]);
-    const epics = buildBoard(issues, DASHBOARD, {}, null, starred).epics;
+    const epics = buildBoard(issues, DASHBOARD, {}, [], starred).epics;
     expect(epics.map((epic) => [epic.number, epic.starred])).toEqual([
       [12, true],
       [10, true],

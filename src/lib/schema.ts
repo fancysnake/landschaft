@@ -98,16 +98,23 @@ export const AXIS_PRECEDENCE = { swimlanes: "first", columns: "last" } as const;
 export type Axis = keyof typeof AXIS_PRECEDENCE;
 export type Precedence = (typeof AXIS_PRECEDENCE)[Axis];
 
-/** "mine": only issues the viewer created or is assigned to; "all": every open issue. */
-export const ScopeSchema = z.enum(["mine", "all"]);
-export type Scope = z.infer<typeof ScopeSchema>;
+/** Stands for the token's account in a dashboard's `users`. */
+export const ME = "@me";
+
+/** A GitHub login, or `@me`. */
+export const userName = z
+  .string()
+  .regex(/^(@me|[a-z\d](?:[a-z\d_-]*[a-z\d])?(\[bot\])?)$/i, "expected a GitHub login or @me");
 
 export const DashboardSchema = z
   .object({
     id,
     name: z.string().min(1),
     repos: z.array(repoName).min(1),
-    scope: ScopeSchema.default("mine"),
+    /** Only items these users authored or are assigned to; empty takes everyone's. */
+    users: z.array(userName).optional(),
+    /** Legacy: "mine" reads as `users: ["@me"]`, "all" as `users: []`. */
+    scope: z.enum(["mine", "all"]).optional(),
     epicLabel: z.string().min(1).optional(),
     sort: SortSchema.default({ by: "updated", dir: "desc" }),
     refreshMinutes: z.number().int().min(1).max(1440).default(5),
@@ -127,7 +134,11 @@ export const DashboardSchema = z
         });
       }
     }
-  });
+  })
+  .transform(({ scope, users, ...dashboard }) => ({
+    ...dashboard,
+    users: users ?? (scope === "all" ? [] : [ME]),
+  }));
 
 export const ConfigSchema = z
   .object({
@@ -173,23 +184,24 @@ export const TEXT_FILTER_KEYS = ["q", "assignee", "label", "epic"] as const;
 export type TextFilterKey = (typeof TEXT_FILTER_KEYS)[number];
 
 export type Filters = { [K in TextFilterKey]?: string } & {
-  /** Repos to show, set by the repo chips; unset shows all. */
+  /** Repos to show, set by the repo chips; unset shows all, empty shows none. */
   repo?: string[];
   sort?: SortBy;
   dir?: SortDir;
 };
 
-/** The `repo` query value (`owner/a,owner/b`) as a list; empty means unset. */
+/** The `repo` query value (`owner/a,owner/b`) as a list; absent is unset, `repo=` is empty. */
 export function parseRepoFilter(value: string | null | undefined): string[] | undefined {
-  const repos = value?.split(",").filter(Boolean) ?? [];
-  return repos.length > 0 ? repos : undefined;
+  return value?.split(",").filter(Boolean);
 }
 
 /**
  * The dashboard repos a repo filter selects: those it lists, or all of them when it lists
  * none on the dashboard (a stale URL would otherwise filter with no control to clear it).
+ * An empty filter selects none, unless a single-repo dashboard hides the chips.
  */
 export function selectedRepos(filter: string[] | undefined, dashboardRepos: string[]): string[] {
+  if (filter?.length === 0 && dashboardRepos.length > 1) return [];
   const listed = dashboardRepos.filter((repo) => filter?.includes(repo));
   return listed.length > 0 ? listed : dashboardRepos;
 }

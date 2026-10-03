@@ -139,6 +139,6 @@ export interface SyncStatus {
   lastError: string | null;
   rateRemaining: number | null;
   inFlight: string[];
-  /** Login the token belongs to; drives the "mine" scope. */
+  /** Login the token belongs to; what `@me` in a dashboard's users stands for. */
   viewer: string | null;
 }
