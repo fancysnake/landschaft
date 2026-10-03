@@ -151,7 +151,11 @@ describe("config schema rules", () => {
   });
 
   it("takes GitHub logins and @me as users", () => {
-    const ok = { dashboards: [{ ...base, users: ["@me", "ann-b", "renovate[bot]"] }] };
+    const ok = {
+      dashboards: [
+        { ...base, users: ["@me", "ann-b", "mona-cat_octo", "renovate[bot]", "renovate"] },
+      ],
+    };
     expect(ConfigSchema.safeParse(ok).success).toBe(true);
     for (const bad of ["@ann", "ann b", "-ann", ""])
       expect(() =>

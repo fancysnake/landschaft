@@ -5,7 +5,7 @@ import type { DragPayload } from "../../lib/client/dnd";
 import { repoShortName } from "../../lib/client/labels";
 import { useBoard } from "../../lib/client/useBoard";
 import { useUrlFilters } from "../../lib/client/useUrlFilters";
-import { cellTakes, ME, repoFilter, selectedRepos } from "../../lib/schema";
+import { cellTakes, repoFilter, selectedRepos } from "../../lib/schema";
 import { cellKey } from "../../lib/types";
 import { Cell } from "./Cell";
 import { EpicStrip } from "./EpicStrip";
@@ -28,7 +28,7 @@ export default function Board({ dashboardId }: Props) {
   if (!data) {
     return <p className="p-6 text-sm text-neutral-500">{loading ? "Loading board…" : error}</p>;
   }
-  const { dashboard, board, status } = data;
+  const { dashboard, users, board, status } = data;
   const showRepo = dashboard.repos.length > 1;
   const columnTotals = Object.fromEntries(
     dashboard.columns.map((column) => [
@@ -49,13 +49,7 @@ export default function Board({ dashboardId }: Props) {
           <span className="ml-2 text-sm font-normal text-neutral-500">
             {total} issues
             {dashboard.users.length > 0 && (
-              <span title="Created by or assigned to">
-                {" "}
-                ·{" "}
-                {dashboard.users
-                  .map((user) => (user === ME && status.viewer ? `${ME} (${status.viewer})` : user))
-                  .join(", ")}
-              </span>
+              <span title="Created by or assigned to"> · {users.join(", ") || "nobody"}</span>
             )}
           </span>
         </h1>

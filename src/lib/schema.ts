@@ -103,7 +103,7 @@ export const ME = "@me";
 /** A GitHub login, or `@me`. */
 export const userName = z
   .string()
-  .regex(/^(@me|[a-z\d](?:[a-z\d-]*[a-z\d])?(\[bot\])?)$/i, "expected a GitHub login or @me");
+  .regex(/^(@me|[a-z\d](?:[a-z\d_-]*[a-z\d])?(\[bot\])?)$/i, "expected a GitHub login or @me");
 
 export const DashboardSchema = z
   .object({
