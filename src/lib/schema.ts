@@ -25,40 +25,67 @@ export function isStatusLabel(name: string): name is StatusLabel {
   return (STATUS_LABEL_NAMES as readonly string[]).includes(name);
 }
 
-/** Retired status labels and what replaced them, so configs written for older releases load. */
-const LEGACY_LABELS: Record<string, string[]> = {
-  "is:ci-not-ok": ["is:ci:failed", "is:ci:running"],
-};
-const labelList = z.preprocess(
-  (labels) =>
-    Array.isArray(labels)
-      ? [...new Set(labels.flatMap((name: string) => LEGACY_LABELS[name] ?? [name]))]
-      : labels,
-  z.array(z.string().min(1)).default([]),
-);
 /** "any": the issue carries at least one of the labels; "all": it carries every one. */
 export const MatchSchema = z.enum(["any", "all"]);
 export type Match = z.infer<typeof MatchSchema>;
+
+/** Retired status labels and the labels that replaced them; any one of those matches. */
+const LEGACY_LABELS = new Map<string, readonly StatusLabel[]>([
+  // retired in 0.8.0
+  ["is:ci-not-ok", ["is:ci:failed", "is:ci:running"]],
+]);
+
+/**
+ * Rewrites retired labels so configs written for older releases load. The replacements match
+ * as "any", so under "all" a retired label rewrites only when it is the group's sole label.
+ */
+function replaceLegacyLabels<T extends { labels: string[]; match: Match }>(
+  group: T,
+  ctx: z.RefinementCtx,
+): T {
+  const legacy = group.labels.find((name) => LEGACY_LABELS.has(name));
+  if (legacy === undefined) return group;
+  if (group.match === "all" && group.labels.length > 1) {
+    const replacements = LEGACY_LABELS.get(legacy)!.join(" or ");
+    ctx.addIssue({
+      code: "custom",
+      path: ["labels"],
+      message: `${legacy} is retired and cannot combine with other labels under match "all"; use ${replacements}`,
+    });
+    return z.NEVER;
+  }
+  const labels = group.labels.flatMap(
+    (name): readonly string[] => LEGACY_LABELS.get(name) ?? [name],
+  );
+  return { ...group, labels: [...new Set(labels)], match: "any" };
+}
+
 /** Which items a swimlane or column takes: both, only issues, or only pull requests. */
 export const KindFilterSchema = z.enum(["any", "issue", "pr"]);
 export type KindFilter = z.infer<typeof KindFilterSchema>;
 
-export const SwimlaneSchema = z.object({
-  id,
-  name: z.string().min(1),
-  labels: labelList,
-  match: MatchSchema.default("any"),
-  kind: KindFilterSchema.default("any"),
-  hideBlocked: z.boolean().default(false),
-});
+const labelList = z.array(z.string().min(1)).default([]);
 
-export const ColumnSchema = z.object({
-  id,
-  name: z.string().min(1),
-  labels: labelList,
-  match: MatchSchema.default("any"),
-  kind: KindFilterSchema.default("any"),
-});
+export const SwimlaneSchema = z
+  .object({
+    id,
+    name: z.string().min(1),
+    labels: labelList,
+    match: MatchSchema.default("any"),
+    kind: KindFilterSchema.default("any"),
+    hideBlocked: z.boolean().default(false),
+  })
+  .transform(replaceLegacyLabels);
+
+export const ColumnSchema = z
+  .object({
+    id,
+    name: z.string().min(1),
+    labels: labelList,
+    match: MatchSchema.default("any"),
+    kind: KindFilterSchema.default("any"),
+  })
+  .transform(replaceLegacyLabels);
 
 export const SortBySchema = z.enum(["created", "updated"]);
 export const SortDirSchema = z.enum(["asc", "desc"]);

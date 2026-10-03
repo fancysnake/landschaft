@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { ConfigSchema } from "../schema";
+import { ConfigSchema, type Match } from "../schema";
 import { allRepos, findDashboard, loadConfig, refreshMinutesByRepo, saveConfig } from "./config";
 
 const minimal = {
@@ -67,8 +67,8 @@ describe("config file", () => {
   });
 });
 
-const withLaneLabels = (labels: string[]) => ({
-  dashboards: [{ ...minimal.dashboards[0]!, swimlanes: [{ id: "a", name: "A", labels }] }],
+const withLaneLabels = (labels: string[], match: Match = "any") => ({
+  dashboards: [{ ...minimal.dashboards[0]!, swimlanes: [{ id: "a", name: "A", labels, match }] }],
 });
 
 describe("config schema rules", () => {
@@ -118,6 +118,28 @@ describe("config schema rules", () => {
       "bug",
       "is:ci:failed",
       "is:ci:running",
+    ]);
+  });
+
+  it('reads a lone is:ci-not-ok under match "all" as "any"', () => {
+    const lane = ConfigSchema.parse(withLaneLabels(["is:ci-not-ok"], "all")).dashboards[0]!
+      .swimlanes[0]!;
+    expect(lane.labels).toEqual(["is:ci:failed", "is:ci:running"]);
+    expect(lane.match).toBe("any");
+  });
+
+  it('rejects is:ci-not-ok combined with other labels under match "all"', () => {
+    expect(() =>
+      saveConfig(withLaneLabels(["bug", "is:ci-not-ok"], "all"), "/dev/null/never"),
+    ).toThrow(/is:ci-not-ok is retired/);
+  });
+
+  it("takes labels named like Object.prototype members", () => {
+    const parsed = ConfigSchema.parse(withLaneLabels(["constructor", "toString", "__proto__"]));
+    expect(parsed.dashboards[0]!.swimlanes[0]!.labels).toEqual([
+      "constructor",
+      "toString",
+      "__proto__",
     ]);
   });
 

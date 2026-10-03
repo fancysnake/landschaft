@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Fixed
 
 - Configs listing `is:ci-not-ok` load again; it reads as `is:ci:failed` plus `is:ci:running`.
+  Under match "all" it must be the entry's only label, which then matches as "any".
 - Configs listing other `is:` labels load again; they match as ordinary GitHub labels.
 
 ## [0.8.0] - 2026-10-03
