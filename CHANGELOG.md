@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- Epics can be marked as in active development with the ☆ on their tile; marked epics lead
+  the strip with an amber accent. The marks live per dashboard in the local database.
+
 ### Changed
 
 - `is:ci:failed` and `is:ci:running` count `codecov/*` checks even when they are not required to

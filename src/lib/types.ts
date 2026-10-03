@@ -106,6 +106,8 @@ export interface Epic {
   title: string;
   url: string;
   progress: Progress | null;
+  /** Marked as in active development on this dashboard. */
+  starred: boolean;
 }
 
 export interface Board {

@@ -132,6 +132,16 @@ describe("Db", () => {
     ]);
   });
 
+  it("stars and unstars epics per dashboard", () => {
+    db.setEpicStarred("a", "acme/app#1", true);
+    db.setEpicStarred("a", "acme/app#1", true);
+    db.setEpicStarred("a", "acme/app#2", true);
+    db.setEpicStarred("b", "acme/app#3", true);
+    db.setEpicStarred("a", "acme/app#2", false);
+    expect(db.starredEpics("a")).toEqual(new Set(["acme/app#1"]));
+    expect(db.starredEpics("b")).toEqual(new Set(["acme/app#3"]));
+  });
+
   it("stores sync state as a patch", () => {
     expect(db.getSyncState(REPO)).toBeNull();
     db.setSyncState(REPO, {

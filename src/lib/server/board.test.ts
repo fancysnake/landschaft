@@ -456,6 +456,18 @@ describe("buildBoard", () => {
     expect(board.cells[cell("rest", "todo")]).toEqual([]);
   });
 
+  it("lists starred epics first, each group in sort order", () => {
+    const issues = [10, 11, 12, 13].map((number) => makeIssue({ number, labels: [label("epic")] }));
+    const starred = new Set(["acme/app#10", "acme/app#12", "acme/app#99"]);
+    const epics = buildBoard(issues, DASHBOARD, {}, [], starred).epics;
+    expect(epics.map((epic) => [epic.number, epic.starred])).toEqual([
+      [12, true],
+      [10, true],
+      [13, false],
+      [11, false],
+    ]);
+  });
+
   it("hides epics from other repos under the repo filter", () => {
     const issues = [
       makeIssue({ number: 10, labels: [label("epic")] }),

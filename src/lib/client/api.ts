@@ -1,4 +1,11 @@
-import type { Config, Dashboard, Filters, MoveRequest, SyncRequest } from "../schema";
+import type {
+  Config,
+  Dashboard,
+  Filters,
+  MoveRequest,
+  StarEpicRequest,
+  SyncRequest,
+} from "../schema";
 import type { Board, Issue, LabelDef, SyncStatus } from "../types";
 
 export interface BoardResponse {
@@ -77,6 +84,11 @@ export const api = {
     request<SyncResponse>("/api/sync", { method: "POST", body: JSON.stringify(body) }),
   move: (body: MoveRequest) =>
     request<MoveResponse>("/api/move", { method: "POST", body: JSON.stringify(body) }),
+  setEpicStarred: (dashboardId: string, body: StarEpicRequest) =>
+    request<{ starredEpics: string[] }>(
+      `/api/dashboards/${encodeURIComponent(dashboardId)}/starred-epics`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
   config: () => request<Config>("/api/config"),
   saveConfig: (config: unknown) =>
     request<Config>("/api/config", { method: "PUT", body: JSON.stringify(config) }),

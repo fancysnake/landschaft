@@ -162,13 +162,14 @@ function byUsers(dashboard: Dashboard, users: string[]): (issue: Issue) => boole
 /**
  * Lays the open issues out on the dashboard's grid. `users` is the dashboard's users through
  * `resolveUsers`; when the dashboard lists any, only issues one of them authored or is
- * assigned to take part.
+ * assigned to take part. `starred` epic keys lead the epic strip.
  */
 export function buildBoard(
   issues: Issue[],
   dashboard: Dashboard,
   filters: Filters = {},
   users: string[] = [],
+  starred: ReadonlySet<string> = new Set(),
 ): Board {
   const byKey = new Map(issues.map((issue) => [issueKey(issue.repo, issue.number), issue]));
   const listed = byUsers(dashboard, users);
@@ -248,14 +249,18 @@ export function buildBoard(
   const compare = compareBy(sort.by, sort.dir);
   for (const [key, cards] of Object.entries(board.cells))
     board.cells[key] = cards.toSorted(compare);
-  board.epics = epicIssues.toSorted(compare).map((issue) => ({
-    key: issueKey(issue.repo, issue.number),
-    repo: issue.repo,
-    number: issue.number,
-    title: issue.title,
-    url: issue.url,
-    progress: issue.subIssues.total > 0 ? issue.subIssues : null,
-  }));
+  const isStarred = (issue: Issue) => starred.has(keyOf(issue));
+  board.epics = epicIssues
+    .toSorted((a, b) => Number(isStarred(b)) - Number(isStarred(a)) || compare(a, b))
+    .map((issue) => ({
+      key: keyOf(issue),
+      repo: issue.repo,
+      number: issue.number,
+      title: issue.title,
+      url: issue.url,
+      progress: issue.subIssues.total > 0 ? issue.subIssues : null,
+      starred: isStarred(issue),
+    }));
   board.assignees = [...assignees].toSorted();
   board.labels = [...labels].toSorted();
   return board;

@@ -8,6 +8,7 @@ const id = z
   .max(32)
   .regex(/^[a-z0-9_-]+$/i, "letters, digits, - and _ only");
 export const repoName = z.string().regex(/^[\w.-]+\/[\w.-]+$/, "expected owner/repo");
+const issueRef = z.string().regex(/^[\w.-]+\/[\w.-]+#\d+$/, "expected owner/repo#number");
 
 /**
  * PR states an entry lists among its labels and matches like labels; they are read from
@@ -168,6 +169,9 @@ export const MoveRequestSchema = z.object({
   to: PositionSchema,
 });
 export type MoveRequest = z.infer<typeof MoveRequestSchema>;
+
+export const StarEpicRequestSchema = z.object({ epic: issueRef, starred: z.boolean() });
+export type StarEpicRequest = z.infer<typeof StarEpicRequestSchema>;
 
 export const SyncRequestSchema = z.object({
   repo: repoName.optional(),

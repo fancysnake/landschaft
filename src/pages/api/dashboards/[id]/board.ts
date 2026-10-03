@@ -11,6 +11,12 @@ export const GET = route(async ({ params, url }) => {
   const { db, syncer } = getApp();
   const viewer = await syncer.viewer().catch(() => null);
   const users = resolveUsers(dashboard.users, viewer);
-  const board = buildBoard(db.listIssues(dashboard.repos), dashboard, filters, users);
+  const board = buildBoard(
+    db.listIssues(dashboard.repos),
+    dashboard,
+    filters,
+    users,
+    db.starredEpics(dashboard.id),
+  );
   return json({ dashboard, users, board, status: syncer.status() });
 });

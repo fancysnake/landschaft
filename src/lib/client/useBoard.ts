@@ -20,6 +20,7 @@ export interface BoardController {
   syncing: boolean;
   move(card: Card, from: CellPosition, to: CellPosition): Promise<void>;
   sync(full?: boolean): Promise<void>;
+  setEpicStarred(epic: string, starred: boolean): Promise<void>;
   dismissError(): void;
 }
 
@@ -91,33 +92,48 @@ export function useBoard(dashboardId: string, filters: Filters): BoardController
     };
   }, [load]);
 
-  const move = useCallback(
-    async (card: Card, from: CellPosition, to: CellPosition) => {
-      setData((previous) => (previous ? optimisticMove(previous, card, from, to) : previous));
+  /** Runs a write, reports its failure as "`what` failed", then reloads either way. */
+  const mutate = useCallback(
+    async (what: string, call: () => Promise<unknown>) => {
       try {
-        await api.move({ dashboardId, repo: card.repo, number: card.number, from, to });
+        await call();
       } catch (cause) {
-        setError(`Move failed: ${errorMessage(cause)}`);
+        setError(`${what} failed: ${errorMessage(cause)}`);
       }
       await load();
     },
-    [dashboardId, load],
+    [load],
+  );
+
+  const move = useCallback(
+    async (card: Card, from: CellPosition, to: CellPosition) => {
+      setData((previous) => (previous ? optimisticMove(previous, card, from, to) : previous));
+      await mutate("Move", () =>
+        api.move({ dashboardId, repo: card.repo, number: card.number, from, to }),
+      );
+    },
+    [dashboardId, mutate],
   );
 
   const sync = useCallback(
     async (full = false) => {
       setSyncing(true);
-      try {
-        const response = await api.sync({ full });
-        if (response.status.lastError) setError(response.status.lastError);
-      } catch (cause) {
-        setError(`Sync failed: ${errorMessage(cause)}`);
-      } finally {
-        setSyncing(false);
-      }
-      await load();
+      await mutate("Sync", async () => {
+        try {
+          const response = await api.sync({ full });
+          if (response.status.lastError) setError(response.status.lastError);
+        } finally {
+          setSyncing(false);
+        }
+      });
     },
-    [load],
+    [mutate],
+  );
+
+  const setEpicStarred = useCallback(
+    (epic: string, starred: boolean) =>
+      mutate("Starring epic", () => api.setEpicStarred(dashboardId, { epic, starred })),
+    [dashboardId, mutate],
   );
 
   const dismissError = useCallback(() => setError(null), []);
@@ -129,6 +145,7 @@ export function useBoard(dashboardId: string, filters: Filters): BoardController
     syncing,
     move,
     sync,
+    setEpicStarred,
     dismissError,
   };
 }

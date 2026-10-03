@@ -61,6 +61,11 @@ CREATE TABLE IF NOT EXISTS sync_state (
   last_error TEXT,
   updated_at TEXT
 );
+CREATE TABLE IF NOT EXISTS starred_epics (
+  dashboard TEXT NOT NULL,
+  epic TEXT NOT NULL,
+  PRIMARY KEY (dashboard, epic)
+);
 `;
 
 interface IssueRow {
@@ -358,6 +363,24 @@ export class Db {
       color: row.color,
       description: row.description,
     }));
+  }
+
+  /** Keys (`owner/repo#number`) of the dashboard's epics in active development. */
+  starredEpics(dashboard: string): Set<string> {
+    const rows = this.db
+      .prepare("SELECT epic FROM starred_epics WHERE dashboard = ?")
+      .all(dashboard) as unknown as { epic: string }[];
+    return new Set(rows.map((row) => row.epic));
+  }
+
+  setEpicStarred(dashboard: string, epic: string, starred: boolean): void {
+    this.db
+      .prepare(
+        starred
+          ? "INSERT OR IGNORE INTO starred_epics (dashboard, epic) VALUES (?, ?)"
+          : "DELETE FROM starred_epics WHERE dashboard = ? AND epic = ?",
+      )
+      .run(dashboard, epic);
   }
 
   getSyncState(repo: string): SyncState | null {
