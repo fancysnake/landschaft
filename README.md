@@ -99,8 +99,8 @@ Saving triggers the first sync; once labels are cached the pickers suggest them.
   labels whatever the match; with no labels it takes every item of that kind.
 - Four **PR status labels** match like labels but come from GitHub, not from the PR's labels:
   `is:conflicting` (merge conflicts), `is:ci:failed` (a check required to merge failed),
-  `is:ci:running` (a required check has not finished; optional checks are ignored by both) and
-  `is:unanswered` (an unresolved review thread whose last comment is not the PR author's). One
+  `is:ci:running` (a required check has not finished) and `is:unanswered` (an unresolved review
+  thread whose last comment is not the PR author's). Both CI labels ignore optional checks. One
   "any of" swimlane with `is:conflicting`, `is:ci:failed` and `is:unanswered` gathers the PRs
   waiting on their author. A move never adds or removes them. The config rejects any other
   `is:` label.

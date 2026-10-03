@@ -372,17 +372,19 @@ export type CheckContext =
 
 const PASSED = new Set(["SUCCESS", "NEUTRAL", "SKIPPED"]);
 
-const RUNNING_STATES = new Set(["PENDING", "EXPECTED"]);
+const RUNNING = new Set(["PENDING", "EXPECTED"]);
 
 /** Checks not required to merge count as passed. */
 function ciState(check: CheckContext): "passed" | "failed" | "running" {
   if (!check.isRequired) return "passed";
-  if (check.type === "StatusContext") {
-    if (check.state === "SUCCESS") return "passed";
-    return RUNNING_STATES.has(check.state) ? "running" : "failed";
-  }
-  if (check.status !== "COMPLETED") return "running";
-  return PASSED.has(check.conclusion ?? "") ? "passed" : "failed";
+  const outcome =
+    check.type === "StatusContext"
+      ? check.state
+      : check.status === "COMPLETED"
+        ? (check.conclusion ?? "")
+        : "PENDING";
+  if (PASSED.has(outcome)) return "passed";
+  return RUNNING.has(outcome) ? "running" : "failed";
 }
 
 interface Login {
