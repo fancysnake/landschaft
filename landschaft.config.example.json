@@ -4,7 +4,7 @@
       "id": "main",
       "name": "Main",
       "repos": ["owner/repo", "owner/other-repo"],
-      "scope": "mine",
+      "users": ["@me"],
       "epicLabel": "epic",
       "sort": { "by": "updated", "dir": "desc" },
       "refreshMinutes": 5,

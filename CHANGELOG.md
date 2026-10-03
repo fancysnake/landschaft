@@ -11,6 +11,9 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 - `is:ci:failed` and `is:ci:running` count `codecov/*` checks even when they are not required to
   merge.
+- A dashboard's `users` (GitHub logins, `@me` for the token's account) choose whose issues and
+  pull requests it shows, in place of `scope`. Configs with `scope` still load: `mine` reads as
+  `["@me"]`, `all` as `[]`.
 
 ## [0.8.0] - 2026-10-03
 

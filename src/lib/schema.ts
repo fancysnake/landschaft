@@ -97,16 +97,23 @@ export const AXIS_PRECEDENCE = { swimlanes: "first", columns: "last" } as const;
 export type Axis = keyof typeof AXIS_PRECEDENCE;
 export type Precedence = (typeof AXIS_PRECEDENCE)[Axis];
 
-/** "mine": only issues the viewer created or is assigned to; "all": every open issue. */
-export const ScopeSchema = z.enum(["mine", "all"]);
-export type Scope = z.infer<typeof ScopeSchema>;
+/** Stands for the token's account in a dashboard's `users`. */
+export const ME = "@me";
+
+/** A GitHub login, or `@me`. */
+export const userName = z
+  .string()
+  .regex(/^(@me|[a-z\d](?:[a-z\d_-]*[a-z\d])?(\[bot\])?)$/i, "expected a GitHub login or @me");
 
 export const DashboardSchema = z
   .object({
     id,
     name: z.string().min(1),
     repos: z.array(repoName).min(1),
-    scope: ScopeSchema.default("mine"),
+    /** Only items these users authored or are assigned to; empty takes everyone's. */
+    users: z.array(userName).optional(),
+    /** Legacy: "mine" reads as `users: ["@me"]`, "all" as `users: []`. */
+    scope: z.enum(["mine", "all"]).optional(),
     epicLabel: z.string().min(1).optional(),
     sort: SortSchema.default({ by: "updated", dir: "desc" }),
     refreshMinutes: z.number().int().min(1).max(1440).default(5),
@@ -126,7 +133,11 @@ export const DashboardSchema = z
         });
       }
     }
-  });
+  })
+  .transform(({ scope, users, ...dashboard }) => ({
+    ...dashboard,
+    users: users ?? (scope === "all" ? [] : [ME]),
+  }));
 
 export const ConfigSchema = z
   .object({

@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 
-import type { Config, Dashboard } from "../../lib/schema";
-
 import { api, errorMessage } from "../../lib/client/api";
+import { type Config, type Dashboard, ME } from "../../lib/schema";
 import { DashboardEditor } from "./DashboardEditor";
 
 function newId(): string {
@@ -14,7 +13,7 @@ function newDashboard(): Dashboard {
     id: newId(),
     name: "New dashboard",
     repos: [],
-    scope: "mine",
+    users: [ME],
     sort: { by: "updated", dir: "desc" },
     refreshMinutes: 5,
     swimlanes: [

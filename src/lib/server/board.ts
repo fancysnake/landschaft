@@ -6,6 +6,7 @@ import {
   fitsKind,
   isCatchAll,
   isStatusLabel,
+  ME,
   type KindFilter,
   type Match,
   type Precedence,
@@ -140,27 +141,40 @@ function compareBy(by: SortBy, dir: SortDir) {
   };
 }
 
-function inScope(dashboard: Dashboard, viewer: string | null): (issue: Issue) => boolean {
-  if (dashboard.scope !== "mine" || viewer === null) return () => true;
-  return (issue) =>
-    issue.author === viewer || issue.assignees.some((assignee) => assignee.login === viewer);
+/**
+ * The dashboard's users as plain logins: `@me` becomes `viewer`, or drops out while that is
+ * unknown, and a `[bot]` suffix comes off, since synced bot logins lack it.
+ */
+export function resolveUsers(users: string[], viewer: string | null): string[] {
+  return users.flatMap((user) => {
+    const login = user.toLowerCase() === ME ? viewer : user.replace(/\[bot\]$/i, "");
+    return login === null ? [] : [login];
+  });
+}
+
+function byUsers(dashboard: Dashboard, users: string[]): (issue: Issue) => boolean {
+  if (dashboard.users.length === 0) return () => true;
+  const logins = new Set(users.map((user) => user.toLowerCase()));
+  const listed = (login: string | null) => login !== null && logins.has(login.toLowerCase());
+  return (issue) => listed(issue.author) || issue.assignees.some(({ login }) => listed(login));
 }
 
 /**
- * Lays the open issues out on the dashboard's grid. `viewer` is the token's login; with
- * scope "mine" only issues they authored or are assigned to take part.
+ * Lays the open issues out on the dashboard's grid. `users` is the dashboard's users through
+ * `resolveUsers`; when the dashboard lists any, only issues one of them authored or is
+ * assigned to take part.
  */
 export function buildBoard(
   issues: Issue[],
   dashboard: Dashboard,
   filters: Filters = {},
-  viewer: string | null = null,
+  users: string[] = [],
 ): Board {
   const byKey = new Map(issues.map((issue) => [issueKey(issue.repo, issue.number), issue]));
-  const mine = inScope(dashboard, viewer);
+  const listed = byUsers(dashboard, users);
   const repos = new Set(selectedRepos(filters.repo, dashboard.repos));
   const wanted = issueFilter(filters, byKey);
-  const open = issues.filter((issue) => issue.state === "OPEN" && mine(issue));
+  const open = issues.filter((issue) => issue.state === "OPEN" && listed(issue));
   const structural = new Set<string>([
     ...dashboard.swimlanes.flatMap((lane) => lane.labels),
     ...dashboard.columns.flatMap((column) => column.labels),
