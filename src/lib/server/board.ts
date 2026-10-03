@@ -148,13 +148,15 @@ function inScope(dashboard: Dashboard, viewer: string | null): (issue: Issue) =>
 
 /**
  * Lays the open issues out on the dashboard's grid. `viewer` is the token's login; with
- * scope "mine" only issues they authored or are assigned to take part.
+ * scope "mine" only issues they authored or are assigned to take part. `starred` epic keys
+ * lead the epic strip.
  */
 export function buildBoard(
   issues: Issue[],
   dashboard: Dashboard,
   filters: Filters = {},
   viewer: string | null = null,
+  starred: ReadonlySet<string> = new Set(),
 ): Board {
   const byKey = new Map(issues.map((issue) => [issueKey(issue.repo, issue.number), issue]));
   const mine = inScope(dashboard, viewer);
@@ -234,10 +236,9 @@ export function buildBoard(
   const compare = compareBy(sort.by, sort.dir);
   for (const [key, cards] of Object.entries(board.cells))
     board.cells[key] = cards.toSorted(compare);
-  const activeKeys = new Set(dashboard.activeEpics);
-  const isActive = (issue: Issue) => activeKeys.has(keyOf(issue));
+  const isStarred = (issue: Issue) => starred.has(keyOf(issue));
   board.epics = epicIssues
-    .toSorted((a, b) => Number(isActive(b)) - Number(isActive(a)) || compare(a, b))
+    .toSorted((a, b) => Number(isStarred(b)) - Number(isStarred(a)) || compare(a, b))
     .map((issue) => ({
       key: keyOf(issue),
       repo: issue.repo,
@@ -245,7 +246,7 @@ export function buildBoard(
       title: issue.title,
       url: issue.url,
       progress: issue.subIssues.total > 0 ? issue.subIssues : null,
-      active: isActive(issue),
+      starred: isStarred(issue),
     }));
   board.assignees = [...assignees].toSorted();
   board.labels = [...labels].toSorted();

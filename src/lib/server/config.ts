@@ -22,23 +22,6 @@ export function saveConfig(config: unknown, file = configPath()): Config {
   return parsed;
 }
 
-/** Drops closed epics from every dashboard's `activeEpics`; writes the file only if one went. */
-export function pruneActiveEpics(
-  config: Config,
-  isClosed: (key: string) => boolean,
-  file = configPath(),
-): Config {
-  const dashboards = config.dashboards.map((dashboard) => ({
-    ...dashboard,
-    activeEpics: dashboard.activeEpics.filter((key) => !isClosed(key)),
-  }));
-  const changed = dashboards.some(
-    (dashboard, index) =>
-      dashboard.activeEpics.length < config.dashboards[index]!.activeEpics.length,
-  );
-  return changed ? saveConfig({ ...config, dashboards }, file) : config;
-}
-
 export function findDashboard(config: Config, id: string): Dashboard | undefined {
   return config.dashboards.find((dashboard) => dashboard.id === id);
 }

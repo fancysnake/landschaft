@@ -431,11 +431,11 @@ describe("buildBoard", () => {
     expect(board.cells[cell("rest", "todo")]).toEqual([]);
   });
 
-  it("lists active epics first, each group in sort order", () => {
+  it("lists starred epics first, each group in sort order", () => {
     const issues = [10, 11, 12, 13].map((number) => makeIssue({ number, labels: [label("epic")] }));
-    const dashboard = { ...DASHBOARD, activeEpics: ["acme/app#10", "acme/app#12", "acme/app#99"] };
-    const epics = buildBoard(issues, dashboard).epics;
-    expect(epics.map((epic) => [epic.number, epic.active])).toEqual([
+    const starred = new Set(["acme/app#10", "acme/app#12", "acme/app#99"]);
+    const epics = buildBoard(issues, DASHBOARD, {}, null, starred).epics;
+    expect(epics.map((epic) => [epic.number, epic.starred])).toEqual([
       [12, true],
       [10, true],
       [13, false],

@@ -1,9 +1,9 @@
 import type {
-  ActiveEpicRequest,
   Config,
   Dashboard,
   Filters,
   MoveRequest,
+  StarEpicRequest,
   SyncRequest,
 } from "../schema";
 import type { Board, Issue, LabelDef, SyncStatus } from "../types";
@@ -81,9 +81,9 @@ export const api = {
     request<SyncResponse>("/api/sync", { method: "POST", body: JSON.stringify(body) }),
   move: (body: MoveRequest) =>
     request<MoveResponse>("/api/move", { method: "POST", body: JSON.stringify(body) }),
-  setEpicActive: (dashboardId: string, body: ActiveEpicRequest) =>
-    request<{ activeEpics: string[] }>(
-      `/api/dashboards/${encodeURIComponent(dashboardId)}/active-epics`,
+  setEpicStarred: (dashboardId: string, body: StarEpicRequest) =>
+    request<{ starredEpics: string[] }>(
+      `/api/dashboards/${encodeURIComponent(dashboardId)}/starred-epics`,
       { method: "POST", body: JSON.stringify(body) },
     ),
   config: () => request<Config>("/api/config"),

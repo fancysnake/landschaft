@@ -10,6 +10,12 @@ export const GET = route(async ({ params, url }) => {
   const filters = parseQuery(FiltersSchema, url);
   const { db, syncer } = getApp();
   const viewer = await syncer.viewer().catch(() => null);
-  const board = buildBoard(db.listIssues(dashboard.repos), dashboard, filters, viewer);
+  const board = buildBoard(
+    db.listIssues(dashboard.repos),
+    dashboard,
+    filters,
+    viewer,
+    db.starredEpics(dashboard.id),
+  );
   return json({ dashboard, board, status: syncer.status() });
 });

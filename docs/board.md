@@ -36,9 +36,8 @@ Pull requests that close the epic or any of those issues (GitHub's "linked pull 
 are kept as well.
 
 The ☆ on a tile marks the epic as in active development: it moves to the front of the strip
-with an amber accent and an `active` badge. The mark is stored per dashboard in
-`activeEpics` in the config file, never on GitHub; ★ clears it, and so does closing the epic
-(within a minute of the sync that sees it closed).
+with an amber accent and an `active` badge; ★ clears it. The mark is kept per dashboard in
+the local database, never on GitHub, so a closed epic that is reopened keeps its star.
 
 ## Pull requests
 

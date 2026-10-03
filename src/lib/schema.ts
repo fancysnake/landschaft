@@ -109,8 +109,6 @@ export const DashboardSchema = z
     repos: z.array(repoName).min(1),
     scope: ScopeSchema.default("mine"),
     epicLabel: z.string().min(1).optional(),
-    /** Keys (`owner/repo#number`) of epics in active development; first in the epic strip. */
-    activeEpics: z.array(issueRef).default([]),
     sort: SortSchema.default({ by: "updated", dir: "desc" }),
     refreshMinutes: z.number().int().min(1).max(1440).default(5),
     swimlanes: z.array(SwimlaneSchema).min(1),
@@ -161,8 +159,8 @@ export const MoveRequestSchema = z.object({
 });
 export type MoveRequest = z.infer<typeof MoveRequestSchema>;
 
-export const ActiveEpicRequestSchema = z.object({ epic: issueRef, active: z.boolean() });
-export type ActiveEpicRequest = z.infer<typeof ActiveEpicRequestSchema>;
+export const StarEpicRequestSchema = z.object({ epic: issueRef, starred: z.boolean() });
+export type StarEpicRequest = z.infer<typeof StarEpicRequestSchema>;
 
 export const SyncRequestSchema = z.object({
   repo: repoName.optional(),

@@ -1,5 +1,4 @@
-import { parseIssueKey } from "../types";
-import { loadConfig, pruneActiveEpics } from "./config";
+import { loadConfig } from "./config";
 import { Db } from "./db";
 import { createGithubClient, getToken, type GithubClient } from "./github";
 import { startScheduler, Syncer } from "./sync";
@@ -19,11 +18,7 @@ export function getApp(): App {
     const db = new Db();
     const gh = createGithubClient(getToken);
     const syncer = new Syncer({ db, gh });
-    const isClosed = (key: string) => {
-      const ref = parseIssueKey(key);
-      return ref !== null && db.getIssue(ref.repo, ref.number)?.state === "CLOSED";
-    };
-    const stopScheduler = startScheduler(syncer, () => pruneActiveEpics(loadConfig(), isClosed));
+    const stopScheduler = startScheduler(syncer, loadConfig);
     registry.landschaftApp = {
       db,
       gh,

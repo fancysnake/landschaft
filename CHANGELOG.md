@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Added
 
 - Epics can be marked as in active development with the ☆ on their tile; marked epics lead
-  the strip with an amber accent. The marks live in the dashboard's `activeEpics`.
+  the strip with an amber accent. The marks live per dashboard in the local database.
 
 ## [0.8.0] - 2026-10-03
 

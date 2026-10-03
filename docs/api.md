@@ -37,6 +37,6 @@ grid as cells keyed by swimlane and column id, the epic strip, the unplaced coun
 label catalogue used for colouring. The React island renders it as-is; all placement logic is
 server-side and unit-tested.
 
-`POST /api/dashboards/:id/active-epics` with `{ "epic": "owner/repo#12", "active": true }` adds
-the epic to (or, with `false`, removes it from) the dashboard's `activeEpics` and returns the
-new list.
+`POST /api/dashboards/:id/starred-epics` with `{ "epic": "owner/repo#12", "starred": true }`
+marks the epic as in active development (`false` clears the mark) and returns the dashboard's
+`starredEpics`. Starring rejects an epic outside the dashboard's repositories with `400`.

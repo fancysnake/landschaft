@@ -15,7 +15,6 @@ function newDashboard(): Dashboard {
     name: "New dashboard",
     repos: [],
     scope: "mine",
-    activeEpics: [],
     sort: { by: "updated", dir: "desc" },
     refreshMinutes: 5,
     swimlanes: [

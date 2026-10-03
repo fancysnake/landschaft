@@ -39,7 +39,6 @@ export const DASHBOARD: Dashboard = {
   repos: [REPO],
   scope: "all",
   epicLabel: "epic",
-  activeEpics: [],
   sort: { by: "updated", dir: "desc" },
   refreshMinutes: 5,
   swimlanes: [
