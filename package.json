@@ -35,13 +35,13 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
-    "@types/node": "^26.6.2",
+    "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "oxfmt": "^0.70.0",
-    "oxlint": "^1.85.0",
+    "oxlint": "^1.86.0",
     "typescript": "6",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.3"
   },
   "engines": {
     "node": ">=26"
