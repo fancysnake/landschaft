@@ -367,16 +367,22 @@ export async function fetchPullsPage(
 
 /** A commit status rollup entry: a check run, or a commit status. */
 export type CheckContext =
-  | { type: "CheckRun"; status: string; conclusion: string | null; isRequired: boolean }
-  | { type: "StatusContext"; state: string; isRequired: boolean };
+  | {
+      type: "CheckRun";
+      name: string;
+      status: string;
+      conclusion: string | null;
+      isRequired: boolean;
+    }
+  | { type: "StatusContext"; name: string; state: string; isRequired: boolean };
 
 const PASSED = new Set(["SUCCESS", "NEUTRAL", "SKIPPED"]);
 
 const RUNNING = new Set(["PENDING", "EXPECTED"]);
 
-/** Checks not required to merge count as passed. */
+/** Checks not required to merge count as passed, except codecov's. */
 function ciState(check: CheckContext): "passed" | "failed" | "running" {
-  if (!check.isRequired) return "passed";
+  if (!check.isRequired && !check.name.startsWith("codecov/")) return "passed";
   const outcome =
     check.type === "StatusContext"
       ? check.state
@@ -433,8 +439,8 @@ function pullStatusField(number: number): string {
     number mergeable author { login }
     commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {
       type: __typename
-      ... on CheckRun { status conclusion isRequired(pullRequestNumber: ${number}) }
-      ... on StatusContext { state isRequired(pullRequestNumber: ${number}) }
+      ... on CheckRun { name status conclusion isRequired(pullRequestNumber: ${number}) }
+      ... on StatusContext { name: context state isRequired(pullRequestNumber: ${number}) }
     } } } } } }
     reviewThreads(first: 100) { nodes { isResolved comments(last: 1) { nodes { author { login } } } } }
   }`;
