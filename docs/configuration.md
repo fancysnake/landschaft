@@ -16,6 +16,7 @@ the file is plain JSON you can also edit by hand (it is validated on load and on
 | `repos`          | `owner/repo[]`, at least one               | required                             | Repositories whose open issues and pull requests appear                |
 | `scope`          | `"mine"` \| `"all"`                        | `"mine"`                             | `mine`: issues you created or are assigned to (the token's account)    |
 | `epicLabel`      | string                                     | none                                 | Issues with this label form the epic strip above the board             |
+| `activeEpics`    | `owner/repo#number[]`                      | `[]`                                 | Epics in active development, listed first; toggled with ☆ on the board |
 | `sort`           | `{ by: created\|updated, dir: asc\|desc }` | `{ "by": "updated", "dir": "desc" }` | Default card order; the URL can override it                            |
 | `refreshMinutes` | 1–1440                                     | `5`                                  | Background sync interval; the smallest across dashboards wins per repo |
 | `swimlanes`      | `Swimlane[]`, at least one                 | required                             | Rows                                                                   |

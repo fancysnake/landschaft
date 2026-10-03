@@ -19,7 +19,7 @@ interface Props {
 
 export default function Board({ dashboardId }: Props) {
   const [filters, updateFilters] = useUrlFilters();
-  const { data, error, loading, syncing, move, sync, dismissError } = useBoard(
+  const { data, error, loading, syncing, move, sync, setEpicActive, dismissError } = useBoard(
     dashboardId,
     filters,
   );
@@ -91,6 +91,7 @@ export default function Board({ dashboardId }: Props) {
           epics={board.epics}
           active={filters.epic}
           onSelect={(key) => updateFilters({ epic: key })}
+          onSetActive={(key, active) => void setEpicActive(key, active)}
         />
       )}
       <FilterBar filters={filters} board={board} onChange={updateFilters} />

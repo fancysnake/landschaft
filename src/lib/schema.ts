@@ -8,6 +8,7 @@ const id = z
   .max(32)
   .regex(/^[a-z0-9_-]+$/i, "letters, digits, - and _ only");
 export const repoName = z.string().regex(/^[\w.-]+\/[\w.-]+$/, "expected owner/repo");
+const issueRef = z.string().regex(/^[\w.-]+\/[\w.-]+#\d+$/, "expected owner/repo#number");
 
 /**
  * PR states an entry lists among its labels and matches like labels; they are read from
@@ -108,6 +109,8 @@ export const DashboardSchema = z
     repos: z.array(repoName).min(1),
     scope: ScopeSchema.default("mine"),
     epicLabel: z.string().min(1).optional(),
+    /** Keys (`owner/repo#number`) of epics in active development; first in the epic strip. */
+    activeEpics: z.array(issueRef).default([]),
     sort: SortSchema.default({ by: "updated", dir: "desc" }),
     refreshMinutes: z.number().int().min(1).max(1440).default(5),
     swimlanes: z.array(SwimlaneSchema).min(1),
@@ -157,6 +160,9 @@ export const MoveRequestSchema = z.object({
   to: PositionSchema,
 });
 export type MoveRequest = z.infer<typeof MoveRequestSchema>;
+
+export const ActiveEpicRequestSchema = z.object({ epic: issueRef, active: z.boolean() });
+export type ActiveEpicRequest = z.infer<typeof ActiveEpicRequestSchema>;
 
 export const SyncRequestSchema = z.object({
   repo: repoName.optional(),

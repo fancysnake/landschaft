@@ -379,6 +379,7 @@ describe("startScheduler", () => {
           name: "D",
           repos: ["acme/due", "acme/fresh"],
           scope: "all",
+          activeEpics: [],
           sort: { by: "updated", dir: "desc" },
           refreshMinutes: 5,
           swimlanes: [

@@ -106,6 +106,8 @@ export interface Epic {
   title: string;
   url: string;
   progress: Progress | null;
+  /** In the dashboard's `activeEpics`. */
+  active: boolean;
 }
 
 export interface Board {

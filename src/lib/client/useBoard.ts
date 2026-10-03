@@ -20,6 +20,7 @@ export interface BoardController {
   syncing: boolean;
   move(card: Card, from: CellPosition, to: CellPosition): Promise<void>;
   sync(full?: boolean): Promise<void>;
+  setEpicActive(epic: string, active: boolean): Promise<void>;
   dismissError(): void;
 }
 
@@ -120,6 +121,18 @@ export function useBoard(dashboardId: string, filters: Filters): BoardController
     [load],
   );
 
+  const setEpicActive = useCallback(
+    async (epic: string, active: boolean) => {
+      try {
+        await api.setEpicActive(dashboardId, { epic, active });
+      } catch (cause) {
+        setError(`Saving active epic failed: ${errorMessage(cause)}`);
+      }
+      await load();
+    },
+    [dashboardId, load],
+  );
+
   const dismissError = useCallback(() => setError(null), []);
 
   return {
@@ -129,6 +142,7 @@ export function useBoard(dashboardId: string, filters: Filters): BoardController
     syncing,
     move,
     sync,
+    setEpicActive,
     dismissError,
   };
 }

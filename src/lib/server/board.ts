@@ -234,14 +234,19 @@ export function buildBoard(
   const compare = compareBy(sort.by, sort.dir);
   for (const [key, cards] of Object.entries(board.cells))
     board.cells[key] = cards.toSorted(compare);
-  board.epics = epicIssues.toSorted(compare).map((issue) => ({
-    key: issueKey(issue.repo, issue.number),
-    repo: issue.repo,
-    number: issue.number,
-    title: issue.title,
-    url: issue.url,
-    progress: issue.subIssues.total > 0 ? issue.subIssues : null,
-  }));
+  const activeKeys = new Set(dashboard.activeEpics);
+  const isActive = (issue: Issue) => activeKeys.has(keyOf(issue));
+  board.epics = epicIssues
+    .toSorted((a, b) => Number(isActive(b)) - Number(isActive(a)) || compare(a, b))
+    .map((issue) => ({
+      key: keyOf(issue),
+      repo: issue.repo,
+      number: issue.number,
+      title: issue.title,
+      url: issue.url,
+      progress: issue.subIssues.total > 0 ? issue.subIssues : null,
+      active: isActive(issue),
+    }));
   board.assignees = [...assignees].toSorted();
   board.labels = [...labels].toSorted();
   return board;

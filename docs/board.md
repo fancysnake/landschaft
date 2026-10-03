@@ -35,6 +35,11 @@ sub-issues and to issues it blocks or is blocked by; clicking again clears the f
 Pull requests that close the epic or any of those issues (GitHub's "linked pull requests")
 are kept as well.
 
+The ☆ on a tile marks the epic as in active development: it moves to the front of the strip
+with an amber accent and an `active` badge. The mark is stored per dashboard in
+`activeEpics` in the config file, never on GitHub; ★ clears it, and so does closing the epic
+(within a minute of the sync that sees it closed).
+
 ## Pull requests
 
 Open pull requests are synced alongside issues and placed by the same label rules; dragging

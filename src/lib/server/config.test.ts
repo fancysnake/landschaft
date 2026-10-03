@@ -4,7 +4,14 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ConfigSchema } from "../schema";
-import { allRepos, findDashboard, loadConfig, refreshMinutesByRepo, saveConfig } from "./config";
+import {
+  allRepos,
+  findDashboard,
+  loadConfig,
+  pruneActiveEpics,
+  refreshMinutesByRepo,
+  saveConfig,
+} from "./config";
 
 const minimal = {
   dashboards: [
@@ -64,6 +71,25 @@ describe("config file", () => {
     };
     expect(() => saveConfig(bad, file)).toThrow();
     expect(loadConfig(file).dashboards).toHaveLength(2);
+  });
+
+  it("prunes closed epics from activeEpics and saves only when one went", () => {
+    const config = saveConfig(
+      {
+        dashboards: [
+          { ...minimal.dashboards[0], activeEpics: ["acme/app#1", "acme/app#2"] },
+          minimal.dashboards[1],
+        ],
+      },
+      file,
+    );
+    rmSync(file);
+    expect(pruneActiveEpics(config, () => false, file)).toBe(config);
+    expect(existsSync(file)).toBe(false);
+
+    const pruned = pruneActiveEpics(config, (key) => key === "acme/app#1", file);
+    expect(pruned.dashboards[0]!.activeEpics).toEqual(["acme/app#2"]);
+    expect(loadConfig(file)).toEqual(pruned);
   });
 });
 
