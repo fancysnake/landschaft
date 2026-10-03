@@ -60,4 +60,4 @@ On multi-repo boards, chips above the board switch each repository on or off
 (`repo=owner/a,owner/b`); `all` turns every chip on and, once all are on, `none` turns them off.
 
 Text, repos, assignee, label, epic and sort live in the query string, so a filtered view is a link
-you can bookmark or send. Empty values count as unset.
+you can bookmark or send. Empty values count as unset, except `repo=`, which shows no repository.
