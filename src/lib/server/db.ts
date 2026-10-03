@@ -14,6 +14,8 @@ import type {
   SyncState,
 } from "../types";
 
+import { isStatusLabel } from "../schema";
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS issues (
   repo TEXT NOT NULL,
@@ -137,7 +139,7 @@ function rowToIssue(row: IssueRow, blockedBy: Blocker[]): Issue {
     blockedBy,
     blockedByTotal: row.blocked_by_total,
     linked: JSON.parse(row.linked_json) as IssueRef[],
-    statuses: JSON.parse(row.status_json) as Issue["statuses"],
+    statuses: (JSON.parse(row.status_json) as string[]).filter(isStatusLabel),
   };
 }
 

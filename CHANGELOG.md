@@ -7,6 +7,18 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-03
+
+### Added
+
+- PR cards show a pill for each status that holds: merge conflict, CI failed, CI running and
+  unanswered review comments.
+
+### Changed
+
+- `is:ci-not-ok` splits into `is:ci:failed` (a required check failed) and `is:ci:running` (a
+  required check has not finished); configs using `is:ci-not-ok` no longer load.
+
 ## [0.7.0] - 2026-10-02
 
 ### Added
@@ -94,7 +106,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v0.7.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/fancysnake/landschaft/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/fancysnake/landschaft/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/fancysnake/landschaft/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/fancysnake/landschaft/compare/v0.4.0...v0.5.0

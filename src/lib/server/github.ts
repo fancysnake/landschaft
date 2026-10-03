@@ -372,15 +372,19 @@ export type CheckContext =
 
 const PASSED = new Set(["SUCCESS", "NEUTRAL", "SKIPPED"]);
 
-/** A required check failed or has not finished; checks not required to merge are ignored. */
-function ciNotOk(contexts: CheckContext[]): boolean {
-  return contexts.some(
-    (check) =>
-      check.isRequired &&
-      (check.type === "StatusContext"
-        ? check.state !== "SUCCESS"
-        : check.status !== "COMPLETED" || !PASSED.has(check.conclusion ?? "")),
-  );
+const RUNNING = new Set(["PENDING", "EXPECTED"]);
+
+/** Checks not required to merge count as passed. */
+function ciState(check: CheckContext): "passed" | "failed" | "running" {
+  if (!check.isRequired) return "passed";
+  const outcome =
+    check.type === "StatusContext"
+      ? check.state
+      : check.status === "COMPLETED"
+        ? (check.conclusion ?? "")
+        : "PENDING";
+  if (PASSED.has(outcome)) return "passed";
+  return RUNNING.has(outcome) ? "running" : "failed";
 }
 
 interface Login {
@@ -402,9 +406,13 @@ export interface PullStatusNode {
 /** Unanswered: an unresolved review thread whose last comment is not the PR author's. */
 export function toPullStatus(node: PullStatusNode): PullStatus {
   const author = node.author?.login;
+  const ci = new Set(
+    (node.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? []).map(ciState),
+  );
   const holds: Record<StatusLabel, boolean> = {
     "is:conflicting": node.mergeable === "CONFLICTING",
-    "is:ci-not-ok": ciNotOk(node.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? []),
+    "is:ci:failed": ci.has("failed"),
+    "is:ci:running": ci.has("running"),
     "is:unanswered": node.reviewThreads.nodes.some(
       (thread) => !thread.isResolved && thread.comments.nodes[0]?.author?.login !== author,
     ),

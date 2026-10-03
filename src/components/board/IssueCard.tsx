@@ -1,9 +1,29 @@
 import type { DragEvent } from "react";
 
+import type { StatusLabel } from "../../lib/schema";
 import type { Card } from "../../lib/types";
 
 import { type DragPayload, setPayload } from "../../lib/client/dnd";
 import { labelStyle, repoShortName } from "../../lib/client/labels";
+
+const STATUS_PILLS: Record<StatusLabel, { text: string; title: string; className: string }> = {
+  "is:conflicting": {
+    text: "conflict",
+    title: "Merge conflict",
+    className: "bg-red-100 text-red-800",
+  },
+  "is:ci:failed": { text: "CI ✗", title: "CI failed", className: "bg-red-100 text-red-800" },
+  "is:ci:running": {
+    text: "CI …",
+    title: "CI running",
+    className: "bg-amber-100 text-amber-800",
+  },
+  "is:unanswered": {
+    text: "comments",
+    title: "Unanswered review comments",
+    className: "bg-orange-100 text-orange-800",
+  },
+};
 
 interface Props {
   card: Card;
@@ -35,7 +55,7 @@ export function IssueCard({ card, laneId, colId, showRepo, onDragStart, onDragEn
               : "border-neutral-200 border-l-emerald-500 bg-white"
       }`}
     >
-      <div className="mb-1 flex items-center gap-1.5 text-xs text-neutral-500">
+      <div className="mb-1 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">
         <span className="font-mono">
           {showRepo ? `${repoShortName(card.repo)}#` : "#"}
           {card.number}
@@ -43,6 +63,15 @@ export function IssueCard({ card, laneId, colId, showRepo, onDragStart, onDragEn
         {card.kind === "pr" && <span className="rounded bg-sky-100 px-1 text-sky-800">PR</span>}
         {card.isEpic && <span className="rounded bg-violet-100 px-1 text-violet-800">epic</span>}
         {card.blocked && <span className="rounded bg-red-100 px-1 text-red-800">blocked</span>}
+        {card.statuses.map((status) => (
+          <span
+            key={status}
+            title={STATUS_PILLS[status].title}
+            className={`rounded px-1 ${STATUS_PILLS[status].className}`}
+          >
+            {STATUS_PILLS[status].text}
+          </span>
+        ))}
         {card.assignees.length > 0 && (
           <span className="ml-auto flex -space-x-1">
             {card.assignees.map((assignee) => (

@@ -93,6 +93,8 @@ export interface Card {
   progress: Progress | null;
   blocked: boolean;
   isEpic: boolean;
+  /** Empty for issues. */
+  statuses: StatusLabel[];
   createdAt: string;
   updatedAt: string;
 }

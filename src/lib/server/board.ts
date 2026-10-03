@@ -224,6 +224,7 @@ export function buildBoard(
       progress: issue.subIssues.total > 0 ? issue.subIssues : null,
       blocked,
       isEpic,
+      statuses: issue.statuses,
       createdAt: issue.createdAt,
       updatedAt: issue.updatedAt,
     });
