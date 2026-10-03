@@ -25,15 +25,17 @@ export function isStatusLabel(name: string): name is StatusLabel {
   return (STATUS_LABEL_NAMES as readonly string[]).includes(name);
 }
 
-/** `is:issue` / `is:pr` live in `kind`, so the only `is:` labels are statuses. */
-const label = z
-  .string()
-  .min(1)
-  .refine(
-    (name) => !name.startsWith("is:") || isStatusLabel(name),
-    `not a PR status label; expected one of ${STATUS_LABEL_NAMES.join(", ")}`,
-  );
-const labelList = z.array(label).default([]);
+/** Retired status labels and what replaced them, so configs written for older releases load. */
+const LEGACY_LABELS: Record<string, string[]> = {
+  "is:ci-not-ok": ["is:ci:failed", "is:ci:running"],
+};
+const labelList = z.preprocess(
+  (labels) =>
+    Array.isArray(labels)
+      ? [...new Set(labels.flatMap((name: string) => LEGACY_LABELS[name] ?? [name]))]
+      : labels,
+  z.array(z.string().min(1)).default([]),
+);
 /** "any": the issue carries at least one of the labels; "all": it carries every one. */
 export const MatchSchema = z.enum(["any", "all"]);
 export type Match = z.infer<typeof MatchSchema>;

@@ -55,5 +55,8 @@ type-checked (`astro check`), not formatted.
 - GitHub writes go through REST by label name; never PATCH the full label list.
 - Config edits go through `saveConfig()` (validation + tmp-file rename). Ids are immutable
   once saved because they are in URLs.
+- A config written by an earlier release must keep loading. Renamed or removed values get a
+  parse-time migration in `schema.ts` (see `LEGACY_LABELS`) plus a test that the old shape
+  parses, kept for at least a transition period. Never ship "configs using X no longer load".
 - Tests live next to the code as `*.test.ts`; fixtures in `src/lib/server/__fixtures__/`.
 - No tests for React forms/components; verify UI in a browser.

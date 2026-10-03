@@ -106,12 +106,19 @@ describe("config schema rules", () => {
     expect(() => saveConfig(twoCatchAlls, "/dev/null/never")).toThrow(/catch-all/);
   });
 
-  it("takes the PR status labels but no other is: label", () => {
-    expect(ConfigSchema.safeParse(withLaneLabels(["is:ci:failed", "bug"])).success).toBe(true);
-    for (const typo of ["is:conflict", "is:pr"])
-      expect(() => saveConfig(withLaneLabels([typo]), "/dev/null/never")).toThrow(
-        /not a PR status label/,
-      );
+  it("takes the PR status labels and other is: labels", () => {
+    expect(
+      ConfigSchema.safeParse(withLaneLabels(["is:ci:failed", "is:wontfix", "bug"])).success,
+    ).toBe(true);
+  });
+
+  it("reads is:ci-not-ok as is:ci:failed plus is:ci:running", () => {
+    const parsed = ConfigSchema.parse(withLaneLabels(["bug", "is:ci-not-ok", "is:ci:failed"]));
+    expect(parsed.dashboards[0]!.swimlanes[0]!.labels).toEqual([
+      "bug",
+      "is:ci:failed",
+      "is:ci:running",
+    ]);
   });
 
   it("does not count a kind-only swimlane or column as a catch-all", () => {
