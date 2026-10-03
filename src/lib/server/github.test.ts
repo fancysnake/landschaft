@@ -139,6 +139,9 @@ const thread = (isResolved: boolean, last: string | null) => ({
 const holds = (status: StatusLabel, overrides: Partial<PullStatusNode>) =>
   toPullStatus(statusNode(overrides)).statuses.includes(status);
 
+const ci = (checks: CheckContext[]) =>
+  toPullStatus(statusNode({ commits: rollup(checks) })).statuses;
+
 describe("toPullStatus", () => {
   it("is clean without checks, threads or conflicts", () => {
     expect(toPullStatus(statusNode())).toEqual({ number: 30, statuses: [] });
@@ -157,17 +160,29 @@ describe("toPullStatus", () => {
     expect(holds("is:conflicting", { mergeable: "UNKNOWN" })).toBe(false);
   });
 
-  it.each<[string, CheckContext, boolean]>([
-    ["passed run", run("COMPLETED", "SUCCESS", true), false],
-    ["skipped run", run("COMPLETED", "SKIPPED", true), false],
-    ["failed run", run("COMPLETED", "FAILURE", true), true],
-    ["running run", run("IN_PROGRESS", null, true), true],
-    ["optional failed run", run("COMPLETED", "FAILURE", false), false],
-    ["pending status", commitStatus("PENDING", true), true],
-    ["successful status", commitStatus("SUCCESS", true), false],
-    ["optional errored status", commitStatus("ERROR", false), false],
-  ])("CI with a %s is not ok: %s", (_, check, expected) => {
-    expect(holds("is:ci-not-ok", { commits: rollup([check]) })).toBe(expected);
+  it.each<[string, CheckContext, StatusLabel[]]>([
+    ["passed run", run("COMPLETED", "SUCCESS", true), []],
+    ["skipped run", run("COMPLETED", "SKIPPED", true), []],
+    ["failed run", run("COMPLETED", "FAILURE", true), ["is:ci:failed"]],
+    ["cancelled run", run("COMPLETED", "CANCELLED", true), ["is:ci:failed"]],
+    ["running run", run("IN_PROGRESS", null, true), ["is:ci:running"]],
+    ["queued run", run("QUEUED", null, true), ["is:ci:running"]],
+    ["optional failed run", run("COMPLETED", "FAILURE", false), []],
+    ["optional running run", run("IN_PROGRESS", null, false), []],
+    ["pending status", commitStatus("PENDING", true), ["is:ci:running"]],
+    ["expected status", commitStatus("EXPECTED", true), ["is:ci:running"]],
+    ["errored status", commitStatus("ERROR", true), ["is:ci:failed"]],
+    ["successful status", commitStatus("SUCCESS", true), []],
+    ["optional errored status", commitStatus("ERROR", false), []],
+  ])("CI with a %s: %j", (_, check, expected) => {
+    expect(ci([check])).toEqual(expected);
+  });
+
+  it("flags CI failed and running at once", () => {
+    expect(ci([run("COMPLETED", "FAILURE", true), commitStatus("PENDING", true)])).toEqual([
+      "is:ci:failed",
+      "is:ci:running",
+    ]);
   });
 
   it("counts unresolved threads the PR author has not answered last", () => {

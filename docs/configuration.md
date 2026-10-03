@@ -27,7 +27,7 @@ the file is plain JSON you can also edit by hand (it is validated on load and on
 | ------------- | ------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------ |
 | `id`          | `[a-z0-9_-]{1,32}`             | required | Unique within its axis; used in the move API                                                                 |
 | `name`        | string                         | required | Header text                                                                                                  |
-| `labels`      | string[]                       | `[]`     | Labels this entry matches, plus PR status labels (`is:ci-not-ok`, ...); **empty (and any kind) = catch-all** |
+| `labels`      | string[]                       | `[]`     | Labels this entry matches, plus PR status labels (`is:ci:failed`, ...); **empty (and any kind) = catch-all** |
 | `match`       | `"any"` \| `"all"`             | `"any"`  | `any`: at least one of the labels; `all`: every one of them                                                  |
 | `kind`        | `"any"` \| `"issue"` \| `"pr"` | `"any"`  | Only issues or only pull requests; with no labels, every item of that kind                                   |
 | `hideBlocked` | boolean (swimlanes)            | `false`  | Drop issues with at least one open blocker                                                                   |

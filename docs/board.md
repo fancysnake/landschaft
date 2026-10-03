@@ -41,8 +41,9 @@ Open pull requests are synced alongside issues and placed by the same label rule
 one edits its labels the same way. They carry a `PR` badge and a sky-blue tint (issues green, epics violet, blocked red). Set a swimlane or column to
 PRs only (or issues only) to split them, with an `is:pr` (or `is:issue`) chip in its label picker; cards cannot be dragged into a cell of the other kind.
 
-Add `is:conflicting`, `is:ci-not-ok` or `is:unanswered` to an entry's labels to pick PRs by merge
-conflicts, required checks failing or running, or review threads awaiting the author; each sync
+Add `is:conflicting`, `is:ci:failed`, `is:ci:running` or `is:unanswered` to an entry's labels to
+pick PRs by merge conflicts, a required check failed, a required check still running, or review
+threads awaiting the author; each sync
 refreshes them for every open PR. Dragging cannot change them, so a card stays in such a lane until
 the PR is fixed.
 

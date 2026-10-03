@@ -107,7 +107,7 @@ describe("config schema rules", () => {
   });
 
   it("takes the PR status labels but no other is: label", () => {
-    expect(ConfigSchema.safeParse(withLaneLabels(["is:ci-not-ok", "bug"])).success).toBe(true);
+    expect(ConfigSchema.safeParse(withLaneLabels(["is:ci:failed", "bug"])).success).toBe(true);
     for (const typo of ["is:conflict", "is:pr"])
       expect(() => saveConfig(withLaneLabels([typo]), "/dev/null/never")).toThrow(
         /not a PR status label/,

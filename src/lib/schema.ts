@@ -13,7 +13,12 @@ export const repoName = z.string().regex(/^[\w.-]+\/[\w.-]+$/, "expected owner/r
  * PR states an entry lists among its labels and matches like labels; they are read from
  * GitHub, never written to it.
  */
-export const STATUS_LABEL_NAMES = ["is:conflicting", "is:ci-not-ok", "is:unanswered"] as const;
+export const STATUS_LABEL_NAMES = [
+  "is:conflicting",
+  "is:ci:failed",
+  "is:ci:running",
+  "is:unanswered",
+] as const;
 export type StatusLabel = (typeof STATUS_LABEL_NAMES)[number];
 
 export function isStatusLabel(name: string): name is StatusLabel {

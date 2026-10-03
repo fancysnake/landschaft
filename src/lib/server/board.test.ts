@@ -243,7 +243,7 @@ describe("buildBoard", () => {
         {
           id: "fix",
           name: "To fix",
-          labels: ["is:conflicting", "is:ci-not-ok", "is:unanswered"],
+          labels: ["is:conflicting", "is:ci:failed", "is:unanswered"],
           match: "any" as const,
           kind: "pr" as const,
           hideBlocked: false,
@@ -253,7 +253,7 @@ describe("buildBoard", () => {
     };
     const issues = [
       makeIssue({ number: 1, kind: "pr", statuses: ["is:conflicting"] }),
-      makeIssue({ number: 2, kind: "pr", statuses: ["is:ci-not-ok"] }),
+      makeIssue({ number: 2, kind: "pr", statuses: ["is:ci:failed"] }),
       makeIssue({ number: 3, kind: "pr", statuses: ["is:unanswered"] }),
       makeIssue({ number: 4, kind: "pr" }),
       makeIssue({ number: 5, kind: "pr", labels: [label("is:conflicting")] }),
@@ -462,7 +462,7 @@ describe("labelDiffForMove", () => {
   const done = { id: "done", labels: ["phase:done", "phase:shipped"] };
 
   it("never adds a status label, only the first real one", () => {
-    const fix = { id: "fix", labels: ["is:ci-not-ok", "needs-fix"] };
+    const fix = { id: "fix", labels: ["is:ci:failed", "needs-fix"] };
     expect(
       labelDiffForMove(["prio:high"], { lane: high, col: todo }, { lane: fix, col: todo }),
     ).toEqual({ add: ["needs-fix"], remove: ["prio:high"] });

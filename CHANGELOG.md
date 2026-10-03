@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- `is:ci-not-ok` splits into `is:ci:failed` (a required check failed) and `is:ci:running` (a
+  required check has not finished); configs using `is:ci-not-ok` no longer load.
+
 ## [0.7.0] - 2026-10-02
 
 ### Added
