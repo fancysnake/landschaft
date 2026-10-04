@@ -410,10 +410,10 @@ export interface PullStatusNode {
 /** Unanswered: an unresolved review thread whose last comment is not the PR author's. */
 export function toPullStatus(node: PullStatusNode): PullStatus {
   const author = node.author?.login;
+  const checks = node.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? [];
+  // An unprotected base branch requires nothing, so every check counts.
   const ci = new Set(
-    (node.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? [])
-      .filter(counted)
-      .map(ciState),
+    (checks.some((check) => check.isRequired) ? checks.filter(counted) : checks).map(ciState),
   );
   const holds: Record<StatusLabel, boolean> = {
     "is:conflicting": node.mergeable === "CONFLICTING",
