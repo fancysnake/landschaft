@@ -372,7 +372,7 @@ export type CheckContext = { name: string; isRequired: boolean } & (
 );
 
 /**
- * The checks behind the CI labels: required ones plus `codecov/*`, or every check while none
+ * The checks behind `is:ci:failed`: required ones plus `codecov/*`, or every check while none
  * has reported as required. `isRequired` is only true on a check that has reported.
  */
 function countedChecks(checks: CheckContext[]): CheckContext[] {
@@ -415,11 +415,11 @@ export interface PullStatusNode {
 export function toPullStatus(node: PullStatusNode): PullStatus {
   const author = node.author?.login;
   const checks = node.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? [];
-  const ci = new Set(countedChecks(checks).map(ciState));
   const holds: Record<StatusLabel, boolean> = {
     "is:conflicting": node.mergeable === "CONFLICTING",
-    "is:ci:failed": ci.has("failed"),
-    "is:ci:running": ci.has("running"),
+    "is:ci:failed": countedChecks(checks).some((check) => ciState(check) === "failed"),
+    // Every check: a required one is missing from the rollup until the jobs it needs finish.
+    "is:ci:running": checks.some((check) => ciState(check) === "running"),
     "is:unanswered": node.reviewThreads.nodes.some(
       (thread) => !thread.isResolved && thread.comments.nodes[0]?.author?.login !== author,
     ),

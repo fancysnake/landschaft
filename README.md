@@ -98,8 +98,8 @@ Saving triggers the first sync; once labels are cached the pickers suggest them.
   `"pr"`, default `"any"`; an `is:issue` / `is:pr` chip in the settings editor), on top of its
   labels whatever the match; with no labels it takes every item of that kind.
 - Four **PR status labels** match like labels but come from GitHub, not from the PR's labels:
-  `is:conflicting` (merge conflicts), `is:ci:failed` and `is:ci:running` (a required (or
-  `codecov/*`) check failed or has not finished; any check while none has reported as required)
+  `is:conflicting` (merge conflicts), `is:ci:failed` (a required (or `codecov/*`) check failed;
+  any check while none has reported as required), `is:ci:running` (any check has not finished)
   and `is:unanswered` (an unresolved review thread whose last comment is not the PR author's).
   One "any of" swimlane with `is:conflicting`, `is:ci:failed` and `is:unanswered` gathers the PRs
   waiting on their author. A move never adds or removes them. The config rejects any other `is:`
