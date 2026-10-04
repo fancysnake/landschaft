@@ -1,4 +1,12 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"]
+  "extends": ["config:best-practices"],
+  "packageRules": [
+    {
+      "matchDatasource": ["*"],
+      "minimumReleaseAge": "7 days",
+      "prCreation": "not-pending",
+      "internalChecksFilter": "strict"
+    }
+  ]
 }
