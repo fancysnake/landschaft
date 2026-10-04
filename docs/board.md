@@ -47,7 +47,7 @@ PRs only (or issues only) to split them, with an `is:pr` (or `is:issue`) chip in
 
 Add `is:conflicting`, `is:ci:failed`, `is:ci:running` or `is:unanswered` to an entry's labels to
 pick PRs by merge conflicts, a required (or `codecov/*`) check failed or still running (any check
-when the base branch requires none), or review
+while none has reported as required), or review
 threads awaiting the author; each sync
 refreshes them for every open PR. Dragging cannot change them, so a card stays in such a lane until
 the PR is fixed.

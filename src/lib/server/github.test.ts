@@ -143,8 +143,9 @@ const holds = (status: StatusLabel, overrides: Partial<PullStatusNode>) =>
 const ci = (checks: CheckContext[]) =>
   toPullStatus(statusNode({ commits: rollup(checks) })).statuses;
 
-/** Beside a passing required check, so optional checks are not all there is. */
-const ciProtected = (check: CheckContext) => ci([run("COMPLETED", "SUCCESS", true, "gate"), check]);
+/** Beside a passing required check, so only required and `codecov/*` checks count. */
+const ciWithRequired = (check: CheckContext) =>
+  ci([run("COMPLETED", "SUCCESS", true, "gate"), check]);
 
 describe("toPullStatus", () => {
   it("is clean without checks, threads or conflicts", () => {
@@ -194,10 +195,10 @@ describe("toPullStatus", () => {
       ["is:ci:failed"],
     ],
   ])("CI with a %s: %j", (_, check, expected) => {
-    expect(ciProtected(check)).toEqual(expected);
+    expect(ciWithRequired(check)).toEqual(expected);
   });
 
-  it("counts every check when none is required", () => {
+  it("counts every check while none has reported as required", () => {
     expect(ci([run("COMPLETED", "FAILURE", false)])).toEqual(["is:ci:failed"]);
     expect(ci([commitStatus("PENDING", false)])).toEqual(["is:ci:running"]);
     expect(ci([run("COMPLETED", "SUCCESS", false)])).toEqual([]);

@@ -371,10 +371,14 @@ export type CheckContext = { name: string; isRequired: boolean } & (
   | { type: "StatusContext"; state: string }
 );
 
-/** Checks not required to merge that still count toward the CI labels. */
-const COUNTED_OPTIONAL = /^codecov\//;
-
-const counted = (check: CheckContext) => check.isRequired || COUNTED_OPTIONAL.test(check.name);
+/**
+ * The checks behind the CI labels: required ones plus `codecov/*`, or every check while none
+ * has reported as required. `isRequired` is only true on a check that has reported.
+ */
+function countedChecks(checks: CheckContext[]): CheckContext[] {
+  if (!checks.some((check) => check.isRequired)) return checks;
+  return checks.filter((check) => check.isRequired || check.name.startsWith("codecov/"));
+}
 
 const PASSED = new Set(["SUCCESS", "NEUTRAL", "SKIPPED"]);
 
@@ -411,10 +415,7 @@ export interface PullStatusNode {
 export function toPullStatus(node: PullStatusNode): PullStatus {
   const author = node.author?.login;
   const checks = node.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? [];
-  // An unprotected base branch requires nothing, so every check counts.
-  const ci = new Set(
-    (checks.some((check) => check.isRequired) ? checks.filter(counted) : checks).map(ciState),
-  );
+  const ci = new Set(countedChecks(checks).map(ciState));
   const holds: Record<StatusLabel, boolean> = {
     "is:conflicting": node.mergeable === "CONFLICTING",
     "is:ci:failed": ci.has("failed"),
@@ -431,8 +432,8 @@ export const STATUS_BATCH = 50;
 
 /**
  * `isRequired` takes the PR number as an argument, so each PR is its own aliased field.
- * ponytail: first 100 checks and review threads; a required check that never reported is
- * missed until it does.
+ * ponytail: first 100 checks and review threads; until a required check reports, every check
+ * counts, so a failing optional one flags `is:ci:failed`.
  */
 function pullStatusField(number: number): string {
   return `pr${number}: pullRequest(number: ${number}) {
