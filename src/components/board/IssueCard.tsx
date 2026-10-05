@@ -23,6 +23,11 @@ const STATUS_PILLS: Record<StatusLabel, { text: string; title: string; className
     title: "Unanswered review comments",
     className: "bg-orange-100 text-orange-800",
   },
+  "is:has-pr": {
+    text: "PR open",
+    title: "An open PR closes it",
+    className: "bg-sky-100 text-sky-800",
+  },
 };
 
 interface Props {

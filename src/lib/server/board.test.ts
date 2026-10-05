@@ -293,6 +293,42 @@ describe("buildBoard", () => {
     expect(numbers(board)).toEqual([5, 4]);
   });
 
+  it("matches is:has-pr on issues an open PR closes, whoever's the PR", () => {
+    const dashboard = {
+      ...DASHBOARD,
+      users: ["alice"],
+      swimlanes: [
+        {
+          id: "review",
+          name: "In review",
+          labels: ["is:has-pr"],
+          match: "any" as const,
+          kind: "issue" as const,
+          hideBlocked: false,
+        },
+        ...DASHBOARD.swimlanes,
+      ],
+    };
+    const alice = { author: "alice" };
+    const issues = [
+      makeIssue({ number: 1, ...alice }),
+      makeIssue({ number: 2, ...alice }),
+      makeIssue({ number: 3, ...alice }),
+      makeIssue({ number: 4, ...alice, labels: [label("is:has-pr")] }),
+      makeIssue({ number: 10, kind: "pr", author: "bob", linked: [{ repo: REPO, number: 1 }] }),
+      makeIssue({
+        number: 11,
+        kind: "pr",
+        state: "CLOSED",
+        linked: [{ repo: REPO, number: 2 }],
+      }),
+    ];
+    const board = buildBoard(issues, dashboard, {}, ["alice"]);
+    expect(board.cells[cell("review", "todo")]?.map((c) => [c.number, c.statuses])).toEqual([
+      [1, ["is:has-pr"]],
+    ]);
+  });
+
   it("counts issues that fit no group when an axis has no catch-all", () => {
     const dashboard = {
       ...DASHBOARD,

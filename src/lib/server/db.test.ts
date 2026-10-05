@@ -34,14 +34,14 @@ describe("Db migration", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("drops cached statuses that are no longer status labels", () => {
+  it("drops cached statuses that are not PR status labels", () => {
     const dir = mkdtempSync(join(tmpdir(), "landschaft-db-"));
     const file = join(dir, "old.db");
     const first = new Db(file);
     first.upsertIssues([makeIssue({ number: 1, kind: "pr" })]);
     first.close();
     const raw = new DatabaseSync(file);
-    raw.exec(`UPDATE issues SET status_json = '["is:ci-not-ok","is:conflicting"]'`);
+    raw.exec(`UPDATE issues SET status_json = '["is:ci-not-ok","is:has-pr","is:conflicting"]'`);
     raw.close();
 
     const db = new Db(file);

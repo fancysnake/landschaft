@@ -3,7 +3,7 @@ import type { Db } from "./db";
 import type { Syncer } from "./sync";
 
 import { cellTakes, type Dashboard, type MoveRequest } from "../schema";
-import { labelDiffForMove, matchLabels, placeCard } from "./board";
+import { labelDiffForMove, matchLabels, placeCard, statusesOf } from "./board";
 import { addLabels, type GithubClient, removeLabel } from "./github";
 
 export class MoveError extends Error {
@@ -58,7 +58,8 @@ export async function moveIssue(
 
   const names = issue.labels.map((label) => label.name);
   const diff = labelDiffForMove(names, from, to);
-  const after = matchLabels(issue);
+  const statuses = statusesOf(deps.db.listIssues(dashboard.repos))(issue);
+  const after = matchLabels({ ...issue, statuses });
   for (const name of diff.remove) after.delete(name);
   for (const name of diff.add) after.add(name);
   const landed = placeCard(dashboard, issue.kind, after);

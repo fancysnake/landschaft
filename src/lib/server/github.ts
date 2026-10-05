@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 
 import type { FetchedIssue, IssueState, LabelDef, PullStatus } from "../types";
 
-import { STATUS_LABEL_NAMES, type StatusLabel } from "../schema";
+import { PULL_STATUS_NAMES, type PullStatusLabel } from "../schema";
 
 const execFileAsync = promisify(execFile);
 
@@ -415,7 +415,7 @@ export interface PullStatusNode {
 export function toPullStatus(node: PullStatusNode): PullStatus {
   const author = node.author?.login;
   const checks = node.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? [];
-  const holds: Record<StatusLabel, boolean> = {
+  const holds: Record<PullStatusLabel, boolean> = {
     "is:conflicting": node.mergeable === "CONFLICTING",
     "is:ci:failed": countedChecks(checks).some((check) => ciState(check) === "failed"),
     // Every check: a required one is missing from the rollup until the jobs it needs finish.
@@ -424,7 +424,7 @@ export function toPullStatus(node: PullStatusNode): PullStatus {
       (thread) => !thread.isResolved && thread.comments.nodes[0]?.author?.login !== author,
     ),
   };
-  return { number: node.number, statuses: STATUS_LABEL_NAMES.filter((name) => holds[name]) };
+  return { number: node.number, statuses: PULL_STATUS_NAMES.filter((name) => holds[name]) };
 }
 
 /** PRs per status query; the caller splits the open PRs into batches this size. */
