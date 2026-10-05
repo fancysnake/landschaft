@@ -366,33 +366,14 @@ export async function fetchPullsPage(
 }
 
 /** A commit status rollup entry: a check run, or a commit status. */
-export type CheckContext = { name: string; isRequired: boolean } & (
-  | { type: "CheckRun"; status: string; conclusion: string | null }
-  | { type: "StatusContext"; state: string }
-);
+export type CheckContext =
+  | { type: "CheckRun"; status: string }
+  | { type: "StatusContext"; state: string };
 
-/**
- * The checks behind `is:ci:failed`: required ones plus `codecov/*`, or every check while none
- * has reported as required. `isRequired` is only true on a check that has reported.
- */
-function countedChecks(checks: CheckContext[]): CheckContext[] {
-  if (!checks.some((check) => check.isRequired)) return checks;
-  return checks.filter((check) => check.isRequired || check.name.startsWith("codecov/"));
-}
-
-const PASSED = new Set(["SUCCESS", "NEUTRAL", "SKIPPED"]);
-
-const RUNNING = new Set(["PENDING", "EXPECTED"]);
-
-function ciState(check: CheckContext): "passed" | "failed" | "running" {
-  const outcome =
-    check.type === "StatusContext"
-      ? check.state
-      : check.status === "COMPLETED"
-        ? (check.conclusion ?? "")
-        : "PENDING";
-  if (PASSED.has(outcome)) return "passed";
-  return RUNNING.has(outcome) ? "running" : "failed";
+function isRunning(check: CheckContext): boolean {
+  return check.type === "StatusContext"
+    ? check.state === "PENDING" || check.state === "EXPECTED"
+    : check.status !== "COMPLETED";
 }
 
 interface Login {
@@ -404,7 +385,9 @@ export interface PullStatusNode {
   mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN";
   author: Login | null;
   commits: {
-    nodes: { commit: { statusCheckRollup: { contexts: { nodes: CheckContext[] } } | null } }[];
+    nodes: {
+      commit: { statusCheckRollup: { state: string; contexts: { nodes: CheckContext[] } } | null };
+    }[];
   };
   reviewThreads: {
     nodes: { isResolved: boolean; comments: { nodes: { author: Login | null }[] } }[];
@@ -414,12 +397,12 @@ export interface PullStatusNode {
 /** Unanswered: an unresolved review thread whose last comment is not the PR author's. */
 export function toPullStatus(node: PullStatusNode): PullStatus {
   const author = node.author?.login;
-  const checks = node.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? [];
+  const rollup = node.commits.nodes[0]?.commit.statusCheckRollup;
   const holds: Record<PullStatusLabel, boolean> = {
     "is:conflicting": node.mergeable === "CONFLICTING",
-    "is:ci:failed": countedChecks(checks).some((check) => ciState(check) === "failed"),
-    // Every check: a required one is missing from the rollup until the jobs it needs finish.
-    "is:ci:running": checks.some((check) => ciState(check) === "running"),
+    // The commit's red X; it stays red while other checks still run.
+    "is:ci:failed": rollup?.state === "FAILURE" || rollup?.state === "ERROR",
+    "is:ci:running": rollup?.contexts.nodes.some(isRunning) ?? false,
     "is:unanswered": node.reviewThreads.nodes.some(
       (thread) => !thread.isResolved && thread.comments.nodes[0]?.author?.login !== author,
     ),
@@ -430,18 +413,14 @@ export function toPullStatus(node: PullStatusNode): PullStatus {
 /** PRs per status query; the caller splits the open PRs into batches this size. */
 export const STATUS_BATCH = 50;
 
-/**
- * `isRequired` takes the PR number as an argument, so each PR is its own aliased field.
- * ponytail: first 100 checks and review threads; until a required check reports, every check
- * counts, so a failing optional one flags `is:ci:failed`.
- */
+/** Each PR is its own aliased field. ponytail: first 100 checks and review threads. */
 function pullStatusField(number: number): string {
   return `pr${number}: pullRequest(number: ${number}) {
     number mergeable author { login }
-    commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {
+    commits(last: 1) { nodes { commit { statusCheckRollup { state contexts(first: 100) { nodes {
       type: __typename
-      ... on CheckRun { name status conclusion isRequired(pullRequestNumber: ${number}) }
-      ... on StatusContext { name: context state isRequired(pullRequestNumber: ${number}) }
+      ... on CheckRun { status }
+      ... on StatusContext { state }
     } } } } } }
     reviewThreads(first: 100) { nodes { isResolved comments(last: 1) { nodes { author { login } } } } }
   }`;
@@ -453,7 +432,7 @@ export interface PullStatusPage {
 }
 
 /**
- * Merge conflicts, required checks and review threads of up to `STATUS_BATCH` PRs, in one
+ * Merge conflicts, checks and review threads of up to `STATUS_BATCH` PRs, in one
  * query. Not all of it bumps a PR's `updatedAt`, so the sync asks for every open PR each time.
  */
 export async function fetchPullStatuses(
