@@ -19,6 +19,10 @@ export const PULL_STATUS_NAMES = [
 ] as const;
 export type PullStatusLabel = (typeof PULL_STATUS_NAMES)[number];
 
+export function isPullStatusLabel(name: string): name is PullStatusLabel {
+  return (PULL_STATUS_NAMES as readonly string[]).includes(name);
+}
+
 /**
  * States an entry lists among its labels and matches like labels; derived from GitHub, never
  * written to it. `is:has-pr` holds for an issue an open PR closes.
@@ -36,7 +40,7 @@ const label = z
   .min(1)
   .refine(
     (name) => !name.startsWith("is:") || isStatusLabel(name),
-    `not a PR status label; expected one of ${STATUS_LABEL_NAMES.join(", ")}`,
+    `not a status label; expected one of ${STATUS_LABEL_NAMES.join(", ")}`,
   );
 const labelList = z.array(label).default([]);
 /** "any": the issue carries at least one of the labels; "all": it carries every one. */

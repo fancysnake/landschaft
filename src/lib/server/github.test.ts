@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { StatusLabel } from "../schema";
+import type { PullStatusLabel } from "../schema";
 
 import {
   type CheckContext,
@@ -137,7 +137,7 @@ const thread = (isResolved: boolean, last: string | null) => ({
   comments: { nodes: [{ author: last === null ? null : { login: last } }] },
 });
 
-const holds = (status: StatusLabel, overrides: Partial<PullStatusNode>) =>
+const holds = (status: PullStatusLabel, overrides: Partial<PullStatusNode>) =>
   toPullStatus(statusNode(overrides)).statuses.includes(status);
 
 const ci = (checks: CheckContext[]) =>
@@ -165,7 +165,7 @@ describe("toPullStatus", () => {
     expect(holds("is:conflicting", { mergeable: "UNKNOWN" })).toBe(false);
   });
 
-  it.each<[string, CheckContext, StatusLabel[]]>([
+  it.each<[string, CheckContext, PullStatusLabel[]]>([
     ["passed run", run("COMPLETED", "SUCCESS", true), []],
     ["skipped run", run("COMPLETED", "SKIPPED", true), []],
     ["failed run", run("COMPLETED", "FAILURE", true), ["is:ci:failed"]],

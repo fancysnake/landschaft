@@ -56,8 +56,8 @@ A PR card shows a pill for each status that holds, whatever lane it is in: `conf
 `CI …` or `comments`.
 
 `is:has-pr` picks issues that an open PR closes (GitHub's "linked pull requests"), whoever
-opened the PR; such an issue card shows a `PR open` pill. It drops once the PR is merged or
-closed.
+opened the PR, as long as the PR is in one of the dashboard's repos; such an issue card shows a
+`PR open` pill. It drops once the PR is merged or closed.
 
 ## Filters
 

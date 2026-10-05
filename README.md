@@ -103,8 +103,8 @@ Saving triggers the first sync; once labels are cached the pickers suggest them.
   and `is:unanswered` (an unresolved review thread whose last comment is not the PR author's).
   One "any of" swimlane with `is:conflicting`, `is:ci:failed` and `is:unanswered` gathers the PRs
   waiting on their author. `is:has-pr` picks issues an open PR closes (GitHub's "linked pull
-  requests"), whoever opened the PR. A move never adds or removes them. The config rejects any
-  other `is:` label.
+  requests"), whoever opened the PR, as long as the PR is in one of the dashboard's repos. A move
+  never adds or removes them. The config rejects any other `is:` label.
 - An entry with **no labels (and any kind) is the catch-all** for issues matching nothing else.
   At most one per axis. Issues that fit neither are counted as "unplaced" on the board.
 - Dragging an issue removes the source entry's labels it carries and adds what the target

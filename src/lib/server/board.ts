@@ -37,10 +37,12 @@ export interface Group {
 }
 
 /**
- * The item's label names plus the PR status labels that hold for it; a real GitHub label
+ * The item's label names plus the status labels that hold for it; a real GitHub label
  * named like a status does not count as one.
  */
-export function matchLabels(issue: Pick<Issue, "labels" | "statuses">): Set<string> {
+export function matchLabels(
+  issue: Pick<Issue, "labels"> & { statuses: StatusLabel[] },
+): Set<string> {
   const names = issue.labels.map((label) => label.name).filter((name) => !isStatusLabel(name));
   return new Set([...names, ...issue.statuses]);
 }
@@ -101,6 +103,17 @@ export function isBlocked(issue: Issue, byKey: Map<string, Issue>): boolean {
 }
 
 const keyOf = (ref: { repo: string; number: number }): string => issueKey(ref.repo, ref.number);
+
+/**
+ * The statuses of an item among `issues`: a PR's own, plus `is:has-pr` for an item an open
+ * PR closes. Only PRs among `issues` count, so one in a repo outside them is never seen.
+ */
+export function statusesOf(issues: Issue[]): (issue: Issue) => StatusLabel[] {
+  const withPr = new Set(
+    issues.filter((issue) => issue.state === "OPEN").flatMap((pr) => pr.linked.map(keyOf)),
+  );
+  return (issue) => (withPr.has(keyOf(issue)) ? [...issue.statuses, "is:has-pr"] : issue.statuses);
+}
 
 /**
  * Keys of the epic's blockers, its sub-issues and the issues it blocks, plus the PRs
@@ -177,12 +190,8 @@ export function buildBoard(
   const repos = new Set(selectedRepos(filters.repo, dashboard.repos));
   const wanted = issueFilter(filters, byKey);
   const open = issues.filter((issue) => issue.state === "OPEN" && listed(issue));
-  // Any open PR counts, whoever's it is, so not just `open`.
-  const withPr = new Set(
-    issues
-      .filter((issue) => issue.kind === "pr" && issue.state === "OPEN")
-      .flatMap((pr) => pr.linked.map(keyOf)),
-  );
+  // Any open PR in `issues` counts, whoever's it is, so not just `open`.
+  const statusesFor = statusesOf(issues);
   const structural = new Set<string>([
     ...dashboard.swimlanes.flatMap((lane) => lane.labels),
     ...dashboard.columns.flatMap((column) => column.labels),
@@ -223,10 +232,7 @@ export function buildBoard(
 
     if (!wanted(issue)) continue;
 
-    const statuses: StatusLabel[] =
-      issue.kind === "issue" && withPr.has(keyOf(issue))
-        ? [...issue.statuses, "is:has-pr"]
-        : issue.statuses;
+    const statuses = statusesFor(issue);
     const placed = placeCard(dashboard, issue.kind, matchLabels({ ...issue, statuses }));
     if (!placed) {
       board.unplaced += 1;
