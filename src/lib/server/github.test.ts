@@ -11,6 +11,7 @@ import {
   type IssueNode,
   type PullStatusNode,
   removeLabel,
+  type StatusState,
   toIssue,
   toPull,
   toPullStatus,
@@ -114,23 +115,13 @@ function statusNode(overrides: Partial<PullStatusNode> = {}): PullStatusNode {
   };
 }
 
-const rollup = (nodes: CheckContext[]) => ({
-  nodes: [{ commit: { statusCheckRollup: { contexts: { nodes } } } }],
+const rollup = (state: StatusState, nodes: CheckContext[] = []) => ({
+  nodes: [{ commit: { statusCheckRollup: { state, contexts: { nodes } } } }],
 });
 
-const run = (
-  status: string,
-  conclusion: string | null,
-  isRequired: boolean,
-  name = "build",
-): CheckContext => ({ type: "CheckRun", name, status, conclusion, isRequired });
+const run = (status: string): CheckContext => ({ type: "CheckRun", status });
 
-const commitStatus = (state: string, isRequired: boolean, name = "ci/build"): CheckContext => ({
-  type: "StatusContext",
-  name,
-  state,
-  isRequired,
-});
+const commitStatus = (state: string): CheckContext => ({ type: "StatusContext", state });
 
 const thread = (isResolved: boolean, last: string | null) => ({
   isResolved,
@@ -140,12 +131,8 @@ const thread = (isResolved: boolean, last: string | null) => ({
 const holds = (status: PullStatusLabel, overrides: Partial<PullStatusNode>) =>
   toPullStatus(statusNode(overrides)).statuses.includes(status);
 
-const ci = (checks: CheckContext[]) =>
-  toPullStatus(statusNode({ commits: rollup(checks) })).statuses;
-
-/** Beside a passing required check, so only required and `codecov/*` checks count. */
-const ciWithRequired = (check: CheckContext) =>
-  ci([run("COMPLETED", "SUCCESS", true, "gate"), check]);
+const ci = (state: StatusState, checks: CheckContext[] = []) =>
+  toPullStatus(statusNode({ commits: rollup(state, checks) })).statuses;
 
 describe("toPullStatus", () => {
   it("is clean without checks, threads or conflicts", () => {
@@ -165,51 +152,30 @@ describe("toPullStatus", () => {
     expect(holds("is:conflicting", { mergeable: "UNKNOWN" })).toBe(false);
   });
 
-  it.each<[string, CheckContext, PullStatusLabel[]]>([
-    ["passed run", run("COMPLETED", "SUCCESS", true), []],
-    ["skipped run", run("COMPLETED", "SKIPPED", true), []],
-    ["failed run", run("COMPLETED", "FAILURE", true), ["is:ci:failed"]],
-    ["cancelled run", run("COMPLETED", "CANCELLED", true), ["is:ci:failed"]],
-    ["running run", run("IN_PROGRESS", null, true), ["is:ci:running"]],
-    ["queued run", run("QUEUED", null, true), ["is:ci:running"]],
-    ["optional failed run", run("COMPLETED", "FAILURE", false), []],
-    ["optional running run", run("IN_PROGRESS", null, false), ["is:ci:running"]],
-    ["optional pending status", commitStatus("PENDING", false), ["is:ci:running"]],
-    ["pending status", commitStatus("PENDING", true), ["is:ci:running"]],
-    ["expected status", commitStatus("EXPECTED", true), ["is:ci:running"]],
-    ["errored status", commitStatus("ERROR", true), ["is:ci:failed"]],
-    ["successful status", commitStatus("SUCCESS", true), []],
-    ["optional errored status", commitStatus("ERROR", false), []],
-    [
-      "optional failed codecov status",
-      commitStatus("FAILURE", false, "codecov/patch"),
-      ["is:ci:failed"],
-    ],
-    [
-      "optional pending codecov status",
-      commitStatus("PENDING", false, "codecov/project"),
-      ["is:ci:running"],
-    ],
-    [
-      "optional failed codecov run",
-      run("COMPLETED", "FAILURE", false, "codecov/patch"),
-      ["is:ci:failed"],
-    ],
-  ])("CI with a %s: %j", (_, check, expected) => {
-    expect(ciWithRequired(check)).toEqual(expected);
+  it.each<StatusState>(["FAILURE", "ERROR"])("flags CI failed when the commit is %s", (state) => {
+    expect(ci(state)).toEqual(["is:ci:failed"]);
   });
 
-  it("counts every check while none has reported as required", () => {
-    expect(ci([run("COMPLETED", "FAILURE", false)])).toEqual(["is:ci:failed"]);
-    expect(ci([commitStatus("PENDING", false)])).toEqual(["is:ci:running"]);
-    expect(ci([run("COMPLETED", "SUCCESS", false)])).toEqual([]);
+  it("is clean when the last commit has no checks", () => {
+    const pull = statusNode({ commits: { nodes: [{ commit: { statusCheckRollup: null } }] } });
+    expect(toPullStatus(pull).statuses).toEqual([]);
+  });
+
+  it.each<[string, CheckContext]>([
+    ["queued run", run("QUEUED")],
+    ["running run", run("IN_PROGRESS")],
+    ["pending status", commitStatus("PENDING")],
+    ["expected status", commitStatus("EXPECTED")],
+  ])("flags CI running with a %s", (_, check) => {
+    expect(ci("PENDING", [check])).toEqual(["is:ci:running"]);
+  });
+
+  it("is clean once every check finished green", () => {
+    expect(ci("SUCCESS", [run("COMPLETED"), commitStatus("SUCCESS")])).toEqual([]);
   });
 
   it("flags CI failed and running at once", () => {
-    expect(ci([run("COMPLETED", "FAILURE", true), commitStatus("PENDING", true)])).toEqual([
-      "is:ci:failed",
-      "is:ci:running",
-    ]);
+    expect(ci("FAILURE", [run("IN_PROGRESS")])).toEqual(["is:ci:failed", "is:ci:running"]);
   });
 
   it("counts unresolved threads the PR author has not answered last", () => {
@@ -239,7 +205,7 @@ describe("fetchPullStatuses", () => {
     const page = await fetchPullStatuses(gh, "acme/app", [7, 8]);
 
     expect(queries).toHaveLength(1);
-    expect(queries[0]).toContain("isRequired(pullRequestNumber: 8)");
+    expect(queries[0]).toContain("pr8: pullRequest(number: 8)");
     expect(page).toEqual({
       statuses: [{ number: 7, statuses: ["is:conflicting"] }],
       rateRemaining: 4321,

@@ -46,11 +46,9 @@ one edits its labels the same way. They carry a `PR` badge and a sky-blue tint (
 PRs only (or issues only) to split them, with an `is:pr` (or `is:issue`) chip in its label picker; cards cannot be dragged into a cell of the other kind.
 
 Add `is:conflicting`, `is:ci:failed`, `is:ci:running` or `is:unanswered` to an entry's labels to
-pick PRs by merge conflicts, a required (or `codecov/*`) check failed (any check while none has
-reported as required), any check still running, or review
-threads awaiting the author; each sync
-refreshes them for every open PR. Dragging cannot change them, so a card stays in such a lane until
-the PR is fixed.
+pick PRs by merge conflicts, a failed check (GitHub's red ✗ on the last commit), any check still
+running, or review threads awaiting the author; each sync refreshes them for every open PR.
+Dragging cannot change them, so a card stays in such a lane until the PR is fixed.
 
 A PR card shows a pill for each status that holds, whatever lane it is in: `conflict`, `CI ✗`,
 `CI …` or `comments`.
