@@ -11,6 +11,7 @@ import {
   type IssueNode,
   type PullStatusNode,
   removeLabel,
+  type StatusState,
   toIssue,
   toPull,
   toPullStatus,
@@ -114,7 +115,7 @@ function statusNode(overrides: Partial<PullStatusNode> = {}): PullStatusNode {
   };
 }
 
-const rollup = (state: string, nodes: CheckContext[] = []) => ({
+const rollup = (state: StatusState, nodes: CheckContext[] = []) => ({
   nodes: [{ commit: { statusCheckRollup: { state, contexts: { nodes } } } }],
 });
 
@@ -130,7 +131,7 @@ const thread = (isResolved: boolean, last: string | null) => ({
 const holds = (status: PullStatusLabel, overrides: Partial<PullStatusNode>) =>
   toPullStatus(statusNode(overrides)).statuses.includes(status);
 
-const ci = (state: string, checks: CheckContext[] = []) =>
+const ci = (state: StatusState, checks: CheckContext[] = []) =>
   toPullStatus(statusNode({ commits: rollup(state, checks) })).statuses;
 
 describe("toPullStatus", () => {
@@ -151,8 +152,13 @@ describe("toPullStatus", () => {
     expect(holds("is:conflicting", { mergeable: "UNKNOWN" })).toBe(false);
   });
 
-  it.each(["FAILURE", "ERROR"])("flags CI failed when the commit is %s", (state) => {
+  it.each<StatusState>(["FAILURE", "ERROR"])("flags CI failed when the commit is %s", (state) => {
     expect(ci(state)).toEqual(["is:ci:failed"]);
+  });
+
+  it("is clean when the last commit has no checks", () => {
+    const pull = statusNode({ commits: { nodes: [{ commit: { statusCheckRollup: null } }] } });
+    expect(toPullStatus(pull).statuses).toEqual([]);
   });
 
   it.each<[string, CheckContext]>([

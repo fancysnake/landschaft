@@ -365,6 +365,8 @@ export async function fetchPullsPage(
   };
 }
 
+export type StatusState = "EXPECTED" | "ERROR" | "FAILURE" | "PENDING" | "SUCCESS";
+
 /** A commit status rollup entry: a check run, or a commit status. */
 export type CheckContext =
   | { type: "CheckRun"; status: string }
@@ -386,7 +388,9 @@ export interface PullStatusNode {
   author: Login | null;
   commits: {
     nodes: {
-      commit: { statusCheckRollup: { state: string; contexts: { nodes: CheckContext[] } } | null };
+      commit: {
+        statusCheckRollup: { state: StatusState; contexts: { nodes: CheckContext[] } } | null;
+      };
     }[];
   };
   reviewThreads: {
