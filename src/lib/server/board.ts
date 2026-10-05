@@ -12,6 +12,7 @@ import {
   type Precedence,
   selectedRepos,
   type SortBy,
+  type StatusLabel,
   type SortDir,
   type Swimlane,
 } from "../schema";
@@ -176,6 +177,12 @@ export function buildBoard(
   const repos = new Set(selectedRepos(filters.repo, dashboard.repos));
   const wanted = issueFilter(filters, byKey);
   const open = issues.filter((issue) => issue.state === "OPEN" && listed(issue));
+  // Any open PR counts, whoever's it is, so not just `open`.
+  const withPr = new Set(
+    issues
+      .filter((issue) => issue.kind === "pr" && issue.state === "OPEN")
+      .flatMap((pr) => pr.linked.map(keyOf)),
+  );
   const structural = new Set<string>([
     ...dashboard.swimlanes.flatMap((lane) => lane.labels),
     ...dashboard.columns.flatMap((column) => column.labels),
@@ -216,7 +223,11 @@ export function buildBoard(
 
     if (!wanted(issue)) continue;
 
-    const placed = placeCard(dashboard, issue.kind, matchLabels(issue));
+    const statuses: StatusLabel[] =
+      issue.kind === "issue" && withPr.has(keyOf(issue))
+        ? [...issue.statuses, "is:has-pr"]
+        : issue.statuses;
+    const placed = placeCard(dashboard, issue.kind, matchLabels({ ...issue, statuses }));
     if (!placed) {
       board.unplaced += 1;
       continue;
@@ -239,7 +250,7 @@ export function buildBoard(
       progress: issue.subIssues.total > 0 ? issue.subIssues : null,
       blocked,
       isEpic,
-      statuses: issue.statuses,
+      statuses,
       createdAt: issue.createdAt,
       updatedAt: issue.updatedAt,
     });

@@ -10,16 +10,20 @@ const id = z
 export const repoName = z.string().regex(/^[\w.-]+\/[\w.-]+$/, "expected owner/repo");
 const issueRef = z.string().regex(/^[\w.-]+\/[\w.-]+#\d+$/, "expected owner/repo#number");
 
-/**
- * PR states an entry lists among its labels and matches like labels; they are read from
- * GitHub, never written to it.
- */
-export const STATUS_LABEL_NAMES = [
+/** PR states the sync reads from GitHub for every open PR. */
+export const PULL_STATUS_NAMES = [
   "is:conflicting",
   "is:ci:failed",
   "is:ci:running",
   "is:unanswered",
 ] as const;
+export type PullStatusLabel = (typeof PULL_STATUS_NAMES)[number];
+
+/**
+ * States an entry lists among its labels and matches like labels; derived from GitHub, never
+ * written to it. `is:has-pr` holds for an issue an open PR closes.
+ */
+export const STATUS_LABEL_NAMES = [...PULL_STATUS_NAMES, "is:has-pr"] as const;
 export type StatusLabel = (typeof STATUS_LABEL_NAMES)[number];
 
 export function isStatusLabel(name: string): name is StatusLabel {

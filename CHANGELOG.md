@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- `is:has-pr` matches issues an open PR closes, with a `PR open` pill on their cards.
+
 ## [0.9.1] - 2026-10-04
 
 ### Fixed

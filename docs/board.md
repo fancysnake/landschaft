@@ -55,6 +55,10 @@ the PR is fixed.
 A PR card shows a pill for each status that holds, whatever lane it is in: `conflict`, `CI ✗`,
 `CI …` or `comments`.
 
+`is:has-pr` picks issues that an open PR closes (GitHub's "linked pull requests"), whoever
+opened the PR; such an issue card shows a `PR open` pill. It drops once the PR is merged or
+closed.
+
 ## Filters
 
 On multi-repo boards, chips above the board switch each repository on or off

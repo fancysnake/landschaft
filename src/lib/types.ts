@@ -93,7 +93,7 @@ export interface Card {
   progress: Progress | null;
   blocked: boolean;
   isEpic: boolean;
-  /** Empty for issues. */
+  /** At most `is:has-pr` for issues. */
   statuses: StatusLabel[];
   createdAt: string;
   updatedAt: string;
