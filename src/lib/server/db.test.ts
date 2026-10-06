@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { label, makeIssue, REPO } from "./__fixtures__/issues";
+import { cachedIssue, label, makeIssue, REPO } from "./__fixtures__/issues";
 import { Db } from "./db";
 
 describe("Db migration", () => {
@@ -29,7 +29,7 @@ describe("Db migration", () => {
     const db = new Db(file);
     expect(db.getSyncState("acme/app")).toBeNull();
     db.upsertIssues([makeIssue({ number: 1, author: "ann" })]);
-    expect(db.getIssue(REPO, 1)?.author).toBe("ann");
+    expect(cachedIssue(db, REPO, 1)?.author).toBe("ann");
     db.close();
     rmSync(dir, { recursive: true, force: true });
   });
@@ -45,7 +45,7 @@ describe("Db migration", () => {
     raw.close();
 
     const db = new Db(file);
-    expect(db.getIssue(REPO, 1)?.statuses).toEqual(["is:conflicting"]);
+    expect(cachedIssue(db, REPO, 1)?.statuses).toEqual(["is:conflicting"]);
     db.close();
     rmSync(dir, { recursive: true, force: true });
   });
@@ -70,7 +70,7 @@ describe("Db", () => {
     db.upsertIssues([
       { ...issue, title: "Renamed", state: "CLOSED", closedAt: "2026-03-01T00:00:00Z" },
     ]);
-    expect(db.getIssue(REPO, 1)).toMatchObject({ title: "Renamed", state: "CLOSED" });
+    expect(cachedIssue(db, REPO, 1)).toMatchObject({ title: "Renamed", state: "CLOSED" });
     expect(db.listIssues([REPO])).toHaveLength(1);
   });
 
@@ -84,12 +84,14 @@ describe("Db", () => {
       blockedByTotal: 2,
     });
     db.upsertIssues([issue]);
-    expect(db.getIssue(REPO, 2)?.blockedBy).toEqual(issue.blockedBy);
+    expect(cachedIssue(db, REPO, 2)?.blockedBy).toEqual(issue.blockedBy);
 
     db.upsertIssues([
       { ...issue, blockedBy: [{ repo: REPO, number: 1, state: "CLOSED" }], blockedByTotal: 1 },
     ]);
-    expect(db.getIssue(REPO, 2)?.blockedBy).toEqual([{ repo: REPO, number: 1, state: "CLOSED" }]);
+    expect(cachedIssue(db, REPO, 2)?.blockedBy).toEqual([
+      { repo: REPO, number: 1, state: "CLOSED" },
+    ]);
     expect(db.listIssues([REPO])[0]?.blockedBy).toEqual([
       { repo: REPO, number: 1, state: "CLOSED" },
     ]);
@@ -110,16 +112,10 @@ describe("Db", () => {
       makeIssue({ number: 1, repo: "acme/lib" }),
     ]);
     expect(db.closeMissing(REPO, new Set([2]))).toBe(1);
-    expect(db.getIssue(REPO, 1)?.state).toBe("CLOSED");
-    expect(db.getIssue(REPO, 2)?.state).toBe("OPEN");
-    expect(db.getIssue("acme/lib", 1)?.state).toBe("OPEN");
+    expect(cachedIssue(db, REPO, 1)?.state).toBe("CLOSED");
+    expect(cachedIssue(db, REPO, 2)?.state).toBe("OPEN");
+    expect(cachedIssue(db, "acme/lib", 1)?.state).toBe("OPEN");
     expect(db.closeMissing(REPO, new Set([2]))).toBe(0);
-  });
-
-  it("patches labels in place", () => {
-    db.upsertIssues([makeIssue({ number: 1, labels: [label("a")] })]);
-    db.patchLabels(REPO, 1, [label("b")]);
-    expect(db.getIssue(REPO, 1)?.labels).toEqual([label("b")]);
   });
 
   it("replaces the label catalogue per repo", () => {

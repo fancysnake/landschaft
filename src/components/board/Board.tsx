@@ -1,11 +1,9 @@
-import { Fragment, useState } from "react";
-
-import type { DragPayload } from "../../lib/client/dnd";
+import { Fragment } from "react";
 
 import { repoShortName } from "../../lib/client/labels";
 import { useBoard } from "../../lib/client/useBoard";
 import { useUrlFilters } from "../../lib/client/useUrlFilters";
-import { cellTakes, repoFilter, selectedRepos } from "../../lib/schema";
+import { repoFilter, selectedRepos } from "../../lib/schema";
 import { cellKey } from "../../lib/types";
 import { Cell } from "./Cell";
 import { EpicStrip } from "./EpicStrip";
@@ -19,11 +17,10 @@ interface Props {
 
 export default function Board({ dashboardId }: Props) {
   const [filters, updateFilters] = useUrlFilters();
-  const { data, error, loading, syncing, move, sync, setEpicStarred, dismissError } = useBoard(
+  const { data, error, loading, syncing, sync, setEpicStarred, dismissError } = useBoard(
     dashboardId,
     filters,
   );
-  const [dragging, setDragging] = useState<DragPayload | null>(null);
 
   if (!data) {
     return <p className="p-6 text-sm text-neutral-500">{loading ? "Loading board…" : error}</p>;
@@ -126,22 +123,8 @@ export default function Board({ dashboardId }: Props) {
               {dashboard.columns.map((column) => (
                 <Cell
                   key={column.id}
-                  laneId={lane.id}
-                  colId={column.id}
                   cards={board.cells[cellKey(lane.id, column.id)] ?? []}
                   showRepo={showRepo}
-                  dragging={dragging}
-                  accepts={(kind) => cellTakes(lane, column, kind)}
-                  onDragStart={setDragging}
-                  onDragEnd={() => setDragging(null)}
-                  onDrop={(payload) => {
-                    setDragging(null);
-                    void move(
-                      payload.card,
-                      { laneId: payload.laneId, colId: payload.colId },
-                      { laneId: lane.id, colId: column.id },
-                    );
-                  }}
                 />
               ))}
             </Fragment>

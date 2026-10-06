@@ -1,12 +1,5 @@
-import type {
-  Config,
-  Dashboard,
-  Filters,
-  MoveRequest,
-  StarEpicRequest,
-  SyncRequest,
-} from "../schema";
-import type { Board, Issue, LabelDef, SyncStatus } from "../types";
+import type { Config, Dashboard, Filters, StarEpicRequest, SyncRequest } from "../schema";
+import type { Board, LabelDef, SyncStatus } from "../types";
 
 export interface BoardResponse {
   dashboard: Dashboard;
@@ -14,12 +7,6 @@ export interface BoardResponse {
   users: string[];
   board: Board;
   status: SyncStatus;
-}
-
-export interface MoveResponse {
-  issue: Issue;
-  add: string[];
-  remove: string[];
 }
 
 export interface SyncResponse {
@@ -82,8 +69,6 @@ export const api = {
   version: () => request<SyncStatus>("/api/version"),
   sync: (body: Partial<SyncRequest>) =>
     request<SyncResponse>("/api/sync", { method: "POST", body: JSON.stringify(body) }),
-  move: (body: MoveRequest) =>
-    request<MoveResponse>("/api/move", { method: "POST", body: JSON.stringify(body) }),
   setEpicStarred: (dashboardId: string, body: StarEpicRequest) =>
     request<{ starredEpics: string[] }>(
       `/api/dashboards/${encodeURIComponent(dashboardId)}/starred-epics`,

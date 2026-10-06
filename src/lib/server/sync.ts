@@ -1,10 +1,9 @@
 import type { Config } from "../schema";
-import type { Issue, SyncStatus } from "../types";
+import type { SyncStatus } from "../types";
 import type { Db } from "./db";
 
 import { refreshMinutesByRepo } from "./config";
 import {
-  fetchIssue,
   fetchIssuesPage,
   fetchPullStatuses,
   fetchPullsPage,
@@ -192,14 +191,6 @@ export class Syncer {
     if (more && rateRemaining < RATE_FLOOR) {
       throw new Error(`GitHub rate limit nearly exhausted (${rateRemaining} left), sync aborted`);
     }
-  }
-
-  /** Refetches one item; returns it as cached, PR statuses included. */
-  async syncIssue(repo: string, number: number): Promise<Issue | null> {
-    const issue = await fetchIssue(this.gh, repo, number);
-    if (issue) this.db.upsertIssues([issue]);
-    this.bump();
-    return issue && this.db.getIssue(repo, number);
   }
 }
 

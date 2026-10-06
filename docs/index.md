@@ -20,7 +20,7 @@
 
 - [Getting started](getting-started.md) — install, run, pin the engine
 - [Configuration](configuration.md) — every field of `landschaft.config.json`
-- [How the board works](board.md) — placement, dragging, epics, filters
+- [How the board works](board.md) — placement, sync, epics, filters
 - [API](api.md) — the local JSON endpoints the islands talk to
 - [How it works](architecture.md) — the shape of the codebase
 - [Changelog](changelog.md) — what each release changed

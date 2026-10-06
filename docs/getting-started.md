@@ -3,7 +3,9 @@
 ## What you need
 
 - [mise](https://mise.jdx.dev), or Node 26+ and a package manager of your choice
-- `gh` logged in (`gh auth login`), or a `GITHUB_TOKEN` with `repo` scope in the environment
+- `gh` logged in (`gh auth login`), or a `GITHUB_TOKEN` that can read the repositories
+  (fine-grained: read access to contents, issues and pull requests; classic: `repo` scope for
+  private repos) in the environment
 
 ## Use as a package
 

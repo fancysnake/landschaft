@@ -7,10 +7,8 @@ import {
   createGithubClient,
   fetchIssuesPage,
   fetchPullStatuses,
-  GithubError,
   type IssueNode,
   type PullStatusNode,
-  removeLabel,
   type StatusState,
   toIssue,
   toPull,
@@ -274,22 +272,5 @@ describe("createGithubClient", () => {
     await expect(
       fetchIssuesPage(gh, "acme/gone", { since: null, openOnly: false, after: null }),
     ).rejects.toThrow(/not found/);
-  });
-});
-
-describe("removeLabel", () => {
-  it("ignores a 404 and rethrows anything else", async () => {
-    const gh404 = createGithubClient(
-      async () => "tok",
-      async () => new Response("nope", { status: 404 }),
-    );
-    await expect(removeLabel(gh404, "acme/app", 1, "a b")).resolves.toBeUndefined();
-
-    const fetchImpl = vi.fn(async () => new Response("denied", { status: 403 }));
-    const gh403 = createGithubClient(async () => "tok", fetchImpl);
-    await expect(removeLabel(gh403, "acme/app", 1, "a b")).rejects.toBeInstanceOf(GithubError);
-    expect((fetchImpl.mock.calls[0] as unknown as [string])[0]).toBe(
-      "https://api.github.com/repos/acme/app/issues/1/labels/a%20b",
-    );
   });
 });

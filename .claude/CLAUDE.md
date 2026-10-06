@@ -34,14 +34,14 @@ type-checked (`astro check`), not formatted.
 - `bin/landschaft.js` — CLI for consumers (`dev|build|start`): runs Astro with `root` = this
   package; config, DB and the production build (`dist/`, fully bundled via `ssr.noExternal` in the CLI's build call)
   live in the consumer's cwd. Plain JS, `@ts-check`.
-- `src/lib/schema.ts` — zod schemas + types shared by server and client (config, filters, move).
+- `src/lib/schema.ts` — zod schemas + types shared by server and client (config, filters).
 - `src/lib/types.ts` — runtime data shapes (Issue, Card, Board, SyncStatus).
 - `src/lib/server/` — Node only: `config.ts` (JSON file, atomic save), `db.ts` (SQLite),
-  `github.ts` (GraphQL sync queries, REST label writes), `sync.ts` (Syncer + scheduler),
-  `board.ts` (**pure** board builder + `labelDiffForMove`), `move.ts`, `app.ts` (process
+  `github.ts` (GraphQL sync queries), `sync.ts` (Syncer + scheduler),
+  `board.ts` (**pure** board builder), `app.ts` (process
   singleton booted by `src/middleware.ts`), `api.ts` (endpoint helpers).
 - `src/pages/api/**` — JSON endpoints, all wrapped in `route()` from `api.ts`.
-- `src/lib/client/` — fetch wrappers, `useBoard` (polling + optimistic move), URL filters, DnD.
+- `src/lib/client/` — fetch wrappers, `useBoard` (polling), URL filters.
 - `src/components/board/` and `src/components/settings/` — React islands mounted with
   `client:only="react"` from `src/pages/d/[id].astro` and `src/pages/settings.astro`.
 
@@ -52,7 +52,6 @@ type-checked (`astro check`), not formatted.
 
 - Board logic stays pure and unit-tested in `board.ts`; endpoints only glue.
 - Sync is sequential on purpose (rate limits); `no-await-in-loop` is off for that reason.
-- GitHub writes go through REST by label name; never PATCH the full label list.
 - Config edits go through `saveConfig()` (validation + tmp-file rename). Ids are immutable
   once saved because they are in URLs.
 - Tests live next to the code as `*.test.ts`; fixtures in `src/lib/server/__fixtures__/`.

@@ -9,23 +9,14 @@
 ## Sync
 
 Sync is sequential per repository, on purpose: GitHub's GraphQL rate limit is shared across
-everything the token does. Three kinds of pass:
+everything the token does. Two kinds of pass:
 
 - **Incremental** — issues updated since the last run, every `refreshMinutes`.
 - **Full** — every open issue, once a day, for repositories just added to a dashboard, and on
   demand from the sync button on the board.
-- **Single issue** — after a drag, the moved issue is refetched so the board reflects GitHub
-  rather than an optimistic guess.
 
 The remaining rate-limit budget is shown next to the sync status. The board polls
 `/api/version` and reloads itself when a sync has landed.
-
-## Dragging
-
-A drop computes a label diff, never a full label list: remove the source entry's labels the
-issue carries, add what the target entry needs (its first label, or every label for an `all`
-entry). Two people editing labels in parallel therefore do not clobber each other. The card
-moves immediately; if GitHub rejects the change it snaps back and the error is shown.
 
 ## Epics
 
@@ -41,14 +32,13 @@ the local database, never on GitHub, so a closed epic that is reopened keeps its
 
 ## Pull requests
 
-Open pull requests are synced alongside issues and placed by the same label rules; dragging
-one edits its labels the same way. They carry a `PR` badge and a sky-blue tint (issues green, epics violet, blocked red). Set a swimlane or column to
-PRs only (or issues only) to split them, with an `is:pr` (or `is:issue`) chip in its label picker; cards cannot be dragged into a cell of the other kind.
+Open pull requests are synced alongside issues and placed by the same label rules. They carry a `PR` badge and a sky-blue tint (issues green, epics violet, blocked red). Set a swimlane or column to
+PRs only (or issues only) to split them, with an `is:pr` (or `is:issue`) chip in its label picker.
 
 Add `is:conflicting`, `is:ci:failed`, `is:ci:running` or `is:unanswered` to an entry's labels to
 pick PRs by merge conflicts, a failed check (GitHub's red ✗ on the last commit), any check still
 running, or review threads awaiting the author; each sync refreshes them for every open PR.
-Dragging cannot change them, so a card stays in such a lane until the PR is fixed.
+A card stays in such a lane until the PR is fixed.
 
 A PR card shows a pill for each status that holds, whatever lane it is in: `conflict`, `CI ✗`,
 `CI …` or `comments`.

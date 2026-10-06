@@ -1,9 +1,6 @@
-import type { DragEvent } from "react";
-
 import type { StatusLabel } from "../../lib/schema";
 import type { Card } from "../../lib/types";
 
-import { type DragPayload, setPayload } from "../../lib/client/dnd";
 import { labelStyle, repoShortName } from "../../lib/client/labels";
 
 const STATUS_PILLS: Record<StatusLabel, { text: string; title: string; className: string }> = {
@@ -32,25 +29,13 @@ const STATUS_PILLS: Record<StatusLabel, { text: string; title: string; className
 
 interface Props {
   card: Card;
-  laneId: string;
-  colId: string;
   showRepo: boolean;
-  onDragStart(payload: DragPayload): void;
-  onDragEnd(): void;
 }
 
-export function IssueCard({ card, laneId, colId, showRepo, onDragStart, onDragEnd }: Props) {
-  const start = (event: DragEvent) => {
-    const payload = { card, laneId, colId };
-    setPayload(event, payload);
-    onDragStart(payload);
-  };
+export function IssueCard({ card, showRepo }: Props) {
   return (
     <article
-      draggable
-      onDragStart={start}
-      onDragEnd={onDragEnd}
-      className={`cursor-grab rounded-md border border-l-4 p-2 text-sm shadow-xs active:cursor-grabbing ${
+      className={`rounded-md border border-l-4 p-2 text-sm shadow-xs ${
         card.blocked
           ? "border-red-300 border-l-red-500 bg-red-50"
           : card.isEpic

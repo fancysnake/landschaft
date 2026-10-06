@@ -89,15 +89,6 @@ export function fitsKind(filter: KindFilter, kind: IssueKind): boolean {
   return filter === "any" || filter === kind;
 }
 
-/** Whether the cell at this swimlane and column takes an item of this kind. */
-export function cellTakes(
-  lane: { kind: KindFilter },
-  column: { kind: KindFilter },
-  kind: IssueKind,
-): boolean {
-  return fitsKind(lane.kind, kind) && fitsKind(column.kind, kind);
-}
-
 /**
  * Which matching entry wins on each axis: the first swimlane, but the last column, so a card
  * carrying two stages' labels sits in the later one.
@@ -166,17 +157,6 @@ export type SortDir = z.infer<typeof SortDirSchema>;
 export type Dashboard = z.infer<typeof DashboardSchema>;
 export type Config = z.infer<typeof ConfigSchema>;
 export type ConfigInput = z.input<typeof ConfigSchema>;
-
-const PositionSchema = z.object({ laneId: id, colId: id });
-
-export const MoveRequestSchema = z.object({
-  dashboardId: id,
-  repo: repoName,
-  number: z.number().int().positive(),
-  from: PositionSchema,
-  to: PositionSchema,
-});
-export type MoveRequest = z.infer<typeof MoveRequestSchema>;
 
 export const StarEpicRequestSchema = z.object({ epic: issueRef, starred: z.boolean() });
 export type StarEpicRequest = z.infer<typeof StarEpicRequestSchema>;

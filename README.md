@@ -11,8 +11,9 @@ come, without paying for GitHub Projects.
 <!-- --8<-- [start:grid] -->
 
 A dashboard spans one or more repositories and lays their open issues out on a grid of
-swimlanes × columns, both defined by labels. Dragging a card swaps the labels on GitHub.
-Everything runs on your machine against a local SQLite cache that refreshes in the background.
+swimlanes × columns, both defined by labels. The board is read-only: labels are edited on
+GitHub. Everything runs on your machine against a local SQLite cache that refreshes in the
+background.
 
 <!-- --8<-- [end:grid] -->
 
@@ -71,7 +72,9 @@ the lockfile. Releases are the [tags](https://github.com/fancysnake/landschaft/t
 Requirements:
 
 - [mise](https://mise.jdx.dev) (installs node, aube, hk and pkl from `mise.toml`)
-- `gh` logged in (`gh auth login`), or a `GITHUB_TOKEN` with `repo` scope
+- `gh` logged in (`gh auth login`), or a `GITHUB_TOKEN` that can read the repositories
+  (fine-grained: read access to contents, issues and pull requests; classic: `repo` scope for
+  private repos)
 
 ```sh
 mise install
@@ -103,13 +106,10 @@ Saving triggers the first sync; once labels are cached the pickers suggest them.
   and `is:unanswered` (an unresolved review thread whose last comment is not the PR author's).
   One "any of" swimlane with `is:conflicting`, `is:ci:failed` and `is:unanswered` gathers the PRs
   waiting on their author. `is:has-pr` picks issues an open PR closes (GitHub's "linked pull
-  requests"), whoever opened the PR, as long as the PR is in one of the dashboard's repos. A move
-  never adds or removes them. The config rejects any other `is:` label.
+  requests"), whoever opened the PR, as long as the PR is in one of the dashboard's repos. The
+  config rejects any other `is:` label.
 - An entry with **no labels (and any kind) is the catch-all** for issues matching nothing else.
   At most one per axis. Issues that fit neither are counted as "unplaced" on the board.
-- Dragging an issue removes the source entry's labels it carries and adds what the target
-  entry needs: its first label, or every label for an "all" entry. Dropping on a catch-all
-  only removes.
 - **Hide blocked** (per swimlane) drops issues that have at least one open blocker
   (GitHub "blocked by" relationships).
 - Issues carrying the **epic label** appear in the strip above the board with sub-issue

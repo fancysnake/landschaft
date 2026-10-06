@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Removed
+
+- Drag and drop on the board, with `POST /api/move` and every GitHub label write. The board is
+  read-only; the token needs read access only.
+
 ## [0.10.1] - 2026-10-05
 
 ### Fixed
