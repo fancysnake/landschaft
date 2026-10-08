@@ -5,9 +5,9 @@ import { useBoard } from "../../lib/client/useBoard";
 import { useUrlFilters } from "../../lib/client/useUrlFilters";
 import { repoFilter, selectedRepos } from "../../lib/schema";
 import { cellKey } from "../../lib/types";
-import { Cell } from "./Cell";
 import { EpicStrip } from "./EpicStrip";
 import { FilterBar } from "./FilterBar";
+import { IssueCard } from "./IssueCard";
 import { SyncStatus } from "./SyncStatus";
 import { Toggles } from "./Toggles";
 
@@ -121,11 +121,14 @@ export default function Board({ dashboardId }: Props) {
                 )}
               </div>
               {dashboard.columns.map((column) => (
-                <Cell
+                <div
                   key={column.id}
-                  cards={board.cells[cellKey(lane.id, column.id)] ?? []}
-                  showRepo={showRepo}
-                />
+                  className="flex min-h-16 flex-col gap-2 rounded-md bg-neutral-100/60 p-2"
+                >
+                  {(board.cells[cellKey(lane.id, column.id)] ?? []).map((card) => (
+                    <IssueCard key={card.key} card={card} showRepo={showRepo} />
+                  ))}
+                </div>
               ))}
             </Fragment>
           ))}

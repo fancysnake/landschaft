@@ -60,10 +60,6 @@ export class Syncer {
     this.now = deps.now ?? (() => new Date());
   }
 
-  bump(): void {
-    this.version += 1;
-  }
-
   status(): SyncStatus {
     return {
       version: this.version,
@@ -147,7 +143,7 @@ export class Syncer {
       throw error;
     } finally {
       this.inFlight.delete(repo);
-      this.bump();
+      this.version += 1;
     }
   }
 

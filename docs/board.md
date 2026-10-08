@@ -38,7 +38,6 @@ PRs only (or issues only) to split them, with an `is:pr` (or `is:issue`) chip in
 Add `is:conflicting`, `is:ci:failed`, `is:ci:running` or `is:unanswered` to an entry's labels to
 pick PRs by merge conflicts, a failed check (GitHub's red ✗ on the last commit), any check still
 running, or review threads awaiting the author; each sync refreshes them for every open PR.
-A card stays in such a lane until the PR is fixed.
 
 A PR card shows a pill for each status that holds, whatever lane it is in: `conflict`, `CI ✗`,
 `CI …` or `comments`.
