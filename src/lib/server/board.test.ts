@@ -4,7 +4,7 @@ import type { Swimlane } from "../schema";
 
 import { cellKey } from "../types";
 import { DASHBOARD, label, makeIssue, REPO } from "./__fixtures__/issues";
-import { buildBoard, isBlocked, labelDiffForMove, placeCard, placeIn, resolveUsers } from "./board";
+import { buildBoard, isBlocked, placeCard, placeIn, resolveUsers } from "./board";
 
 const cell = (laneId: string, colId: string) => cellKey(laneId, colId);
 const TWO_REPOS = { ...DASHBOARD, repos: [REPO, "acme/other"] };
@@ -528,116 +528,5 @@ describe("buildBoard", () => {
     const board = buildBoard([makeIssue({ number: 1, labels: [label("epic")] })], dashboard);
     expect(board.epics).toEqual([]);
     expect(board.cells[cell("rest", "todo")]?.[0]?.labels.map((l) => l.name)).toEqual(["epic"]);
-  });
-});
-
-describe("labelDiffForMove", () => {
-  const high = { id: "high", labels: ["prio:high"] };
-  const low = { id: "low", labels: ["prio:low"] };
-  const rest = { id: "rest", labels: [] };
-  const todo = { id: "todo", labels: [] };
-  const doing = { id: "doing", labels: ["phase:doing"] };
-  const done = { id: "done", labels: ["phase:done", "phase:shipped"] };
-
-  it("never adds a status label, only the first real one", () => {
-    const fix = { id: "fix", labels: ["is:ci:failed", "needs-fix"] };
-    expect(
-      labelDiffForMove(["prio:high"], { lane: high, col: todo }, { lane: fix, col: todo }),
-    ).toEqual({ add: ["needs-fix"], remove: ["prio:high"] });
-    expect(
-      labelDiffForMove(
-        [],
-        { lane: rest, col: todo },
-        { lane: { ...fix, match: "all" }, col: todo },
-      ),
-    ).toEqual({ add: ["needs-fix"], remove: [] });
-  });
-
-  it("swaps the column label when only the column changes", () => {
-    expect(
-      labelDiffForMove(
-        ["prio:high", "phase:doing"],
-        { lane: high, col: doing },
-        { lane: high, col: done },
-      ),
-    ).toEqual({ add: ["phase:done"], remove: ["phase:doing"] });
-  });
-
-  it("swaps the lane label when only the lane changes", () => {
-    expect(
-      labelDiffForMove(["prio:high"], { lane: high, col: todo }, { lane: low, col: todo }),
-    ).toEqual({
-      add: ["prio:low"],
-      remove: ["prio:high"],
-    });
-  });
-
-  it("changes both axes at once", () => {
-    expect(
-      labelDiffForMove(["prio:high"], { lane: high, col: todo }, { lane: low, col: doing }),
-    ).toEqual({
-      add: ["prio:low", "phase:doing"],
-      remove: ["prio:high"],
-    });
-  });
-
-  it("only removes when the target is a catch-all", () => {
-    expect(
-      labelDiffForMove(
-        ["prio:high", "phase:shipped"],
-        { lane: high, col: done },
-        { lane: rest, col: todo },
-      ),
-    ).toEqual({ add: [], remove: ["prio:high", "phase:shipped"] });
-  });
-
-  it("removes every source label the issue carries, adds only the first target label", () => {
-    expect(
-      labelDiffForMove(
-        ["phase:done", "phase:shipped"],
-        { lane: rest, col: done },
-        { lane: rest, col: doing },
-      ),
-    ).toEqual({ add: ["phase:doing"], remove: ["phase:done", "phase:shipped"] });
-  });
-
-  it("does not add a label the issue already has", () => {
-    expect(
-      labelDiffForMove(
-        ["prio:high", "prio:low"],
-        { lane: high, col: todo },
-        { lane: low, col: todo },
-      ),
-    ).toEqual({ add: [], remove: ["prio:high"] });
-  });
-
-  it("is a no-op when nothing changes", () => {
-    expect(
-      labelDiffForMove(["prio:high"], { lane: high, col: todo }, { lane: high, col: todo }),
-    ).toEqual({
-      add: [],
-      remove: [],
-    });
-  });
-
-  it('adds every missing label of an "all" target and keeps the ones present', () => {
-    const waiting = { id: "waiting", labels: ["phase:doing", "wait"], match: "all" as const };
-    expect(
-      labelDiffForMove(["phase:doing"], { lane: rest, col: doing }, { lane: rest, col: waiting }),
-    ).toEqual({ add: ["wait"], remove: [] });
-    expect(
-      labelDiffForMove(["phase:done"], { lane: rest, col: done }, { lane: rest, col: waiting }),
-    ).toEqual({ add: ["phase:doing", "wait"], remove: ["phase:done"] });
-  });
-
-  it('removes all labels of an "all" source when leaving it', () => {
-    const waiting = { id: "waiting", labels: ["phase:doing", "wait"], match: "all" as const };
-    expect(
-      labelDiffForMove(
-        ["phase:doing", "wait"],
-        { lane: rest, col: waiting },
-        { lane: rest, col: doing },
-      ),
-    ).toEqual({ add: [], remove: ["wait"] });
   });
 });

@@ -1,5 +1,6 @@
 import type { Dashboard } from "../../schema";
 import type { Issue } from "../../types";
+import type { Db } from "../db";
 
 export const REPO = "acme/app";
 
@@ -65,3 +66,8 @@ export const DASHBOARD: Dashboard = {
     },
   ],
 };
+
+/** The cached item `repo#number`, or null. */
+export function cachedIssue(db: Db, repo: string, number: number): Issue | null {
+  return db.listIssues([repo]).find((issue) => issue.number === number) ?? null;
+}

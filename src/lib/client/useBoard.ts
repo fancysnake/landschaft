@@ -2,48 +2,22 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Filters } from "../schema";
 
-import { type Card, cellKey } from "../types";
 import { api, type BoardResponse, errorMessage, filtersToQuery } from "./api";
 import { readFilters } from "./useUrlFilters";
 
 const POLL_MS = 4000;
-
-export interface CellPosition {
-  laneId: string;
-  colId: string;
-}
 
 export interface BoardController {
   data: BoardResponse | null;
   error: string | null;
   loading: boolean;
   syncing: boolean;
-  move(card: Card, from: CellPosition, to: CellPosition): Promise<void>;
   sync(full?: boolean): Promise<void>;
   setEpicStarred(epic: string, starred: boolean): Promise<void>;
   dismissError(): void;
 }
 
-function optimisticMove(
-  previous: BoardResponse,
-  card: Card,
-  from: CellPosition,
-  to: CellPosition,
-): BoardResponse {
-  const fromKey = cellKey(from.laneId, from.colId);
-  const toKey = cellKey(to.laneId, to.colId);
-  const cells = { ...previous.board.cells };
-  cells[fromKey] = (cells[fromKey] ?? []).filter((c) => c.key !== card.key);
-  cells[toKey] = [card, ...(cells[toKey] ?? []).filter((c) => c.key !== card.key)];
-  const laneTotals = { ...previous.board.laneTotals };
-  if (from.laneId !== to.laneId) {
-    laneTotals[from.laneId] = (laneTotals[from.laneId] ?? 1) - 1;
-    laneTotals[to.laneId] = (laneTotals[to.laneId] ?? 0) + 1;
-  }
-  return { ...previous, board: { ...previous.board, cells, laneTotals } };
-}
-
-/** Loads the board for the current filters, polls the sync version, applies moves optimistically. */
+/** Loads the board for the current filters, polls the sync version. */
 export function useBoard(dashboardId: string, filters: Filters): BoardController {
   const [data, setData] = useState<BoardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -105,16 +79,6 @@ export function useBoard(dashboardId: string, filters: Filters): BoardController
     [load],
   );
 
-  const move = useCallback(
-    async (card: Card, from: CellPosition, to: CellPosition) => {
-      setData((previous) => (previous ? optimisticMove(previous, card, from, to) : previous));
-      await mutate("Move", () =>
-        api.move({ dashboardId, repo: card.repo, number: card.number, from, to }),
-      );
-    },
-    [dashboardId, mutate],
-  );
-
   const sync = useCallback(
     async (full = false) => {
       setSyncing(true);
@@ -143,7 +107,6 @@ export function useBoard(dashboardId: string, filters: Filters): BoardController
     error,
     loading: data === null && error === null,
     syncing,
-    move,
     sync,
     setEpicStarred,
     dismissError,

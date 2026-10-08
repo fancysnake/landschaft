@@ -11,24 +11,6 @@ localhost only. Errors are `{ "error": "message" }` with a matching status.
 | `POST /api/sync`                | `{ "repo"?: "owner/repo", "full"?: true }`; `409` while busy |
 | `GET /api/version`              | Sync status per repository plus rate-limit budget            |
 | `GET /api/labels?repos=a/b,c/d` | Cached label catalogue for the pickers                       |
-| `POST /api/move`                | Apply a drag: label diff on GitHub, then refetch the issue   |
-
-## Move
-
-```json
-{
-  "dashboardId": "main",
-  "repo": "owner/repo",
-  "number": 42,
-  "from": { "laneId": "normal", "colId": "backlog" },
-  "to": { "laneId": "high", "colId": "doing" }
-}
-```
-
-The server recomputes the diff from the dashboard definition, so a stale client cannot add
-labels the target entry does not ask for. It rejects a move into a swimlane or column of the other
-kind, or one where the new labels would land the card in another swimlane or column. GitHub writes
-go through REST by label name.
 
 ## Board
 

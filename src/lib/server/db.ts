@@ -262,24 +262,6 @@ export class Db {
     });
   }
 
-  getIssue(repo: string, number: number): Issue | null {
-    const row = this.db
-      .prepare("SELECT * FROM issues WHERE repo = ? AND number = ?")
-      .get(repo, number) as IssueRow | undefined;
-    if (!row) return null;
-    const blockers = this.db
-      .prepare("SELECT * FROM blocked_by WHERE repo = ? AND number = ?")
-      .all(repo, number) as unknown as BlockerRow[];
-    return rowToIssue(
-      row,
-      blockers.map((b) => ({
-        repo: b.blocker_repo,
-        number: b.blocker_number,
-        state: b.blocker_state as IssueState,
-      })),
-    );
-  }
-
   /** Every cached issue (any state) for the given repos. */
   listIssues(repos: string[]): Issue[] {
     if (repos.length === 0) return [];
@@ -333,12 +315,6 @@ export class Db {
     this.transaction(() => {
       for (const s of statuses) update.run(JSON.stringify(s.statuses), repo, s.number);
     });
-  }
-
-  patchLabels(repo: string, number: number, labels: LabelRef[]): void {
-    this.db
-      .prepare("UPDATE issues SET labels_json = ? WHERE repo = ? AND number = ?")
-      .run(JSON.stringify(labels), repo, number);
   }
 
   /** Replaces the label catalogue of one repo. */

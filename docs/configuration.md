@@ -25,7 +25,7 @@ the file is plain JSON you can also edit by hand (it is validated on load and on
 
 | Field         | Type                           | Default  | Meaning                                                                                                      |
 | ------------- | ------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------ |
-| `id`          | `[a-z0-9_-]{1,32}`             | required | Unique within its axis; used in the move API                                                                 |
+| `id`          | `[a-z0-9_-]{1,32}`             | required | Unique within its axis; keys the board's cells                                                               |
 | `name`        | string                         | required | Header text                                                                                                  |
 | `labels`      | string[]                       | `[]`     | Labels this entry matches, plus PR status labels (`is:ci:failed`, ...); **empty (and any kind) = catch-all** |
 | `match`       | `"any"` \| `"all"`             | `"any"`  | `any`: at least one of the labels; `all`: every one of them                                                  |

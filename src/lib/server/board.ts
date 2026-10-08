@@ -55,12 +55,6 @@ function matches(group: Group, labelNames: Set<string>): boolean {
     : group.labels.some((label) => labelNames.has(label));
 }
 
-/** The labels a move adds for a group: all of them, or just the first; never status labels. */
-function wantedLabels(group: Group): string[] {
-  const real = group.labels.filter((label) => !isStatusLabel(label));
-  return group.match === "all" ? real : real.slice(0, 1);
-}
-
 /**
  * The `first` (or `last`) group in the list whose labels the issue satisfies (any or all of
  * them, per `match`; a kind-only group needs none); otherwise the catch-all (no labels, any
@@ -281,41 +275,4 @@ export function buildBoard(
   board.assignees = [...assignees].toSorted();
   board.labels = [...labels].toSorted();
   return board;
-}
-
-export interface Position {
-  lane: Group;
-  col: Group;
-}
-
-/**
- * Labels to add/remove so the issue lands in `to`. Per axis that changed: drop the
- * source group's labels the issue carries, add what the target group needs (its first real
- * label, or every one for an "all" group; nothing for a catch-all). A label that the
- * target still needs is never removed.
- */
-export function labelDiffForMove(
-  issueLabels: string[],
-  from: Position,
-  to: Position,
-): { add: string[]; remove: string[] } {
-  const add = new Set<string>();
-  const remove = new Set<string>();
-  const keep = new Set<string>();
-  for (const [source, target] of [
-    [from.lane, to.lane],
-    [from.col, to.col],
-  ] as const) {
-    if (source.id === target.id) {
-      for (const label of target.labels) keep.add(label);
-      continue;
-    }
-    for (const label of source.labels) if (issueLabels.includes(label)) remove.add(label);
-    for (const wanted of wantedLabels(target)) {
-      keep.add(wanted);
-      if (!issueLabels.includes(wanted)) add.add(wanted);
-    }
-  }
-  for (const label of keep) remove.delete(label);
-  return { add: [...add], remove: [...remove] };
 }

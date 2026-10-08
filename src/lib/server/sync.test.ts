@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Config } from "../schema";
 import type { GithubClient, IssueNode, PullNode } from "./github";
 
-import { makeIssue, REPO } from "./__fixtures__/issues";
+import { cachedIssue, makeIssue, REPO } from "./__fixtures__/issues";
 import { Db } from "./db";
 import { startScheduler, SyncBusyError, Syncer } from "./sync";
 
@@ -90,10 +90,6 @@ function fakeGithub(
         );
         return { rateLimit: { remaining }, repository } as T;
       }
-      if (query.includes("query Issue(")) {
-        const node = { type: "Issue", ...toNode(variables.number as number) };
-        return { repository: { issueOrPullRequest: node } } as T;
-      }
       const pulled = query.includes("query PullsPage");
       const source = pulled ? pulls : pages;
       const index = variables.after ? Number(variables.after) : 0;
@@ -107,9 +103,6 @@ function fakeGithub(
         rateLimit: { remaining },
         repository: pulled ? { pullRequests: connection } : { issues: connection },
       } as T;
-    },
-    async rest() {
-      return null;
     },
   };
   return { gh, calls };
@@ -144,7 +137,7 @@ describe("Syncer", () => {
       { owner: "acme", name: "app", since: null, states: ["OPEN"], after: null },
       { owner: "acme", name: "app", since: null, states: ["OPEN"], after: "1" },
     ]);
-    expect(db.getIssue(REPO, 99)?.state).toBe("CLOSED");
+    expect(cachedIssue(db, REPO, 99)?.state).toBe("CLOSED");
     expect(db.listLabels([REPO]).map((l) => l.name)).toEqual(["bug"]);
     expect(db.getSyncState(REPO)).toMatchObject({
       lastSyncAt: "2026-05-01T12:00:00.000Z",
@@ -174,7 +167,7 @@ describe("Syncer", () => {
       since: "2026-05-01T10:58:00.000Z",
       states: null,
     });
-    expect(db.getIssue(REPO, 5)?.state).toBe("CLOSED");
+    expect(cachedIssue(db, REPO, 5)?.state).toBe("CLOSED");
     expect(db.getSyncState(REPO)?.lastFullSyncAt).toBe("2026-05-01T11:00:00.000Z");
   });
 
@@ -191,18 +184,18 @@ describe("Syncer", () => {
 
     expect(await syncer.syncRepo(REPO)).toMatchObject({ upserted: 1 });
     expect(calls.filter((c) => c.query.includes("query PullsPage"))).toHaveLength(1);
-    expect(db.getIssue(REPO, 20)).toMatchObject({
+    expect(cachedIssue(db, REPO, 20)).toMatchObject({
       kind: "pr",
       linked: [{ repo: REPO, number: 1 }],
     });
-    expect(db.getIssue(REPO, 21)).toBeNull();
+    expect(cachedIssue(db, REPO, 21)).toBeNull();
   });
 
   it("keeps open pull requests open on a full sync", async () => {
     const { gh } = fakeGithub([[toNode(1)]], 5000, [[toPullNode(2, "2026-05-01T00:00:00Z")]]);
     const syncer = new Syncer({ db, gh, now: () => now });
     expect(await syncer.syncRepo(REPO)).toMatchObject({ full: true, upserted: 2, closed: 0 });
-    expect(db.getIssue(REPO, 2)?.state).toBe("OPEN");
+    expect(cachedIssue(db, REPO, 2)?.state).toBe("OPEN");
   });
 
   it("refreshes the status of every open PR, also those an incremental sync did not page", async () => {
@@ -216,7 +209,7 @@ describe("Syncer", () => {
 
     await syncer.syncRepo(REPO);
 
-    expect(db.getIssue(REPO, 7)?.statuses).toEqual(["is:conflicting"]);
+    expect(cachedIssue(db, REPO, 7)?.statuses).toEqual(["is:conflicting"]);
     const status = calls.find((c) => c.query.includes("query PullStatus"));
     expect(status?.query).toContain("pr7:");
     expect(status?.query).not.toContain("pr8:");
@@ -238,7 +231,7 @@ describe("Syncer", () => {
     const { gh, calls } = fakeGithub([[]], 5000, [], [51]);
     await new Syncer({ db, gh, now: () => now }).syncRepo(REPO);
     expect(statusCalls(calls)).toHaveLength(2);
-    expect(db.getIssue(REPO, 51)?.statuses).toEqual(["is:conflicting"]);
+    expect(cachedIssue(db, REPO, 51)?.statuses).toEqual(["is:conflicting"]);
   });
 
   it("aborts between PR status batches when the rate limit is nearly gone", async () => {
@@ -257,7 +250,7 @@ describe("Syncer", () => {
     db.upsertIssues([makeIssue({ number: 7, kind: "pr" })]);
     db.setPullStatuses(REPO, [{ number: 7, statuses: ["is:conflicting", "is:unanswered"] }]);
     db.upsertIssues([makeIssue({ number: 7, kind: "pr", title: "renamed" })]);
-    expect(db.getIssue(REPO, 7)).toMatchObject({
+    expect(cachedIssue(db, REPO, 7)).toMatchObject({
       title: "renamed",
       statuses: ["is:conflicting", "is:unanswered"],
     });
@@ -279,9 +272,6 @@ describe("Syncer", () => {
       async gql() {
         throw new Error("boom");
       },
-      async rest() {
-        return null;
-      },
     };
     const syncer = new Syncer({ db, gh, now: () => now });
     await expect(syncer.syncRepo(REPO)).rejects.toThrow("boom");
@@ -301,9 +291,6 @@ describe("Syncer", () => {
         query.includes("query Labels")
           ? labelsOnly.gql<T>(query, variables)
           : (gate.promise as Promise<T>),
-      async rest() {
-        return null;
-      },
     };
     const syncer = new Syncer({ db, gh, now: () => now });
     const running = syncer.syncRepo(REPO);
@@ -322,8 +309,8 @@ describe("Syncer", () => {
     const { gh } = fakeGithub([[toNode(1)], [toNode(2)]], 50);
     const syncer = new Syncer({ db, gh, now: () => now });
     await expect(syncer.syncRepo(REPO)).rejects.toThrow(/rate limit/);
-    expect(db.getIssue(REPO, 1)).not.toBeNull();
-    expect(db.getIssue(REPO, 2)).toBeNull();
+    expect(cachedIssue(db, REPO, 1)).not.toBeNull();
+    expect(cachedIssue(db, REPO, 2)).toBeNull();
   });
 
   it("fetches the viewer once and exposes it in the status", async () => {
@@ -334,23 +321,6 @@ describe("Syncer", () => {
     expect(await syncer.viewer()).toBe("me");
     expect(calls.filter((c) => c.query.includes("query Viewer"))).toHaveLength(1);
     expect(syncer.status().viewer).toBe("me");
-  });
-
-  it("refetches a single issue and bumps the version", async () => {
-    const { gh } = fakeGithub([]);
-    const syncer = new Syncer({ db, gh, now: () => now });
-    const issue = await syncer.syncIssue(REPO, 7);
-    expect(issue?.number).toBe(7);
-    expect(db.getIssue(REPO, 7)).not.toBeNull();
-    expect(syncer.version).toBe(1);
-  });
-
-  it("returns a refetched item with the statuses the cache holds", async () => {
-    db.upsertIssues([makeIssue({ number: 7 })]);
-    db.setPullStatuses(REPO, [{ number: 7, statuses: ["is:unanswered"] }]);
-    const { gh } = fakeGithub([]);
-    const issue = await new Syncer({ db, gh, now: () => now }).syncIssue(REPO, 7);
-    expect(issue?.statuses).toEqual(["is:unanswered"]);
   });
 });
 

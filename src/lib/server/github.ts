@@ -7,14 +7,8 @@ import { PULL_STATUS_NAMES, type PullStatusLabel } from "../schema";
 
 const execFileAsync = promisify(execFile);
 
-const API = "https://api.github.com";
-const API_VERSION = "2022-11-28";
-
 export class GithubError extends Error {
-  constructor(
-    message: string,
-    readonly status?: number,
-  ) {
+  constructor(message: string) {
     super(message);
     this.name = "GithubError";
   }
@@ -35,7 +29,6 @@ export async function getToken(): Promise<string> {
 
 export interface GithubClient {
   gql<T>(query: string, variables: Record<string, unknown>): Promise<T>;
-  rest<T>(method: string, path: string, body?: unknown): Promise<T | null>;
 }
 
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
@@ -52,25 +45,18 @@ export function createGithubClient(
     });
     return cached;
   };
-  const headers = async () => ({
-    authorization: `Bearer ${await token()}`,
-    accept: "application/vnd.github+json",
-    "x-github-api-version": API_VERSION,
-    "content-type": "application/json",
-  });
-
   return {
     async gql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
-      const response = await fetchImpl(`${API}/graphql`, {
+      const response = await fetchImpl("https://api.github.com/graphql", {
         method: "POST",
-        headers: await headers(),
+        headers: {
+          authorization: `Bearer ${await token()}`,
+          "content-type": "application/json",
+        },
         body: JSON.stringify({ query, variables }),
       });
       if (!response.ok) {
-        throw new GithubError(
-          `GraphQL HTTP ${response.status}: ${await response.text()}`,
-          response.status,
-        );
+        throw new GithubError(`GraphQL HTTP ${response.status}: ${await response.text()}`);
       }
       const payload = (await response.json()) as { data?: T; errors?: { message: string }[] };
       if (payload.errors?.length) {
@@ -78,22 +64,6 @@ export function createGithubClient(
       }
       if (!payload.data) throw new GithubError("GraphQL response without data");
       return payload.data;
-    },
-
-    async rest<T>(method: string, path: string, body?: unknown): Promise<T | null> {
-      const response = await fetchImpl(`${API}${path}`, {
-        method,
-        headers: await headers(),
-        body: body === undefined ? undefined : JSON.stringify(body),
-      });
-      if (!response.ok) {
-        throw new GithubError(
-          `${method} ${path}: HTTP ${response.status}: ${await response.text()}`,
-          response.status,
-        );
-      }
-      if (response.status === 204) return null;
-      return (await response.json()) as T;
     },
   };
 }
@@ -145,15 +115,6 @@ query PullsPage($owner: String!, $name: String!, $states: [PullRequestState!], $
     }
   }
 }
-${PULL_FIELDS}`;
-
-const ISSUE_QUERY = `
-query Issue($owner: String!, $name: String!, $number: Int!) {
-  repository(owner: $owner, name: $name) {
-    issueOrPullRequest(number: $number) { type: __typename ...IssueFields ...PullFields }
-  }
-}
-${ISSUE_FIELDS}
 ${PULL_FIELDS}`;
 
 const VIEWER_QUERY = `query Viewer { viewer { login } }`;
@@ -219,15 +180,6 @@ interface IssuesPageData {
 interface PullsPageData {
   rateLimit: { remaining: number };
   repository: { pullRequests: { pageInfo: PageInfo; nodes: PullNode[] } } | null;
-}
-
-interface IssueData {
-  repository: {
-    issueOrPullRequest:
-      | (IssueNode & { type: "Issue" })
-      | (PullNode & { type: "PullRequest" })
-      | null;
-  } | null;
 }
 
 interface LabelsData {
@@ -329,8 +281,7 @@ export async function fetchIssuesPage(
     states: options.openOnly ? ["OPEN"] : null,
     after: options.after,
   });
-  if (!data.repository)
-    throw new GithubError(`repository ${repo} not found or not accessible`, 404);
+  if (!data.repository) throw new GithubError(`repository ${repo} not found or not accessible`);
   const { issues } = data.repository;
   return {
     issues: issues.nodes.map((node) => toIssue(repo, node)),
@@ -351,8 +302,7 @@ export async function fetchPullsPage(
     states: options.openOnly ? ["OPEN"] : null,
     after: options.after,
   });
-  if (!data.repository)
-    throw new GithubError(`repository ${repo} not found or not accessible`, 404);
+  if (!data.repository) throw new GithubError(`repository ${repo} not found or not accessible`);
   const { pageInfo, nodes } = data.repository.pullRequests;
   const since = options.since ? Date.parse(options.since) : null;
   const fresh =
@@ -454,8 +404,7 @@ export async function fetchPullStatuses(
     }`,
     splitRepo(repo),
   );
-  if (!data.repository)
-    throw new GithubError(`repository ${repo} not found or not accessible`, 404);
+  if (!data.repository) throw new GithubError(`repository ${repo} not found or not accessible`);
   const nodes = Object.values(data.repository).filter((node) => node !== null);
   return { statuses: nodes.map(toPullStatus), rateRemaining: data.rateLimit.remaining };
 }
@@ -466,17 +415,6 @@ export async function fetchViewer(gh: GithubClient): Promise<string> {
   return data.viewer.login;
 }
 
-export async function fetchIssue(
-  gh: GithubClient,
-  repo: string,
-  number: number,
-): Promise<FetchedIssue | null> {
-  const data = await gh.gql<IssueData>(ISSUE_QUERY, { ...splitRepo(repo), number });
-  const node = data.repository?.issueOrPullRequest;
-  if (!node) return null;
-  return node.type === "PullRequest" ? toPull(repo, node) : toIssue(repo, node);
-}
-
 export async function fetchRepoLabels(
   gh: GithubClient,
   repo: string,
@@ -485,36 +423,10 @@ export async function fetchRepoLabels(
   let after: string | null = null;
   do {
     const data: LabelsData = await gh.gql<LabelsData>(LABELS_QUERY, { ...splitRepo(repo), after });
-    if (!data.repository)
-      throw new GithubError(`repository ${repo} not found or not accessible`, 404);
+    if (!data.repository) throw new GithubError(`repository ${repo} not found or not accessible`);
     const page = data.repository.labels;
     labels.push(...page.nodes);
     after = page.pageInfo.hasNextPage ? page.pageInfo.endCursor : null;
   } while (after);
   return labels;
-}
-
-export async function addLabels(
-  gh: GithubClient,
-  repo: string,
-  number: number,
-  labels: string[],
-): Promise<void> {
-  if (labels.length === 0) return;
-  await gh.rest("POST", `/repos/${repo}/issues/${number}/labels`, { labels });
-}
-
-export async function removeLabel(
-  gh: GithubClient,
-  repo: string,
-  number: number,
-  label: string,
-): Promise<void> {
-  try {
-    await gh.rest("DELETE", `/repos/${repo}/issues/${number}/labels/${encodeURIComponent(label)}`);
-  } catch (error) {
-    // Already gone remotely: the end state is what we wanted.
-    if (error instanceof GithubError && error.status === 404) return;
-    throw error;
-  }
 }
