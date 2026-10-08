@@ -14,7 +14,7 @@ import type {
   SyncState,
 } from "../types";
 
-import { isPullStatusLabel } from "../schema";
+import { isPullStatusLabel } from "../status";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS issues (

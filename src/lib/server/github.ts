@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 
 import type { FetchedIssue, IssueState, LabelDef, PullStatus } from "../types";
 
-import { PULL_STATUS_NAMES, type PullStatusLabel } from "../schema";
+import { PULL_STATUS_NAMES, type PullStatusLabel } from "../status";
 
 const execFileAsync = promisify(execFile);
 

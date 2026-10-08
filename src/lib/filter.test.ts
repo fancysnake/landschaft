@@ -90,6 +90,13 @@ describe("parseFilter", () => {
     expect(filterError("repo:app")).toMatch(/owner\/repo/);
     expect(filterError("parent-issue:acme/app")).toMatch(/owner\/repo#number/);
     expect(filterError("author:@ann")).toMatch(/GitHub login/);
+    expect(filterError("has:children")).toMatch(/expected parent-issue, sub-issues/);
+  });
+
+  it("rejects keys and values inherited from Object", () => {
+    expect(filterError("constructor:x")).toMatch(/unknown key "constructor"/);
+    expect(filterError("toString:x")).toMatch(/unknown key "toString"/);
+    expect(filterError("is:constructor")).toMatch(/is:constructor is not valid/);
   });
 });
 
@@ -120,7 +127,8 @@ describe("matchesFilter", () => {
     expect(fits("has:parent-issue", item())).toBe(false);
     expect(fits("parent-issue:Acme/App#12", child)).toBe(true);
     expect(fits("parent-issue:acme/app#1", child)).toBe(false);
-    expect(fits("has:sub-issues", item({ subIssues: { total: 2 } }))).toBe(true);
+    expect(fits("has:Sub-Issues", item({ subIssues: { total: 2 } }))).toBe(true);
+    expect(fits("has:sub-issues", child)).toBe(false);
   });
 
   it("matches repos and people, with @me as the viewer", () => {
@@ -174,5 +182,7 @@ describe("suggestFilter", () => {
     expect(suggestFilter("(label:x|B", ["bug", "x"])).toEqual(["(label:x|bug"]);
     expect(suggestFilter("is:ci", [])).toEqual(["is:ci:failed", "is:ci:running"]);
     expect(suggestFilter("repo:", [])).toEqual([]);
+    expect(suggestFilter("constructor:", [])).toEqual([]);
+    expect(suggestFilter("has:", [])).toEqual(["has:parent-issue", "has:sub-issues"]);
   });
 });

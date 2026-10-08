@@ -1,4 +1,5 @@
-import type { PullStatusLabel, SortBy, SortDir, StatusLabel } from "./schema";
+import type { SortBy, SortDir } from "./schema";
+import type { PullStatusLabel, StatusLabel } from "./status";
 
 export type IssueState = "OPEN" | "CLOSED";
 export type IssueKind = "issue" | "pr";

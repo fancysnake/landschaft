@@ -1,17 +1,15 @@
-import { askedLabels, type FilterNode, matchesFilter, parseFilter } from "../filter";
+import type { StatusLabel } from "../status";
+
+import { askedLabels, type FilterNode, labelKey, matchesFilter, parseFilter } from "../filter";
 import {
   AXIS_PRECEDENCE,
-  type Column,
   type Dashboard,
   type Filters,
-  isCatchAll,
   ME,
   type Precedence,
   selectedRepos,
   type SortBy,
-  type StatusLabel,
   type SortDir,
-  type Swimlane,
 } from "../schema";
 import {
   type Board,
@@ -23,32 +21,37 @@ import {
   type IssueRef,
 } from "../types";
 
+/** A swimlane or column with its filter parsed; a null `node` is the catch-all. */
 export interface Group {
   id: string;
-  filter: string;
+  node: FilterNode | null;
 }
+
+/** `groups` with their filters parsed. */
+export const compile = <T extends { id: string; filter: string }>(groups: T[]): (T & Group)[] =>
+  groups.map((group) => ({ ...group, node: parseFilter(group.filter) }));
 
 /**
  * The `first` (or `last`) group in the list whose filter `hit` accepts; otherwise the
- * catch-all (empty filter), wherever it sits in the list; otherwise null.
+ * catch-all, wherever it sits in the list; otherwise null.
  */
 export function placeIn<T extends Group>(
   groups: T[],
-  hit: (group: T) => boolean,
+  hit: (node: FilterNode) => boolean,
   precedence: Precedence = "first",
 ): T | null {
-  const matched = (group: T) => !isCatchAll(group) && hit(group);
+  const matched = (group: T) => group.node !== null && hit(group.node);
   const found = precedence === "first" ? groups.find(matched) : groups.findLast(matched);
-  return found ?? groups.find(isCatchAll) ?? null;
+  return found ?? groups.find((group) => group.node === null) ?? null;
 }
 
 /** The lane and column an item lands in, each picked by its axis's `AXIS_PRECEDENCE`. */
-export function placeCard(
-  dashboard: Pick<Dashboard, "swimlanes" | "columns">,
-  hit: (group: Group) => boolean,
-): { lane: Swimlane; column: Column } | null {
-  const lane = placeIn(dashboard.swimlanes, hit, AXIS_PRECEDENCE.swimlanes);
-  const column = placeIn(dashboard.columns, hit, AXIS_PRECEDENCE.columns);
+export function placeCard<L extends Group, C extends Group>(
+  axes: { swimlanes: L[]; columns: C[] },
+  hit: (node: FilterNode) => boolean,
+): { lane: L; column: C } | null {
+  const lane = placeIn(axes.swimlanes, hit, AXIS_PRECEDENCE.swimlanes);
+  const column = placeIn(axes.columns, hit, AXIS_PRECEDENCE.columns);
   return lane && column ? { lane, column } : null;
 }
 
@@ -97,11 +100,11 @@ function relatedTo(epicKey: string, byKey: Map<string, Issue>): Set<string> {
 function issueFilter(filters: Filters, byKey: Map<string, Issue>): (issue: Issue) => boolean {
   const query = filters.q?.trim().toLowerCase();
   const related = filters.epic ? relatedTo(filters.epic, byKey) : null;
-  const wantedLabel = filters.label?.toLowerCase();
+  const wantedLabel = filters.label && labelKey(filters.label);
   return (issue) =>
     (!query || `${issue.number} ${issue.title}`.toLowerCase().includes(query)) &&
     (!filters.assignee || issue.assignees.some((a) => a.login === filters.assignee)) &&
-    (!wantedLabel || issue.labels.some((l) => l.name.toLowerCase() === wantedLabel)) &&
+    (!wantedLabel || issue.labels.some((l) => labelKey(l.name) === wantedLabel)) &&
     (!related || related.has(keyOf(issue)));
 }
 
@@ -158,17 +161,14 @@ export function buildBoard(
   const blocking = new Set(
     issues.filter((issue) => issue.state === "OPEN").flatMap((issue) => issue.blockedBy.map(keyOf)),
   );
-  const groups = [...dashboard.swimlanes, ...dashboard.columns];
-  const parsed = new Map<string, FilterNode | null>(
-    groups.map((group) => [group.filter, parseFilter(group.filter)]),
-  );
-  const epicLabel = dashboard.epicLabel?.toLowerCase();
-  // Lower-cased, like every label comparison here.
+  const axes = { swimlanes: compile(dashboard.swimlanes), columns: compile(dashboard.columns) };
+  const epicLabel = dashboard.epicLabel && labelKey(dashboard.epicLabel);
+  // By `labelKey`, like every label comparison here.
   const structural = new Set<string>([
-    ...[...parsed.values()].flatMap(askedLabels),
+    ...[...axes.swimlanes, ...axes.columns].flatMap((group) => askedLabels(group.node)),
     ...(epicLabel ? [epicLabel] : []),
   ]);
-  const shown = (label: { name: string }) => !structural.has(label.name.toLowerCase());
+  const shown = (label: { name: string }) => !structural.has(labelKey(label.name));
   const sort = { by: filters.sort ?? dashboard.sort.by, dir: filters.dir ?? dashboard.sort.dir };
 
   const board: Board = {
@@ -188,21 +188,22 @@ export function buildBoard(
   }
 
   const assignees = new Set<string>();
-  /** First spelling seen of each label, by its lower-cased name. */
+  /** First spelling seen of each label, by its `labelKey`. */
   const labels = new Map<string, string>();
   const epicIssues: Issue[] = [];
 
   for (const issue of open) {
     for (const assignee of issue.assignees) assignees.add(assignee.login);
     for (const label of issue.labels.filter(shown)) {
-      if (!labels.has(label.name.toLowerCase())) labels.set(label.name.toLowerCase(), label.name);
+      const key = labelKey(label.name);
+      if (!labels.has(key)) labels.set(key, label.name);
     }
     if (!repos.has(issue.repo)) continue;
 
     const isEpic =
       issue.kind === "issue" &&
       epicLabel !== undefined &&
-      issue.labels.some((label) => label.name.toLowerCase() === epicLabel);
+      issue.labels.some((label) => labelKey(label.name) === epicLabel);
     if (isEpic) epicIssues.push(issue);
 
     if (!wanted(issue)) continue;
@@ -210,9 +211,7 @@ export function buildBoard(
     const statuses = statusesFor(issue);
     const blocked = isBlocked(issue, byKey);
     const item = { ...issue, statuses, blocked, blocking: blocking.has(keyOf(issue)) };
-    const placed = placeCard(dashboard, (group) =>
-      matchesFilter(parsed.get(group.filter) ?? null, item, viewer),
-    );
+    const placed = placeCard(axes, (node) => matchesFilter(node, item, viewer));
     if (!placed) {
       board.unplaced += 1;
       continue;

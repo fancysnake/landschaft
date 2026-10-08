@@ -139,6 +139,10 @@ describe("config schema rules", () => {
     expect(lane({ labels: ["a", "b"], match: "all", kind: "issue" })?.filter).toBe(
       "is:issue label:a label:b",
     );
+    expect(lane({ labels: ["x OR y"], match: "all", kind: "pr" })?.filter).toBe(
+      'is:pr label:"x OR y"',
+    );
+    expect(lane({ labels: ["x OR y"], kind: "pr" })?.filter).toBe('is:pr label:"x OR y"');
     expect(lane({ kind: "pr" })?.filter).toBe("is:pr");
     expect(lane({ labels: [], match: "any", kind: "any" })?.filter).toBe("");
     expect(lane({ filter: "label:x", labels: ["y"] })?.filter).toBe("label:x");

@@ -1,5 +1,6 @@
-import type { StatusLabel } from "./schema";
 import type { IssueKind, IssueRef } from "./types";
+
+import { STATUS_LABEL_NAMES, type StatusLabel } from "./status";
 
 /**
  * Filter expressions for swimlanes and columns, in GitHub search syntax: `key:value` terms,
@@ -12,45 +13,13 @@ export type FilterNode =
   | { type: "not"; node: FilterNode }
   | { type: "and" | "or"; nodes: FilterNode[] };
 
-export const IS_VALUES = [
-  "issue",
-  "pr",
-  "conflicting",
-  "ci:failed",
-  "ci:running",
-  "unanswered",
-  "has-pr",
-  "blocked",
-  "blocking",
-] as const;
-export const HAS_VALUES = ["parent-issue", "sub-issues"] as const;
-const LOGIN = /^(@me|[a-z\d](?:[a-z\d_-]*[a-z\d])?(\[bot\])?)$/i;
-const REPO = /^[\w.-]+\/[\w.-]+$/;
-const ISSUE_REF = /^[\w.-]+\/[\w.-]+#\d+$/;
+/** A GitHub login, or `@me`. */
+export const LOGIN = /^(@me|[a-z\d](?:[a-z\d_-]*[a-z\d])?(\[bot\])?)$/i;
+export const REPO = /^[\w.-]+\/[\w.-]+$/;
+export const ISSUE_REF = /^[\w.-]+\/[\w.-]+#\d+$/;
 
-/** Each key with the check its values must pass, or null for any value. */
-const KEYS = {
-  label: null,
-  is: (value: string) => (IS_VALUES as readonly string[]).includes(value),
-  has: (value: string) => (HAS_VALUES as readonly string[]).includes(value),
-  "parent-issue": (value: string) => ISSUE_REF.test(value),
-  repo: (value: string) => REPO.test(value),
-  author: (value: string) => LOGIN.test(value),
-  assignee: (value: string) => LOGIN.test(value),
-  user: (value: string) => LOGIN.test(value),
-} as const;
-export type FilterKey = keyof typeof KEYS;
-export const FILTER_KEYS = Object.keys(KEYS) as FilterKey[];
-
-const EXPECTED: Partial<Record<FilterKey, string>> = {
-  is: IS_VALUES.join(", "),
-  has: HAS_VALUES.join(", "),
-  "parent-issue": "owner/repo#number",
-  repo: "owner/repo",
-  author: "a GitHub login or @me",
-  assignee: "a GitHub login or @me",
-  user: "a GitHub login or @me",
-};
+/** A label name as every comparison sees it: labels match whatever their case. */
+export const labelKey = (name: string) => name.toLowerCase();
 
 export class FilterError extends Error {
   constructor(
@@ -106,28 +75,26 @@ export function parseFilter(text: string): FilterNode | null {
       while (!isBreak(text[pos])) pos += 1;
       throw new FilterError(`expected key:value, got "${text.slice(start, pos)}"`, start);
     }
-    if (!(key in KEYS)) {
+    const spec = specOf(key);
+    if (!spec) {
       throw new FilterError(
         `unknown key "${key}"; expected one of ${FILTER_KEYS.join(", ")}`,
         start,
       );
     }
-    const filterKey = key as FilterKey;
     pos += 1;
     const values: string[] = [];
     for (;;) {
       const at = pos;
       const raw = value();
-      const normal = filterKey === "is" || filterKey === "has" ? raw.toLowerCase() : raw;
-      const check = KEYS[filterKey];
-      if (check && !check(normal)) {
-        throw new FilterError(`${key}:${raw} is not valid; expected ${EXPECTED[filterKey]}`, at);
+      if (spec.check && !spec.check.test(raw)) {
+        throw new FilterError(`${key}:${raw} is not valid; expected ${spec.check.expected}`, at);
       }
-      values.push(normal);
+      values.push(raw);
       if (text[pos] !== "|") break;
       pos += 1;
     }
-    return { type: "term", key: filterKey, values };
+    return { type: "term", key: key as FilterKey, values };
   };
 
   const unary = (): FilterNode => {
@@ -197,11 +164,11 @@ export function quoteValue(value: string): string {
   return /[\s()|"\\]/.test(value) ? `"${value.replaceAll(/["\\]/g, "\\$&")}"` : value;
 }
 
-/** Labels a filter asks for outside a `-`, lower-cased. */
+/** Labels a filter asks for outside a `-`, as `labelKey`s. */
 export function askedLabels(node: FilterNode | null): string[] {
   if (!node || node.type === "not") return [];
   if (node.type === "term") {
-    return node.key === "label" ? node.values.map((value) => value.toLowerCase()) : [];
+    return node.key === "label" ? node.values.map(labelKey) : [];
   }
   return node.nodes.flatMap(askedLabels);
 }
@@ -230,32 +197,81 @@ function isLogin(value: string, login: string | null, viewer: string | null): bo
   return wanted !== null && login !== null && same(wanted, login);
 }
 
-function holds(key: FilterKey, value: string, item: FilterItem, viewer: string | null): boolean {
-  switch (key) {
-    case "label":
-      return item.labels.some((label) => same(label.name, value));
-    case "is":
-      if (value === "issue" || value === "pr") return item.kind === value;
-      if (value === "blocked") return item.blocked;
-      if (value === "blocking") return item.blocking;
-      return item.statuses.includes(`is:${value}` as StatusLabel);
-    case "has":
-      return value === "parent-issue" ? item.parent !== null : item.subIssues.total > 0;
-    case "parent-issue":
-      return item.parent !== null && same(`${item.parent.repo}#${item.parent.number}`, value);
-    case "repo":
-      return same(item.repo, value);
-    case "author":
-      return isLogin(value, item.author, viewer);
-    case "assignee":
-      return item.assignees.some(({ login }) => isLogin(value, login, viewer));
-    case "user":
-      return (
-        isLogin(value, item.author, viewer) ||
-        item.assignees.some(({ login }) => isLogin(value, login, viewer))
-      );
-  }
+interface KeySpec {
+  /** What every value must pass, and how to describe it; absent when any value goes. */
+  check?: { test: (value: string) => boolean; expected: string };
+  /** Values to complete after the key. */
+  suggest?: readonly string[];
+  /** Whether `item` has `value` for this key; `viewer` is who `@me` stands for. */
+  holds: (value: string, item: FilterItem, viewer: string | null) => boolean;
 }
+
+/** A key over a fixed set of values, in any case, each tested by its own predicate. */
+function oneOf(tests: Record<string, (item: FilterItem) => boolean>): KeySpec {
+  const values = Object.keys(tests);
+  return {
+    check: {
+      test: (value) => Object.hasOwn(tests, value.toLowerCase()),
+      expected: values.join(", "),
+    },
+    suggest: values,
+    holds: (value, item) => tests[value.toLowerCase()]!(item),
+  };
+}
+
+const matching = (pattern: RegExp, expected: string) => ({
+  check: { test: (value: string) => pattern.test(value), expected },
+});
+const person = { ...matching(LOGIN, "a GitHub login or @me"), suggest: ["@me"] };
+
+const KEYS = {
+  label: {
+    holds: (value, item) => item.labels.some((label) => labelKey(label.name) === labelKey(value)),
+  },
+  is: oneOf({
+    issue: (item) => item.kind === "issue",
+    pr: (item) => item.kind === "pr",
+    ...Object.fromEntries(
+      STATUS_LABEL_NAMES.map((status) => [
+        status.replace(/^is:/, ""),
+        (item: FilterItem) => item.statuses.includes(status),
+      ]),
+    ),
+    blocked: (item) => item.blocked,
+    blocking: (item) => item.blocking,
+  }),
+  has: oneOf({
+    "parent-issue": (item) => item.parent !== null,
+    "sub-issues": (item) => item.subIssues.total > 0,
+  }),
+  "parent-issue": {
+    ...matching(ISSUE_REF, "owner/repo#number"),
+    holds: (value, item) =>
+      item.parent !== null && same(`${item.parent.repo}#${item.parent.number}`, value),
+  },
+  repo: {
+    ...matching(REPO, "owner/repo"),
+    holds: (value, item) => same(item.repo, value),
+  },
+  author: { ...person, holds: (value, item, viewer) => isLogin(value, item.author, viewer) },
+  assignee: {
+    ...person,
+    holds: (value, item, viewer) =>
+      item.assignees.some(({ login }) => isLogin(value, login, viewer)),
+  },
+  user: {
+    ...person,
+    holds: (value, item, viewer) =>
+      isLogin(value, item.author, viewer) ||
+      item.assignees.some(({ login }) => isLogin(value, login, viewer)),
+  },
+} satisfies Record<string, KeySpec>;
+export type FilterKey = keyof typeof KEYS;
+export const FILTER_KEYS = Object.keys(KEYS) as FilterKey[];
+
+/** The spec of `key`, or undefined for an unknown key, inherited `Object` members included. */
+const specOf = (key: string): KeySpec | undefined =>
+  Object.hasOwn(KEYS, key) ? KEYS[key as FilterKey] : undefined;
 
 /** Whether `item` satisfies `node`; an empty filter takes everything. */
 export function matchesFilter(
@@ -266,7 +282,7 @@ export function matchesFilter(
   if (!node) return true;
   switch (node.type) {
     case "term":
-      return node.values.some((value) => holds(node.key, value, item, viewer));
+      return node.values.some((value) => KEYS[node.key].holds(value, item, viewer));
     case "not":
       return !matchesFilter(node.node, item, viewer);
     case "and":
@@ -288,15 +304,12 @@ export function suggestFilter(text: string, labels: string[]): string[] {
   const key = colon < 0 ? null : word.slice(0, colon);
   const partial = key === null ? word : word.slice(Math.max(colon, word.lastIndexOf("|")) + 1);
   const head = text.slice(0, text.length - partial.length);
-  const options: Record<string, readonly string[]> = {
-    label: labels.map(quoteValue),
-    is: IS_VALUES,
-    has: HAS_VALUES,
-    author: ["@me"],
-    assignee: ["@me"],
-    user: ["@me"],
-  };
-  const candidates = key === null ? FILTER_KEYS.map((name) => `${name}:`) : (options[key] ?? []);
+  const candidates =
+    key === null
+      ? FILTER_KEYS.map((name) => `${name}:`)
+      : key === "label"
+        ? labels.map(quoteValue)
+        : (specOf(key)?.suggest ?? []);
   return candidates
     .filter((option) => option !== partial && same(option.slice(0, partial.length), partial))
     .map((option) => head + option);

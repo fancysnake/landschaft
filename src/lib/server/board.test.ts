@@ -1,50 +1,52 @@
 import { describe, expect, it } from "vitest";
 
+import { askedLabels, type FilterNode } from "../filter";
 import { cellKey } from "../types";
 import { DASHBOARD, label, makeIssue, REPO } from "./__fixtures__/issues";
-import { buildBoard, isBlocked, placeCard, placeIn, resolveUsers } from "./board";
+import { buildBoard, compile, isBlocked, placeCard, placeIn, resolveUsers } from "./board";
 
 const cell = (laneId: string, colId: string) => cellKey(laneId, colId);
 const TWO_REPOS = { ...DASHBOARD, repos: [REPO, "acme/other"] };
+const AXES = { swimlanes: compile(DASHBOARD.swimlanes), columns: compile(DASHBOARD.columns) };
 const numbers = (board: ReturnType<typeof buildBoard>) =>
   board.cells[cell("rest", "todo")]?.map((c) => c.number);
 
-/** A group hits when its filter names one of `hits`. */
+/** A filter hits when it asks for one of the labels `hits`. */
 const hitting =
   (...hits: string[]) =>
-  (group: { filter: string }) =>
-    hits.includes(group.filter);
+  (node: FilterNode) =>
+    askedLabels(node).some((name) => hits.includes(name));
 
 describe("placeIn", () => {
   it("takes the first group that matches", () => {
-    const groups = [
-      { id: "a", filter: "x" },
-      { id: "b", filter: "y" },
-    ];
+    const groups = compile([
+      { id: "a", filter: "label:x" },
+      { id: "b", filter: "label:y" },
+    ]);
     expect(placeIn(groups, hitting("y", "x"))?.id).toBe("a");
     expect(placeIn(groups, hitting("y"))?.id).toBe("b");
   });
 
   it("falls back to the catch-all wherever it is listed", () => {
-    const groups = [
+    const groups = compile([
       { id: "all", filter: "" },
-      { id: "a", filter: "x" },
-    ];
+      { id: "a", filter: "label:x" },
+    ]);
     expect(placeIn(groups, hitting("x"))?.id).toBe("a");
     expect(placeIn(groups, () => false)?.id).toBe("all");
     expect(placeIn(groups, () => true)?.id).toBe("a");
   });
 
   it("returns null without a match and without a catch-all", () => {
-    expect(placeIn([{ id: "a", filter: "x" }], () => false)).toBeNull();
+    expect(placeIn(compile([{ id: "a", filter: "label:x" }]), () => false)).toBeNull();
   });
 
   it("takes the last match when asked, the catch-all still only as a fallback", () => {
-    const groups = [
-      { id: "a", filter: "x" },
+    const groups = compile([
+      { id: "a", filter: "label:x" },
       { id: "rest", filter: "" },
-      { id: "b", filter: "y" },
-    ];
+      { id: "b", filter: "label:y" },
+    ]);
     expect(placeIn(groups, hitting("x", "y"), "last")?.id).toBe("b");
     expect(placeIn(groups, hitting("x"), "last")?.id).toBe("a");
     expect(placeIn(groups, () => false, "last")?.id).toBe("rest");
@@ -53,21 +55,16 @@ describe("placeIn", () => {
 
 describe("placeCard", () => {
   it("puts a card matching two columns in the later one, two lanes in the earlier", () => {
-    const hit = hitting(
-      "label:prio:high",
-      "label:prio:low",
-      "label:phase:doing",
-      "label:phase:done|phase:shipped",
-    );
-    expect(placeCard(DASHBOARD, hit)).toMatchObject({
+    const hit = hitting("prio:high", "prio:low", "phase:doing", "phase:done");
+    expect(placeCard(AXES, hit)).toMatchObject({
       lane: { id: "high" },
       column: { id: "done" },
     });
   });
 
   it("returns null when no column matches and none is the catch-all", () => {
-    const columns = DASHBOARD.columns.filter((column) => column.filter !== "");
-    expect(placeCard({ ...DASHBOARD, columns }, () => false)).toBeNull();
+    const columns = AXES.columns.filter((column) => column.node !== null);
+    expect(placeCard({ ...AXES, columns }, () => false)).toBeNull();
   });
 });
 

@@ -1,4 +1,4 @@
-import type { StatusLabel } from "../../lib/schema";
+import type { StatusLabel } from "../../lib/status";
 import type { Card } from "../../lib/types";
 
 import { labelStyle, repoShortName } from "../../lib/client/labels";

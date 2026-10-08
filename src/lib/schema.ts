@@ -1,38 +1,15 @@
 import { z } from "zod";
 
-import { filterError, quoteValue } from "./filter";
+import { filterError, ISSUE_REF, LOGIN, quoteValue, REPO } from "./filter";
+import { isStatusLabel } from "./status";
 
 const id = z
   .string()
   .min(1)
   .max(32)
   .regex(/^[a-z0-9_-]+$/i, "letters, digits, - and _ only");
-export const repoName = z.string().regex(/^[\w.-]+\/[\w.-]+$/, "expected owner/repo");
-const issueRef = z.string().regex(/^[\w.-]+\/[\w.-]+#\d+$/, "expected owner/repo#number");
-
-/** PR states the sync reads from GitHub for every open PR. */
-export const PULL_STATUS_NAMES = [
-  "is:conflicting",
-  "is:ci:failed",
-  "is:ci:running",
-  "is:unanswered",
-] as const;
-export type PullStatusLabel = (typeof PULL_STATUS_NAMES)[number];
-
-export function isPullStatusLabel(name: string): name is PullStatusLabel {
-  return (PULL_STATUS_NAMES as readonly string[]).includes(name);
-}
-
-/**
- * States derived from GitHub that filters match with `is:` terms. `is:has-pr` holds for an
- * issue an open PR closes.
- */
-export const STATUS_LABEL_NAMES = [...PULL_STATUS_NAMES, "is:has-pr"] as const;
-export type StatusLabel = (typeof STATUS_LABEL_NAMES)[number];
-
-export function isStatusLabel(name: string): name is StatusLabel {
-  return (STATUS_LABEL_NAMES as readonly string[]).includes(name);
-}
+export const repoName = z.string().regex(REPO, "expected owner/repo");
+const issueRef = z.string().regex(ISSUE_REF, "expected owner/repo#number");
 
 /** A filter expression (see `filter.ts`); empty is the catch-all. */
 const filterText = z.string().superRefine((text, ctx) => {
@@ -41,23 +18,25 @@ const filterText = z.string().superRefine((text, ctx) => {
 });
 
 /** Pre-filter fields: a label list, matched by any or all of them, and an item kind. */
-const legacyGroup = {
+const LegacyGroupSchema = z.object({
   labels: z.array(z.string().min(1)).optional(),
   match: z.enum(["any", "all"]).optional(),
   kind: z.enum(["any", "issue", "pr"]).optional(),
-};
-type LegacyGroup = { [K in keyof typeof legacyGroup]?: z.infer<(typeof legacyGroup)[K]> };
+});
+type LegacyGroup = z.infer<typeof LegacyGroupSchema>;
 
 /** The filter a legacy group stands for: any → `label:a|b`, all → `label:a label:b`. */
-export function legacyFilter({ labels = [], match = "any", kind = "any" }: LegacyGroup): string {
+function legacyFilter({ labels = [], match = "any", kind = "any" }: LegacyGroup): string {
   const plain = labels.filter((name) => !isStatusLabel(name)).map(quoteValue);
   const statuses = labels.filter(isStatusLabel);
-  const body =
+  const parts =
     match === "all"
-      ? [...plain.map((name) => `label:${name}`), ...statuses].join(" ")
-      : [...(plain.length > 0 ? [`label:${plain.join("|")}`] : []), ...statuses].join(" OR ");
+      ? [...plain.map((name) => `label:${name}`), ...statuses]
+      : [...(plain.length > 0 ? [`label:${plain.join("|")}`] : []), ...statuses];
+  const body = parts.join(match === "all" ? " " : " OR ");
   if (kind === "any") return body;
-  return [`is:${kind}`, body.includes(" OR ") ? `(${body})` : body].filter(Boolean).join(" ");
+  const ored = match === "any" && parts.length > 1;
+  return [`is:${kind}`, ored ? `(${body})` : body].filter(Boolean).join(" ");
 }
 
 /** Old configs carry `labels`/`match`/`kind`; they turn into `filter` unless one is set. */
@@ -76,13 +55,18 @@ export const SwimlaneSchema = z
     id,
     name: z.string().min(1),
     filter: filterText.optional(),
-    ...legacyGroup,
+    ...LegacyGroupSchema.shape,
     hideBlocked: z.boolean().default(false),
   })
   .transform(migrateGroup);
 
 export const ColumnSchema = z
-  .object({ id, name: z.string().min(1), filter: filterText.optional(), ...legacyGroup })
+  .object({
+    id,
+    name: z.string().min(1),
+    filter: filterText.optional(),
+    ...LegacyGroupSchema.shape,
+  })
   .transform(migrateGroup);
 
 export const SortBySchema = z.enum(["created", "updated"]);
@@ -114,9 +98,7 @@ export type Precedence = (typeof AXIS_PRECEDENCE)[Axis];
 export const ME = "@me";
 
 /** A GitHub login, or `@me`. */
-export const userName = z
-  .string()
-  .regex(/^(@me|[a-z\d](?:[a-z\d_-]*[a-z\d])?(\[bot\])?)$/i, "expected a GitHub login or @me");
+export const userName = z.string().regex(LOGIN, "expected a GitHub login or @me");
 
 export const DashboardSchema = z
   .object({
