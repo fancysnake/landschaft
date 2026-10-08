@@ -1,14 +1,11 @@
+import { askedLabels, type FilterNode, matchesFilter, parseFilter } from "../filter";
 import {
   AXIS_PRECEDENCE,
   type Column,
   type Dashboard,
   type Filters,
-  fitsKind,
   isCatchAll,
-  isStatusLabel,
   ME,
-  type KindFilter,
-  type Match,
   type Precedence,
   selectedRepos,
   type SortBy,
@@ -23,67 +20,35 @@ import {
   type Epic,
   type Issue,
   issueKey,
-  type IssueKind,
   type IssueRef,
 } from "../types";
 
 export interface Group {
   id: string;
-  labels: string[];
-  /** Defaults to "any". */
-  match?: Match;
-  /** Defaults to "any"; what tells a kind-only group from the catch-all. */
-  kind?: KindFilter;
+  filter: string;
 }
 
 /**
- * The item's label names plus the status labels that hold for it; a real GitHub label
- * named like a status does not count as one.
- */
-export function matchLabels(
-  issue: Pick<Issue, "labels"> & { statuses: StatusLabel[] },
-): Set<string> {
-  const names = issue.labels.map((label) => label.name).filter((name) => !isStatusLabel(name));
-  return new Set([...names, ...issue.statuses]);
-}
-
-function matches(group: Group, labelNames: Set<string>): boolean {
-  // A kind-only group (no labels, a kind set) takes every item, in list order.
-  if (group.labels.length === 0) return (group.kind ?? "any") !== "any";
-  return group.match === "all"
-    ? group.labels.every((label) => labelNames.has(label))
-    : group.labels.some((label) => labelNames.has(label));
-}
-
-/**
- * The `first` (or `last`) group in the list whose labels the issue satisfies (any or all of
- * them, per `match`; a kind-only group needs none); otherwise the catch-all (no labels, any
- * kind), wherever it sits in the list; otherwise null. Groups of the wrong kind are the
- * caller's to drop.
+ * The `first` (or `last`) group in the list whose filter `hit` accepts; otherwise the
+ * catch-all (empty filter), wherever it sits in the list; otherwise null.
  */
 export function placeIn<T extends Group>(
   groups: T[],
-  labelNames: Set<string>,
+  hit: (group: T) => boolean,
   precedence: Precedence = "first",
 ): T | null {
-  const hit = (group: T) => matches(group, labelNames);
-  const labeled = precedence === "first" ? groups.find(hit) : groups.findLast(hit);
-  if (labeled) return labeled;
-  return groups.find(isCatchAll) ?? null;
+  const matched = (group: T) => !isCatchAll(group) && hit(group);
+  const found = precedence === "first" ? groups.find(matched) : groups.findLast(matched);
+  return found ?? groups.find(isCatchAll) ?? null;
 }
 
-/**
- * The lane and column (among those taking `kind`) an item carrying `labelNames` lands in,
- * each picked by its axis's `AXIS_PRECEDENCE`.
- */
+/** The lane and column an item lands in, each picked by its axis's `AXIS_PRECEDENCE`. */
 export function placeCard(
   dashboard: Pick<Dashboard, "swimlanes" | "columns">,
-  kind: IssueKind,
-  labelNames: Set<string>,
+  hit: (group: Group) => boolean,
 ): { lane: Swimlane; column: Column } | null {
-  const takes = (group: { kind: KindFilter }) => fitsKind(group.kind, kind);
-  const lane = placeIn(dashboard.swimlanes.filter(takes), labelNames, AXIS_PRECEDENCE.swimlanes);
-  const column = placeIn(dashboard.columns.filter(takes), labelNames, AXIS_PRECEDENCE.columns);
+  const lane = placeIn(dashboard.swimlanes, hit, AXIS_PRECEDENCE.swimlanes);
+  const column = placeIn(dashboard.columns, hit, AXIS_PRECEDENCE.columns);
   return lane && column ? { lane, column } : null;
 }
 
@@ -132,10 +97,11 @@ function relatedTo(epicKey: string, byKey: Map<string, Issue>): Set<string> {
 function issueFilter(filters: Filters, byKey: Map<string, Issue>): (issue: Issue) => boolean {
   const query = filters.q?.trim().toLowerCase();
   const related = filters.epic ? relatedTo(filters.epic, byKey) : null;
+  const wantedLabel = filters.label?.toLowerCase();
   return (issue) =>
     (!query || `${issue.number} ${issue.title}`.toLowerCase().includes(query)) &&
     (!filters.assignee || issue.assignees.some((a) => a.login === filters.assignee)) &&
-    (!filters.label || issue.labels.some((l) => l.name === filters.label)) &&
+    (!wantedLabel || issue.labels.some((l) => l.name.toLowerCase() === wantedLabel)) &&
     (!related || related.has(keyOf(issue)));
 }
 
@@ -170,7 +136,8 @@ function byUsers(dashboard: Dashboard, users: string[]): (issue: Issue) => boole
 /**
  * Lays the open issues out on the dashboard's grid. `users` is the dashboard's users through
  * `resolveUsers`; when the dashboard lists any, only issues one of them authored or is
- * assigned to take part. `starred` epic keys lead the epic strip.
+ * assigned to take part. `starred` epic keys lead the epic strip. `viewer` is what `@me`
+ * in a filter stands for.
  */
 export function buildBoard(
   issues: Issue[],
@@ -178,6 +145,7 @@ export function buildBoard(
   filters: Filters = {},
   users: string[] = [],
   starred: ReadonlySet<string> = new Set(),
+  viewer: string | null = null,
 ): Board {
   const byKey = new Map(issues.map((issue) => [issueKey(issue.repo, issue.number), issue]));
   const listed = byUsers(dashboard, users);
@@ -186,11 +154,21 @@ export function buildBoard(
   const open = issues.filter((issue) => issue.state === "OPEN" && listed(issue));
   // Any open PR in `issues` counts, whoever's it is, so not just `open`.
   const statusesFor = statusesOf(issues);
+  // Keys of the items an open issue waits on; any issue in `issues` counts, not just `open`.
+  const blocking = new Set(
+    issues.filter((issue) => issue.state === "OPEN").flatMap((issue) => issue.blockedBy.map(keyOf)),
+  );
+  const groups = [...dashboard.swimlanes, ...dashboard.columns];
+  const parsed = new Map<string, FilterNode | null>(
+    groups.map((group) => [group.filter, parseFilter(group.filter)]),
+  );
+  const epicLabel = dashboard.epicLabel?.toLowerCase();
+  // Lower-cased, like every label comparison here.
   const structural = new Set<string>([
-    ...dashboard.swimlanes.flatMap((lane) => lane.labels),
-    ...dashboard.columns.flatMap((column) => column.labels),
-    ...(dashboard.epicLabel ? [dashboard.epicLabel] : []),
+    ...[...parsed.values()].flatMap(askedLabels),
+    ...(epicLabel ? [epicLabel] : []),
   ]);
+  const shown = (label: { name: string }) => !structural.has(label.name.toLowerCase());
   const sort = { by: filters.sort ?? dashboard.sort.by, dir: filters.dir ?? dashboard.sort.dir };
 
   const board: Board = {
@@ -210,30 +188,36 @@ export function buildBoard(
   }
 
   const assignees = new Set<string>();
-  const labels = new Set<string>();
+  /** First spelling seen of each label, by its lower-cased name. */
+  const labels = new Map<string, string>();
   const epicIssues: Issue[] = [];
 
   for (const issue of open) {
     for (const assignee of issue.assignees) assignees.add(assignee.login);
-    for (const label of issue.labels) if (!structural.has(label.name)) labels.add(label.name);
+    for (const label of issue.labels.filter(shown)) {
+      if (!labels.has(label.name.toLowerCase())) labels.set(label.name.toLowerCase(), label.name);
+    }
     if (!repos.has(issue.repo)) continue;
 
     const isEpic =
       issue.kind === "issue" &&
-      dashboard.epicLabel !== undefined &&
-      issue.labels.some((label) => label.name === dashboard.epicLabel);
+      epicLabel !== undefined &&
+      issue.labels.some((label) => label.name.toLowerCase() === epicLabel);
     if (isEpic) epicIssues.push(issue);
 
     if (!wanted(issue)) continue;
 
     const statuses = statusesFor(issue);
-    const placed = placeCard(dashboard, issue.kind, matchLabels({ ...issue, statuses }));
+    const blocked = isBlocked(issue, byKey);
+    const item = { ...issue, statuses, blocked, blocking: blocking.has(keyOf(issue)) };
+    const placed = placeCard(dashboard, (group) =>
+      matchesFilter(parsed.get(group.filter) ?? null, item, viewer),
+    );
     if (!placed) {
       board.unplaced += 1;
       continue;
     }
     const { lane, column } = placed;
-    const blocked = isBlocked(issue, byKey);
     if (lane.hideBlocked && blocked) {
       board.hiddenBlocked[lane.id] = (board.hiddenBlocked[lane.id] ?? 0) + 1;
       continue;
@@ -246,7 +230,7 @@ export function buildBoard(
       title: issue.title,
       url: issue.url,
       assignees: issue.assignees,
-      labels: issue.labels.filter((label) => !structural.has(label.name)),
+      labels: issue.labels.filter(shown),
       progress: issue.subIssues.total > 0 ? issue.subIssues : null,
       blocked,
       isEpic,
@@ -273,6 +257,6 @@ export function buildBoard(
       starred: isStarred(issue),
     }));
   board.assignees = [...assignees].toSorted();
-  board.labels = [...labels].toSorted();
+  board.labels = [...labels.values()].toSorted();
   return board;
 }

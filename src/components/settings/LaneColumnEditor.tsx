@@ -1,21 +1,14 @@
-import type { IssueKind, LabelDef } from "../../lib/types";
+import { useId } from "react";
 
-import {
-  AXIS_PRECEDENCE,
-  type Axis,
-  isCatchAll,
-  type KindFilter,
-  type Match,
-  STATUS_LABEL_NAMES,
-} from "../../lib/schema";
-import { LabelPicker } from "./LabelPicker";
+import type { LabelDef } from "../../lib/types";
+
+import { filterError, suggestFilter } from "../../lib/filter";
+import { AXIS_PRECEDENCE, type Axis, isCatchAll } from "../../lib/schema";
 
 interface Group {
   id: string;
   name: string;
-  labels: string[];
-  match: Match;
-  kind: KindFilter;
+  filter: string;
   hideBlocked?: boolean;
 }
 
@@ -24,37 +17,10 @@ interface Props<T extends Group> {
   items: T[];
   onChange(items: T[]): void;
   create(id: string): T;
+  /** Suggested after `label:`. */
   labels: LabelDef[];
   /** Sets the precedence shown; swimlanes also get the "hide blocked" toggle. */
   axis: Axis;
-}
-
-/**
- * The picker shows an entry's `kind` as an `is:issue` / `is:pr` chip, as on GitHub, and
- * offers the PR status labels (`is:conflicting`, ...), which stay in `labels`.
- */
-const CHIP_COLOR = "e5e5e5";
-const pickerOption = (name: string): LabelDef => ({
-  name,
-  color: CHIP_COLOR,
-  repo: "",
-  description: null,
-});
-const KIND_CHIPS = (["issue", "pr"] as const).map((kind) => pickerOption(`is:${kind}`));
-const STATUS_CHIPS = STATUS_LABEL_NAMES.map(pickerOption);
-const isKindChip = (name: string) => KIND_CHIPS.some((c) => c.name === name);
-
-function toChips(group: Group): string[] {
-  return group.kind === "any" ? group.labels : [`is:${group.kind}`, ...group.labels];
-}
-
-/** Picker chips back to labels and kind; the last kind chip picked wins; status chips stay labels. */
-function fromChips(value: string[]): Pick<Group, "labels" | "kind"> {
-  const chip = value.findLast(isKindChip);
-  return {
-    labels: value.filter((name) => !isKindChip(name)),
-    kind: chip ? (chip.slice("is:".length) as IssueKind) : "any",
-  };
 }
 
 function slug(name: string, taken: Set<string>): string {
@@ -88,20 +54,20 @@ export function LaneColumnEditor<T extends Group>({
     onChange(next);
   };
   const catchAlls = items.filter(isCatchAll).length;
-  const options = [...labels, ...KIND_CHIPS, ...STATUS_CHIPS];
+  const labelNames = [...new Set(labels.map((label) => label.name))];
 
   return (
     <section>
       <div className="mb-2 flex items-baseline justify-between">
         <h3 className="font-medium">{title}</h3>
         <span className="text-xs text-neutral-500">
-          {AXIS_PRECEDENCE[axis]} matching entry wins · any or all of its labels · is:issue / is:pr
-          · {STATUS_LABEL_NAMES.join(" / ")} · one catch-all (no labels)
+          {AXIS_PRECEDENCE[axis]} matching entry wins · GitHub search syntax · one catch-all (empty
+          filter)
         </span>
       </div>
       {catchAlls > 1 && (
         <p className="mb-2 text-xs text-red-700">
-          Only one {title.toLowerCase()} entry may be a catch-all (no labels).
+          Only one {title.toLowerCase()} entry may be a catch-all (empty filter).
         </p>
       )}
       <ol className="space-y-2">
@@ -127,28 +93,11 @@ export function LaneColumnEditor<T extends Group>({
                 </label>
               )}
             </div>
-            <div className="flex items-start gap-2">
-              {item.labels.length >= 2 && (
-                <select
-                  value={item.match}
-                  onChange={(event) =>
-                    replace(index, { ...item, match: event.target.value as Match })
-                  }
-                  title="Match any of the labels, or require all of them"
-                  className="rounded-md border border-neutral-300 bg-white px-1.5 py-1.5 text-xs"
-                >
-                  <option value="any">any of</option>
-                  <option value="all">all of</option>
-                </select>
-              )}
-              <div className="flex-1">
-                <LabelPicker
-                  value={toChips(item)}
-                  onChange={(value) => replace(index, { ...item, ...fromChips(value) })}
-                  options={options}
-                />
-              </div>
-            </div>
+            <FilterInput
+              value={item.filter}
+              onChange={(filter) => replace(index, { ...item, filter })}
+              labels={labelNames}
+            />
             <div className="flex gap-1">
               <button
                 type="button"
@@ -186,5 +135,40 @@ export function LaneColumnEditor<T extends Group>({
         + add
       </button>
     </section>
+  );
+}
+
+/** A filter expression with completions for its last term and the parse error below it. */
+function FilterInput({
+  value,
+  onChange,
+  labels,
+}: {
+  value: string;
+  onChange(value: string): void;
+  labels: string[];
+}) {
+  const listId = useId();
+  const error = filterError(value);
+  return (
+    <div>
+      <input
+        list={listId}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="empty = catch-all, e.g. label:bug -is:pr"
+        aria-invalid={error !== null}
+        spellCheck={false}
+        className={`w-full rounded-md border px-2 py-1 font-mono text-sm ${
+          error ? "border-red-400" : "border-neutral-300"
+        }`}
+      />
+      <datalist id={listId}>
+        {suggestFilter(value, labels).map((option) => (
+          <option key={option} value={option} />
+        ))}
+      </datalist>
+      {error && <p className="mt-0.5 text-xs text-red-700">{error}</p>}
+    </div>
   );
 }

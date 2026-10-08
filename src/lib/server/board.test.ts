@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import type { Swimlane } from "../schema";
-
 import { cellKey } from "../types";
 import { DASHBOARD, label, makeIssue, REPO } from "./__fixtures__/issues";
 import { buildBoard, isBlocked, placeCard, placeIn, resolveUsers } from "./board";
@@ -11,118 +9,65 @@ const TWO_REPOS = { ...DASHBOARD, repos: [REPO, "acme/other"] };
 const numbers = (board: ReturnType<typeof buildBoard>) =>
   board.cells[cell("rest", "todo")]?.map((c) => c.number);
 
+/** A group hits when its filter names one of `hits`. */
+const hitting =
+  (...hits: string[]) =>
+  (group: { filter: string }) =>
+    hits.includes(group.filter);
+
 describe("placeIn", () => {
-  it("takes the first labeled group that matches", () => {
+  it("takes the first group that matches", () => {
     const groups = [
-      { id: "a", labels: ["x"] },
-      { id: "b", labels: ["y", "z"] },
+      { id: "a", filter: "x" },
+      { id: "b", filter: "y" },
     ];
-    expect(placeIn(groups, new Set(["z", "x"]))?.id).toBe("a");
-    expect(placeIn(groups, new Set(["z"]))?.id).toBe("b");
+    expect(placeIn(groups, hitting("y", "x"))?.id).toBe("a");
+    expect(placeIn(groups, hitting("y"))?.id).toBe("b");
   });
 
   it("falls back to the catch-all wherever it is listed", () => {
     const groups = [
-      { id: "all", labels: [] },
-      { id: "a", labels: ["x"] },
+      { id: "all", filter: "" },
+      { id: "a", filter: "x" },
     ];
-    expect(placeIn(groups, new Set(["x"]))?.id).toBe("a");
-    expect(placeIn(groups, new Set(["nope"]))?.id).toBe("all");
+    expect(placeIn(groups, hitting("x"))?.id).toBe("a");
+    expect(placeIn(groups, () => false)?.id).toBe("all");
+    expect(placeIn(groups, () => true)?.id).toBe("a");
   });
 
   it("returns null without a match and without a catch-all", () => {
-    expect(placeIn([{ id: "a", labels: ["x"] }], new Set())).toBeNull();
-  });
-
-  it('requires every label for an "all" group and falls through otherwise', () => {
-    const groups = [
-      { id: "both", labels: ["x", "y"], match: "all" as const },
-      { id: "either", labels: ["x", "y"], match: "any" as const },
-      { id: "rest", labels: [] },
-    ];
-    expect(placeIn(groups, new Set(["x", "y", "z"]))?.id).toBe("both");
-    expect(placeIn(groups, new Set(["x"]))?.id).toBe("either");
-    expect(placeIn(groups, new Set(["z"]))?.id).toBe("rest");
-    expect(placeIn([groups[0]!], new Set(["y"]))).toBeNull();
-  });
-
-  it("matches a kind-only group in list order, not as the catch-all", () => {
-    const groups = [
-      { id: "bugs", labels: ["bug"] },
-      { id: "rest", labels: [] },
-      { id: "prs", labels: [], kind: "pr" as const },
-    ];
-    expect(placeIn(groups, new Set(["bug"]))?.id).toBe("bugs");
-    expect(placeIn(groups, new Set())?.id).toBe("prs");
-    expect(placeIn([groups[0]!, groups[1]!], new Set())?.id).toBe("rest");
+    expect(placeIn([{ id: "a", filter: "x" }], () => false)).toBeNull();
   });
 
   it("takes the last match when asked, the catch-all still only as a fallback", () => {
     const groups = [
-      { id: "a", labels: ["x"] },
-      { id: "rest", labels: [] },
-      { id: "b", labels: ["y"] },
+      { id: "a", filter: "x" },
+      { id: "rest", filter: "" },
+      { id: "b", filter: "y" },
     ];
-    expect(placeIn(groups, new Set(["x", "y"]), "last")?.id).toBe("b");
-    expect(placeIn(groups, new Set(["x"]), "last")?.id).toBe("a");
-    expect(placeIn(groups, new Set(), "last")?.id).toBe("rest");
+    expect(placeIn(groups, hitting("x", "y"), "last")?.id).toBe("b");
+    expect(placeIn(groups, hitting("x"), "last")?.id).toBe("a");
+    expect(placeIn(groups, () => false, "last")?.id).toBe("rest");
   });
 });
 
 describe("placeCard", () => {
-  const prs: Swimlane = {
-    id: "prs",
-    name: "PRs",
-    labels: [],
-    match: "any",
-    kind: "pr",
-    hideBlocked: false,
-  };
-  const dashboard = { ...DASHBOARD, swimlanes: [prs, ...DASHBOARD.swimlanes] };
-
-  it("lets a PR-only lane shadow the labeled lanes after it for PRs only", () => {
-    expect(placeCard(dashboard, "issue", new Set(["prio:high", "phase:doing"]))).toMatchObject({
+  it("puts a card matching two columns in the later one, two lanes in the earlier", () => {
+    const hit = hitting(
+      "label:prio:high",
+      "label:prio:low",
+      "label:phase:doing",
+      "label:phase:done|phase:shipped",
+    );
+    expect(placeCard(DASHBOARD, hit)).toMatchObject({
       lane: { id: "high" },
-      column: { id: "doing" },
-    });
-    expect(placeCard(dashboard, "pr", new Set(["prio:high"]))).toMatchObject({
-      lane: { id: "prs" },
-      column: { id: "todo" },
-    });
-  });
-
-  it("puts a card carrying two columns' labels in the later column", () => {
-    expect(placeCard(DASHBOARD, "issue", new Set(["phase:done", "phase:doing"]))).toMatchObject({
       column: { id: "done" },
     });
   });
 
-  it("ands the kind with the labels, whatever the match", () => {
-    const lanes = [
-      { ...prs, id: "pr-high", labels: ["prio:high", "prio:low"] },
-      ...DASHBOARD.swimlanes,
-    ];
-    const withLanes = { ...DASHBOARD, swimlanes: lanes };
-    expect(placeCard(withLanes, "pr", new Set(["prio:low"]))?.lane.id).toBe("pr-high");
-    expect(placeCard(withLanes, "pr", new Set())?.lane.id).toBe("rest");
-    expect(placeCard(withLanes, "issue", new Set(["prio:low"]))?.lane.id).toBe("low");
-  });
-
-  it("drops columns of the other kind", () => {
-    const review = {
-      ...DASHBOARD.columns[1]!,
-      id: "review",
-      labels: ["review"],
-      kind: "pr" as const,
-    };
-    const withReview = { ...DASHBOARD, columns: [...DASHBOARD.columns, review] };
-    expect(placeCard(withReview, "pr", new Set(["review"]))?.column.id).toBe("review");
-    expect(placeCard(withReview, "issue", new Set(["review"]))?.column.id).toBe("todo");
-  });
-
-  it("returns null when no column takes the labels", () => {
-    const columns = DASHBOARD.columns.filter((column) => column.labels.length > 0);
-    expect(placeCard({ ...DASHBOARD, columns }, "issue", new Set())).toBeNull();
+  it("returns null when no column matches and none is the catch-all", () => {
+    const columns = DASHBOARD.columns.filter((column) => column.filter !== "");
+    expect(placeCard({ ...DASHBOARD, columns }, () => false)).toBeNull();
   });
 });
 
@@ -144,6 +89,8 @@ describe("isBlocked", () => {
   });
 });
 
+const waitsOn = (number: number) => [{ repo: REPO, number, state: "OPEN" as const }];
+
 describe("buildBoard", () => {
   it("places issues by lane and column labels, catch-all otherwise", () => {
     const issues = [
@@ -162,25 +109,13 @@ describe("buildBoard", () => {
     expect(board.unplaced).toBe(0);
   });
 
-  it('places by an "all" column only when the issue carries every label', () => {
+  it("places by a column that asks for every one of its labels", () => {
     const dashboard = {
       ...DASHBOARD,
       columns: [
-        { id: "todo", name: "Todo", labels: [], match: "any" as const, kind: "any" as const },
-        {
-          id: "doing",
-          name: "Doing",
-          labels: ["phase:doing"],
-          match: "any" as const,
-          kind: "any" as const,
-        },
-        {
-          id: "waiting",
-          name: "Waiting",
-          labels: ["phase:doing", "wait"],
-          match: "all" as const,
-          kind: "any" as const,
-        },
+        { id: "todo", name: "Todo", filter: "" },
+        { id: "doing", name: "Doing", filter: "label:phase:doing" },
+        { id: "waiting", name: "Waiting", filter: "label:phase:doing label:wait" },
       ],
     };
     const issues = [
@@ -241,14 +176,7 @@ describe("buildBoard", () => {
     const dashboard = {
       ...DASHBOARD,
       swimlanes: [
-        {
-          id: "prs",
-          name: "PRs",
-          labels: [],
-          match: "any" as const,
-          kind: "pr" as const,
-          hideBlocked: false,
-        },
+        { id: "prs", name: "PRs", filter: "is:pr", hideBlocked: false },
         ...DASHBOARD.swimlanes,
       ],
     };
@@ -261,16 +189,14 @@ describe("buildBoard", () => {
     expect(board.cells[cell("high", "todo")]?.map((c) => c.number)).toEqual([2]);
   });
 
-  it("matches PR status labels like labels, so one lane gathers unfinished PRs", () => {
+  it("matches PR statuses, so one lane gathers unfinished PRs", () => {
     const dashboard = {
       ...DASHBOARD,
       swimlanes: [
         {
           id: "fix",
           name: "To fix",
-          labels: ["is:conflicting", "is:ci:failed", "is:unanswered"],
-          match: "any" as const,
-          kind: "pr" as const,
+          filter: "is:pr is:conflicting|ci:failed|unanswered",
           hideBlocked: false,
         },
         ...DASHBOARD.swimlanes,
@@ -298,14 +224,7 @@ describe("buildBoard", () => {
       ...DASHBOARD,
       users: ["alice"],
       swimlanes: [
-        {
-          id: "review",
-          name: "In review",
-          labels: ["is:has-pr"],
-          match: "any" as const,
-          kind: "issue" as const,
-          hideBlocked: false,
-        },
+        { id: "review", name: "In review", filter: "is:issue is:has-pr", hideBlocked: false },
         ...DASHBOARD.swimlanes,
       ],
     };
@@ -332,15 +251,7 @@ describe("buildBoard", () => {
   it("counts issues that fit no group when an axis has no catch-all", () => {
     const dashboard = {
       ...DASHBOARD,
-      columns: [
-        {
-          id: "doing",
-          name: "Doing",
-          labels: ["phase:doing"],
-          match: "any" as const,
-          kind: "any" as const,
-        },
-      ],
+      columns: [{ id: "doing", name: "Doing", filter: "label:phase:doing" }],
     };
     const board = buildBoard([makeIssue({ number: 1 })], dashboard);
     expect(board.unplaced).toBe(1);
@@ -386,6 +297,41 @@ describe("buildBoard", () => {
     expect(card?.isEpic).toBe(true);
     expect(board.labels).toEqual(["bug"]);
     expect(board.assignees).toEqual(["ann"]);
+  });
+
+  it("matches the epic label and structural labels whatever their case", () => {
+    const issues = [
+      makeIssue({ number: 1, labels: [label("Epic")] }),
+      makeIssue({ number: 2, labels: [label("epic"), label("Prio:High"), label("Bug")] }),
+      makeIssue({ number: 3, labels: [label("bug")] }),
+    ];
+    const board = buildBoard(issues, DASHBOARD);
+    expect(board.epics.map((epic) => epic.number)).toEqual([2, 1]);
+    expect(board.cells[cell("high", "todo")]?.[0]?.labels.map((l) => l.name)).toEqual(["Bug"]);
+    expect(board.labels).toEqual(["Bug"]);
+    expect(numbers(buildBoard(issues, DASHBOARD, { label: "BUG" }))).toEqual([3]);
+  });
+
+  it("matches is:blocking on items an open issue waits on, and @me as the viewer", () => {
+    const dashboard = {
+      ...DASHBOARD,
+      swimlanes: [
+        { id: "blocking", name: "Blocking", filter: "is:blocking", hideBlocked: false },
+        { id: "mine", name: "Mine", filter: "user:@me", hideBlocked: false },
+        ...DASHBOARD.swimlanes,
+      ],
+    };
+    const issues = [
+      makeIssue({ number: 1 }),
+      makeIssue({ number: 2, blockedBy: waitsOn(1), blockedByTotal: 1 }),
+      makeIssue({ number: 3 }),
+      makeIssue({ number: 4, state: "CLOSED", blockedBy: waitsOn(3), blockedByTotal: 1 }),
+      makeIssue({ number: 5, author: "me" }),
+    ];
+    const board = buildBoard(issues, dashboard, {}, [], new Set(), "me");
+    expect(board.cells[cell("blocking", "todo")]?.map((c) => c.number)).toEqual([1]);
+    expect(board.cells[cell("mine", "todo")]?.map((c) => c.number)).toEqual([5]);
+    expect(numbers(board)).toEqual([3, 2]);
   });
 
   it("sorts cells by the dashboard sort, overridable per request", () => {

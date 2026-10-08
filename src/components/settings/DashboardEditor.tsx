@@ -133,14 +133,7 @@ export function DashboardEditor({ dashboard, onChange }: Props) {
         title="Swimlanes"
         items={dashboard.swimlanes}
         onChange={(swimlanes) => patch({ swimlanes })}
-        create={(id) => ({
-          id,
-          name: "New lane",
-          labels: [],
-          match: "any",
-          kind: "any",
-          hideBlocked: false,
-        })}
+        create={(id) => ({ id, name: "New lane", filter: "", hideBlocked: false })}
         labels={catalog}
         axis="swimlanes"
       />
@@ -148,7 +141,7 @@ export function DashboardEditor({ dashboard, onChange }: Props) {
         title="Columns"
         items={dashboard.columns}
         onChange={(columns) => patch({ columns })}
-        create={(id) => ({ id, name: "New column", labels: [], match: "any", kind: "any" })}
+        create={(id) => ({ id, name: "New column", filter: "" })}
         labels={catalog}
         axis="columns"
       />

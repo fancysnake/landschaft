@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { IssueKind } from "./types";
+import { filterError, quoteValue } from "./filter";
 
 const id = z
   .string()
@@ -24,8 +24,8 @@ export function isPullStatusLabel(name: string): name is PullStatusLabel {
 }
 
 /**
- * States an entry lists among its labels and matches like labels; derived from GitHub, never
- * written to it. `is:has-pr` holds for an issue an open PR closes.
+ * States derived from GitHub that filters match with `is:` terms. `is:has-pr` holds for an
+ * issue an open PR closes.
  */
 export const STATUS_LABEL_NAMES = [...PULL_STATUS_NAMES, "is:has-pr"] as const;
 export type StatusLabel = (typeof STATUS_LABEL_NAMES)[number];
@@ -34,38 +34,56 @@ export function isStatusLabel(name: string): name is StatusLabel {
   return (STATUS_LABEL_NAMES as readonly string[]).includes(name);
 }
 
-/** `is:issue` / `is:pr` live in `kind`, so the only `is:` labels are statuses. */
-const label = z
-  .string()
-  .min(1)
-  .refine(
-    (name) => !name.startsWith("is:") || isStatusLabel(name),
-    `not a status label; expected one of ${STATUS_LABEL_NAMES.join(", ")}`,
-  );
-const labelList = z.array(label).default([]);
-/** "any": the issue carries at least one of the labels; "all": it carries every one. */
-export const MatchSchema = z.enum(["any", "all"]);
-export type Match = z.infer<typeof MatchSchema>;
-/** Which items a swimlane or column takes: both, only issues, or only pull requests. */
-export const KindFilterSchema = z.enum(["any", "issue", "pr"]);
-export type KindFilter = z.infer<typeof KindFilterSchema>;
-
-export const SwimlaneSchema = z.object({
-  id,
-  name: z.string().min(1),
-  labels: labelList,
-  match: MatchSchema.default("any"),
-  kind: KindFilterSchema.default("any"),
-  hideBlocked: z.boolean().default(false),
+/** A filter expression (see `filter.ts`); empty is the catch-all. */
+const filterText = z.string().superRefine((text, ctx) => {
+  const message = filterError(text);
+  if (message) ctx.addIssue({ code: "custom", message });
 });
 
-export const ColumnSchema = z.object({
-  id,
-  name: z.string().min(1),
-  labels: labelList,
-  match: MatchSchema.default("any"),
-  kind: KindFilterSchema.default("any"),
-});
+/** Pre-filter fields: a label list, matched by any or all of them, and an item kind. */
+const legacyGroup = {
+  labels: z.array(z.string().min(1)).optional(),
+  match: z.enum(["any", "all"]).optional(),
+  kind: z.enum(["any", "issue", "pr"]).optional(),
+};
+type LegacyGroup = { [K in keyof typeof legacyGroup]?: z.infer<(typeof legacyGroup)[K]> };
+
+/** The filter a legacy group stands for: any → `label:a|b`, all → `label:a label:b`. */
+export function legacyFilter({ labels = [], match = "any", kind = "any" }: LegacyGroup): string {
+  const plain = labels.filter((name) => !isStatusLabel(name)).map(quoteValue);
+  const statuses = labels.filter(isStatusLabel);
+  const body =
+    match === "all"
+      ? [...plain.map((name) => `label:${name}`), ...statuses].join(" ")
+      : [...(plain.length > 0 ? [`label:${plain.join("|")}`] : []), ...statuses].join(" OR ");
+  if (kind === "any") return body;
+  return [`is:${kind}`, body.includes(" OR ") ? `(${body})` : body].filter(Boolean).join(" ");
+}
+
+/** Old configs carry `labels`/`match`/`kind`; they turn into `filter` unless one is set. */
+function migrateGroup<T extends LegacyGroup & { filter?: string }>({
+  labels,
+  match,
+  kind,
+  filter: text,
+  ...group
+}: T) {
+  return { ...group, filter: text ?? legacyFilter({ labels, match, kind }) };
+}
+
+export const SwimlaneSchema = z
+  .object({
+    id,
+    name: z.string().min(1),
+    filter: filterText.optional(),
+    ...legacyGroup,
+    hideBlocked: z.boolean().default(false),
+  })
+  .transform(migrateGroup);
+
+export const ColumnSchema = z
+  .object({ id, name: z.string().min(1), filter: filterText.optional(), ...legacyGroup })
+  .transform(migrateGroup);
 
 export const SortBySchema = z.enum(["created", "updated"]);
 export const SortDirSchema = z.enum(["asc", "desc"]);
@@ -79,14 +97,9 @@ function hasUniqueIds(items: { id: string }[]): boolean {
   return new Set(items.map((item) => item.id)).size === items.length;
 }
 
-/** No labels and no kind restriction: takes whatever no other entry does. */
-export function isCatchAll(group: { labels: string[]; kind?: KindFilter }): boolean {
-  return group.labels.length === 0 && (group.kind ?? "any") === "any";
-}
-
-/** Whether a kind filter lets an item of this kind in. */
-export function fitsKind(filter: KindFilter, kind: IssueKind): boolean {
-  return filter === "any" || filter === kind;
+/** An empty filter: takes whatever no other entry does. */
+export function isCatchAll(group: { filter: string }): boolean {
+  return group.filter.trim() === "";
 }
 
 /**
@@ -129,7 +142,7 @@ export const DashboardSchema = z
         ctx.addIssue({
           code: "custom",
           path: [axis],
-          message: "at most one catch-all (no labels, any kind) allowed",
+          message: "at most one catch-all (empty filter) allowed",
         });
       }
     }

@@ -39,6 +39,10 @@ describe("config file", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it("loads the example config", () => {
+    expect(loadConfig("landschaft.config.example.json").dashboards).toHaveLength(1);
+  });
+
   it("returns an empty config when the file is missing", () => {
     expect(loadConfig(file)).toEqual({ dashboards: [] });
   });
@@ -49,8 +53,8 @@ describe("config file", () => {
       sort: { by: "updated", dir: "desc" },
       refreshMinutes: 5,
       users: ["@me"],
-      swimlanes: [{ id: "all", labels: [], match: "any", kind: "any", hideBlocked: false }],
-      columns: [{ id: "todo", labels: [], match: "any", kind: "any" }],
+      swimlanes: [{ id: "all", filter: "", hideBlocked: false }],
+      columns: [{ id: "todo", filter: "" }],
     });
     expect(loadConfig(file)).toEqual(saved);
     expect(existsSync(`${file}.tmp`)).toBe(false);
@@ -70,9 +74,8 @@ describe("config file", () => {
 const parseDashboard = (extra: object) =>
   ConfigSchema.parse({ dashboards: [{ ...minimal.dashboards[0]!, ...extra }] }).dashboards[0]!;
 
-const withLaneLabels = (labels: string[]) => ({
-  dashboards: [{ ...minimal.dashboards[0]!, swimlanes: [{ id: "a", name: "A", labels }] }],
-});
+const lane = (group: object) =>
+  parseDashboard({ swimlanes: [{ id: "a", name: "A", ...group }] }).swimlanes[0];
 
 describe("config schema rules", () => {
   const base = minimal.dashboards[0]!;
@@ -109,33 +112,36 @@ describe("config schema rules", () => {
     expect(() => saveConfig(twoCatchAlls, "/dev/null/never")).toThrow(/catch-all/);
   });
 
-  it("takes the PR status labels but no other is: label", () => {
-    expect(ConfigSchema.safeParse(withLaneLabels(["is:ci:failed", "bug"])).success).toBe(true);
-    for (const typo of ["is:conflict", "is:pr"])
-      expect(() => saveConfig(withLaneLabels([typo]), "/dev/null/never")).toThrow(
-        /not a status label/,
-      );
+  const laneFiltered = (filter: string) => ({
+    dashboards: [{ ...base, swimlanes: [{ id: "a", name: "A", filter }] }],
   });
 
-  it("does not count a kind-only swimlane or column as a catch-all", () => {
-    const prLane = {
-      dashboards: [
-        {
-          ...base,
-          swimlanes: [
-            { id: "prs", name: "PRs", kind: "pr" },
-            { id: "rest", name: "Rest" },
-          ],
-          columns: [
-            { id: "issues", name: "Issues", kind: "issue" },
-            { id: "rest", name: "Rest" },
-          ],
-        },
-      ],
-    };
-    const parsed = ConfigSchema.parse(prLane).dashboards[0]!;
-    expect(parsed.swimlanes[0]!.kind).toBe("pr");
-    expect(parsed.columns[0]!.kind).toBe("issue");
+  it("rejects a filter that does not parse, with the parser's message", () => {
+    expect(ConfigSchema.safeParse(laneFiltered("is:ci:failed label:bug")).success).toBe(true);
+    expect(() => saveConfig(laneFiltered("is:conflict"), "/dev/null/never")).toThrow(/is:conflict/);
+    expect(() => saveConfig(laneFiltered("(label:a"), "/dev/null/never")).toThrow(/unclosed paren/);
+  });
+
+  it("migrates labels, match and kind into a filter", () => {
+    expect(lane({ labels: ["a", "needs review"] })).toEqual({
+      id: "a",
+      name: "A",
+      filter: 'label:a|"needs review"',
+      hideBlocked: false,
+    });
+    expect(lane({ labels: ["a", "b"], match: "all" })?.filter).toBe("label:a label:b");
+    expect(lane({ labels: ["bug", "is:ci:failed", "is:has-pr"] })?.filter).toBe(
+      "label:bug OR is:ci:failed OR is:has-pr",
+    );
+    expect(lane({ labels: ["a", "is:unanswered"], kind: "pr" })?.filter).toBe(
+      "is:pr (label:a OR is:unanswered)",
+    );
+    expect(lane({ labels: ["a", "b"], match: "all", kind: "issue" })?.filter).toBe(
+      "is:issue label:a label:b",
+    );
+    expect(lane({ kind: "pr" })?.filter).toBe("is:pr");
+    expect(lane({ labels: [], match: "any", kind: "any" })?.filter).toBe("");
+    expect(lane({ filter: "label:x", labels: ["y"] })?.filter).toBe("label:x");
   });
 
   it("rejects malformed repo names", () => {

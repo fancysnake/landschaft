@@ -11,7 +11,7 @@ come, without paying for GitHub Projects.
 <!-- --8<-- [start:grid] -->
 
 A dashboard spans one or more repositories and lays their open issues out on a grid of
-swimlanes × columns, both defined by labels. The board is read-only: labels are edited on
+swimlanes × columns, each defined by a filter in GitHub search syntax. The board is read-only: labels are edited on
 GitHub. Everything runs on your machine against a local SQLite cache that refreshes in the
 background.
 
@@ -84,7 +84,7 @@ mise run dev        # http://localhost:4321
 For a production build: `mise run build` then `mise run preview`.
 
 Open **Settings**, create a dashboard, add repositories and define swimlanes and columns.
-Saving triggers the first sync; once labels are cached the pickers suggest them.
+Saving triggers the first sync; once labels are cached the filter inputs suggest them.
 
 ## How placement works
 
@@ -93,23 +93,28 @@ Saving triggers the first sync; once labels are cached the pickers suggest them.
 - A dashboard shows only open issues **its users created or are assigned to**. The default is
   `@me`, the account behind the token; list other GitHub logins in settings to follow them too,
   or remove every user to see everyone's.
-- Each swimlane and column lists the labels it matches. An issue lands in the **first**
-  swimlane and the **last** column (in order) it satisfies, so a card carrying two stages'
-  labels sits in the later one: by default carrying **any** of the labels; an entry set to
-  **all** needs every one of them (`"match": "all"` in the config).
-- A swimlane or column can take **only issues or only pull requests** (`"kind": "issue"` /
-  `"pr"`, default `"any"`; an `is:issue` / `is:pr` chip in the settings editor), on top of its
-  labels whatever the match; with no labels it takes every item of that kind.
-- Four **PR status labels** match like labels but come from GitHub, not from the PR's labels:
-  `is:conflicting` (merge conflicts), `is:ci:failed` (the PR's last commit shows GitHub's red
-  ✗: a check failed), `is:ci:running` (any check has not finished)
-  and `is:unanswered` (an unresolved review thread whose last comment is not the PR author's).
-  One "any of" swimlane with `is:conflicting`, `is:ci:failed` and `is:unanswered` gathers the PRs
-  waiting on their author. `is:has-pr` picks issues an open PR closes (GitHub's "linked pull
-  requests"), whoever opened the PR, as long as the PR is in one of the dashboard's repos. The
-  config rejects any other `is:` label.
-- An entry with **no labels (and any kind) is the catch-all** for issues matching nothing else.
-  At most one per axis. Issues that fit neither are counted as "unplaced" on the board.
+- Each swimlane and column has a **filter**. An issue lands in the **first** swimlane and the
+  **last** column (in order) whose filter it satisfies, so a card carrying two stages' labels
+  sits in the later one.
+- Filters follow GitHub search: `label:bug is:pr` needs both (`AND` works too),
+  `label:a OR -label:b` either, `-` negates, parens group, `label:a|b|c` takes any of the
+  values, and quotes hold spaces: `label:"needs review"`. `AND` and `OR` count only in
+  uppercase. `-` binds tightest, then AND, then OR. Labels match by name, ignoring case.
+- Terms:
+  - `label:`, `repo:`, `author:`, `assignee:` and `user:` (author or assignee), where `@me` is
+    the account behind the token.
+  - `is:issue`, `is:pr`, `is:blocked` (has an open blocker), `is:blocking` (blocks an open
+    issue).
+  - `has:parent-issue`, `has:sub-issues`, `parent-issue:owner/repo#12`.
+  - PR statuses from GitHub: `is:conflicting` (merge conflicts), `is:ci:failed` (the last
+    commit shows GitHub's red ✗), `is:ci:running` (a check has not finished) and
+    `is:unanswered` (an unresolved review thread whose last comment is not the PR author's).
+    `is:pr is:conflicting|ci:failed|unanswered` gathers the PRs waiting on their author.
+  - `is:has-pr` picks issues an open PR closes (GitHub's "linked pull requests"), whoever
+    opened the PR, as long as the PR is in one of the dashboard's repos.
+- Labels a filter asks for (outside a `-`) are hidden on cards.
+- An entry with an **empty filter is the catch-all** for issues matching nothing else. At most
+  one per axis. Issues that fit neither are counted as "unplaced" on the board.
 - **Hide blocked** (per swimlane) drops issues that have at least one open blocker
   (GitHub "blocked by" relationships).
 - Issues carrying the **epic label** appear in the strip above the board with sub-issue

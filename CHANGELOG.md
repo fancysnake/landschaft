@@ -7,6 +7,18 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- Swimlanes and columns pick items with a filter in GitHub search syntax (`label:a|b -is:pr`,
+  `OR`, parens), with terms for blockers, parents, sub-issues, repos and people. Settings
+  checks each filter as you type and suggests terms and label names.
+
+### Changed
+
+- Labels, the epic label among them, match by name, ignoring case.
+- `labels`, `match` and `kind` on swimlanes and columns become `filter`; old configs convert
+  on load.
+
 ### Removed
 
 - Drag and drop on the board, with `POST /api/move` and every GitHub label write. The board is

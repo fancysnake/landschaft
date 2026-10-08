@@ -16,10 +16,8 @@ function newDashboard(): Dashboard {
     users: [ME],
     sort: { by: "updated", dir: "desc" },
     refreshMinutes: 5,
-    swimlanes: [
-      { id: "all", name: "Everything", labels: [], match: "any", kind: "any", hideBlocked: false },
-    ],
-    columns: [{ id: "todo", name: "Todo", labels: [], match: "any", kind: "any" }],
+    swimlanes: [{ id: "all", name: "Everything", filter: "", hideBlocked: false }],
+    columns: [{ id: "todo", name: "Todo", filter: "" }],
   };
 }
 
