@@ -2,8 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Filters } from "../schema";
 
-import { api, type BoardResponse, errorMessage, filtersToQuery } from "./api";
-import { readFilters } from "./useUrlFilters";
+import { api, type BoardResponse, errorMessage } from "./api";
 
 const POLL_MS = 4000;
 
@@ -23,22 +22,28 @@ export function useBoard(dashboardId: string, filters: Filters): BoardController
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const versionRef = useRef(-1);
-  const filtersKey = filtersToQuery(filters);
+  // Read at request time, so a reload after a slow write uses the filters current by then.
+  const filtersRef = useRef(filters);
+  const loadSeq = useRef(0);
 
-  const apply = useCallback((response: BoardResponse) => {
-    versionRef.current = response.status.version;
-    setData(response);
-    setError(null);
-  }, []);
-  const fail = useCallback((cause: unknown) => setError(errorMessage(cause)), []);
-  const load = useCallback(
-    () => api.board(dashboardId, readFilters(filtersKey)).then(apply, fail),
-    [dashboardId, filtersKey, apply, fail],
-  );
+  /** Loads the board; a response is dropped once a newer load has started. */
+  const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
+    try {
+      const response = await api.board(dashboardId, filtersRef.current);
+      if (seq !== loadSeq.current) return;
+      versionRef.current = response.status.version;
+      setData(response);
+      setError(null);
+    } catch (cause) {
+      if (seq === loadSeq.current) setError(errorMessage(cause));
+    }
+  }, [dashboardId]);
 
   useEffect(() => {
-    load().catch(fail);
-  }, [load, fail]);
+    filtersRef.current = filters;
+    void load();
+  }, [load, filters]);
 
   useEffect(() => {
     let cancelled = false;

@@ -26,6 +26,8 @@ export function useUrlFilters(): [Filters, (patch: Partial<Filters>) => void] {
     setFilters((previous) => {
       const next = readFilters(filtersToQuery({ ...previous, ...patch }));
       const query = filtersToQuery(next);
+      // Same object for the same query, so effects keyed on filters skip no-op patches.
+      if (query === filtersToQuery(previous)) return previous;
       window.history.replaceState(null, "", query ? `?${query}` : window.location.pathname);
       return next;
     });
