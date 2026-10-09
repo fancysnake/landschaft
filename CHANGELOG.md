@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Fixed
+
+- The board no longer shows items from a deselected repo after a sync. A reload after sync or
+  starring uses the current filters, and a slow response for older filters is dropped.
+
 ## [1.0.0] - 2026-10-09
 
 ### Added

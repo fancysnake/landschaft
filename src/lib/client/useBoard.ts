@@ -24,21 +24,29 @@ export function useBoard(dashboardId: string, filters: Filters): BoardController
   const [syncing, setSyncing] = useState(false);
   const versionRef = useRef(-1);
   const filtersKey = filtersToQuery(filters);
+  // Read at request time, so a reload after a slow write uses the filters current by then.
+  const filtersRef = useRef(filtersKey);
+  const loadSeq = useRef(0);
 
-  const apply = useCallback((response: BoardResponse) => {
-    versionRef.current = response.status.version;
-    setData(response);
-    setError(null);
-  }, []);
   const fail = useCallback((cause: unknown) => setError(errorMessage(cause)), []);
-  const load = useCallback(
-    () => api.board(dashboardId, readFilters(filtersKey)).then(apply, fail),
-    [dashboardId, filtersKey, apply, fail],
-  );
+  /** Loads the board; a response is dropped once a newer load has started. */
+  const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
+    try {
+      const response = await api.board(dashboardId, readFilters(filtersRef.current));
+      if (seq !== loadSeq.current) return;
+      versionRef.current = response.status.version;
+      setData(response);
+      setError(null);
+    } catch (cause) {
+      if (seq === loadSeq.current) fail(cause);
+    }
+  }, [dashboardId, fail]);
 
   useEffect(() => {
-    load().catch(fail);
-  }, [load, fail]);
+    filtersRef.current = filtersKey;
+    void load();
+  }, [load, filtersKey]);
 
   useEffect(() => {
     let cancelled = false;
