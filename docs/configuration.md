@@ -23,12 +23,12 @@ the file is plain JSON you can also edit by hand (it is validated on load and on
 
 ## Swimlane and column
 
-| Field         | Type                | Default  | Meaning                                                                                                                      |
-| ------------- | ------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `id`          | `[a-z0-9_-]{1,32}`  | required | Unique within its axis; keys the board's cells                                                                               |
-| `name`        | string              | required | Header text                                                                                                                  |
-| `filter`      | string              | `""`     | Items this entry takes, in GitHub search syntax; empty = everything, `other` = what no lane above / column to the right took |
-| `hideBlocked` | boolean (swimlanes) | `false`  | Drop issues with at least one open blocker, and show how many it dropped                                                     |
+| Field         | Type                | Default  | Meaning                                                                                                                                                                                               |
+| ------------- | ------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`          | `[a-z0-9_-]{1,32}`  | required | Unique within its axis; keys the board's cells                                                                                                                                                        |
+| `name`        | string              | required | Header text                                                                                                                                                                                           |
+| `filter`      | string              | `other`  | Items this entry takes, in GitHub search syntax; `""` = everything, `other` = what no lane above / column to the right took; omitted = `other` minus a `-(…)` for each entry `other` does not look at |
+| `hideBlocked` | boolean (swimlanes) | `false`  | Drop issues with at least one open blocker, and show how many it dropped                                                                                                                              |
 
 A filter combines terms such as `label:prio:high`, `is:pr`, `is:ci:failed` or `user:@me`; see
 [How the board works](board.md#placement) for the syntax and every term.

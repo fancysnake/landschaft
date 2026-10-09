@@ -114,6 +114,8 @@ export interface Epic {
 export interface Board {
   cells: Record<string, Card[]>;
   laneTotals: Record<string, number>;
+  /** Issues shown in each column; one in several lanes counts once. */
+  columnTotals: Record<string, number>;
   hiddenBlocked: Record<string, number>;
   epics: Epic[];
   unplaced: number;

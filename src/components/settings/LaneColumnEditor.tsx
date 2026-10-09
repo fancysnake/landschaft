@@ -144,6 +144,7 @@ function FilterInput({
   labels: string[];
 }) {
   const listId = useId();
+  const errorId = useId();
   const error = filterError(value);
   return (
     <div>
@@ -153,6 +154,7 @@ function FilterInput({
         onChange={(event) => onChange(event.target.value)}
         placeholder="empty = all, e.g. label:bug -is:pr, other label:bug"
         aria-invalid={error !== null}
+        aria-describedby={error ? errorId : undefined}
         spellCheck={false}
         className={`w-full rounded-md border px-2 py-1 font-mono text-sm ${
           error ? "border-red-400" : "border-neutral-300"
@@ -163,7 +165,11 @@ function FilterInput({
           <option key={option} value={option} />
         ))}
       </datalist>
-      {error && <p className="mt-0.5 text-xs text-red-700">{error}</p>}
+      {error && (
+        <p id={errorId} className="mt-0.5 text-xs text-red-700">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

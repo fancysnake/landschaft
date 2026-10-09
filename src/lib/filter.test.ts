@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   askedLabels,
+  type FilterContext,
   type FilterItem,
   filterError,
   matchesFilter,
@@ -24,8 +25,8 @@ const item = (extra: Partial<FilterItem> = {}): FilterItem => ({
   ...extra,
 });
 const labels = (...names: string[]) => item({ labels: names.map((name) => ({ name })) });
-const fits = (filter: string, target: FilterItem, viewer: string | null = null) =>
-  matchesFilter(parseFilter(filter), target, viewer);
+const fits = (filter: string, target: FilterItem, ctx: FilterContext = {}) =>
+  matchesFilter(parseFilter(filter), target, ctx);
 
 describe("parseFilter", () => {
   it("reads an empty filter as null", () => {
@@ -137,7 +138,7 @@ describe("matchesFilter", () => {
     expect(fits("author:ann", ann)).toBe(true);
     expect(fits("assignee:ann", ann)).toBe(false);
     expect(fits("user:bob", ann)).toBe(true);
-    expect(fits("user:@me", ann, "bob")).toBe(true);
+    expect(fits("user:@me", ann, { viewer: "bob" })).toBe(true);
     expect(fits("user:@me", ann)).toBe(false);
     expect(fits("author:renovate[bot]", item({ author: "renovate" }))).toBe(true);
   });
@@ -148,12 +149,12 @@ describe("matchesFilter", () => {
     expect(fits(filter, item({ labels: [{ name: "a" }] }))).toBe(false);
   });
 
-  it("reads a bare `other` as a term the item's `other` flag decides", () => {
+  it("reads a bare `other` as a term the context's `other` flag decides", () => {
     expect(parseFilter("other label:b")).toEqual({
       type: "and",
       nodes: [{ type: "other" }, { type: "term", key: "label", values: ["b"] }],
     });
-    expect(fits("other label:b", { ...labels("b"), other: true })).toBe(true);
+    expect(fits("other label:b", labels("b"), { other: true })).toBe(true);
     expect(fits("other label:b", labels("b"))).toBe(false);
     expect(fits("-other", labels())).toBe(true);
     expect(filterError("others")).toMatch(/expected key:value/);

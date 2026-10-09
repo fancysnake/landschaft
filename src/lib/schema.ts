@@ -26,10 +26,10 @@ const LegacyGroupSchema = z.object({
 type LegacyGroup = z.infer<typeof LegacyGroupSchema>;
 
 /**
- * The filter a legacy group stands for: any → `label:a|b`, all → `label:a label:b`; empty for
- * the catch-all, which `settleCatchAll` rewrites.
+ * The filter a legacy group stands for: any → `label:a|b`, all → `label:a label:b`; null for
+ * the catch-all, which `migrateAxis` rewrites.
  */
-function legacyFilter({ labels = [], match = "any", kind = "any" }: LegacyGroup): string {
+function legacyFilter({ labels = [], match = "any", kind = "any" }: LegacyGroup): string | null {
   const plain = labels.filter((name) => !isStatusLabel(name)).map(quoteValue);
   const statuses = labels.filter(isStatusLabel);
   const parts =
@@ -37,25 +37,9 @@ function legacyFilter({ labels = [], match = "any", kind = "any" }: LegacyGroup)
       ? [...plain.map((name) => `label:${name}`), ...statuses]
       : [...(plain.length > 0 ? [`label:${plain.join("|")}`] : []), ...statuses];
   const body = parts.join(match === "all" ? " " : " OR ");
-  if (kind === "any") return body;
+  if (kind === "any") return body || null;
   const ored = match === "any" && parts.length > 1;
   return [`is:${kind}`, ored ? `(${body})` : body].filter(Boolean).join(" ");
-}
-
-/** Migrated groups that were the legacy catch-all. */
-const legacyCatchAlls = new WeakSet<object>();
-
-/** Old configs carry `labels`/`match`/`kind`; they turn into `filter` unless one is set. */
-function migrateGroup<T extends LegacyGroup & { filter?: string }>({
-  labels,
-  match,
-  kind,
-  filter: text,
-  ...group
-}: T) {
-  const migrated = { ...group, filter: text ?? legacyFilter({ labels, match, kind }) };
-  if (text === undefined && migrated.filter === "") legacyCatchAlls.add(migrated);
-  return migrated;
 }
 
 export type Axis = "swimlanes" | "columns";
@@ -70,38 +54,39 @@ export const OTHER_LOOKS_AT: Record<Axis, "earlier" | "later"> = {
 };
 
 /**
- * A legacy catch-all took what no other entry took: `other` excludes the entries it looks at,
- * a `-(…)` each of the rest.
+ * Old configs carry `labels`/`match`/`kind`; they turn into `filter` unless one is set. A legacy
+ * catch-all took what no other entry took: `other` excludes the entries it looks at, a `-(…)`
+ * each of the rest.
  */
-const settleCatchAll =
+const migrateAxis =
   (axis: Axis) =>
-  <T extends { filter: string }>(groups: T[]): T[] =>
-    groups.map((group, index) => {
-      if (!legacyCatchAlls.has(group)) return group;
+  <T extends LegacyGroup & { filter?: string }>(groups: T[]) => {
+    const filterOf = ({ labels, match, kind, filter }: T) =>
+      filter ?? legacyFilter({ labels, match, kind });
+    return groups.map(({ labels, match, kind, filter, ...group }, index) => {
+      const own = filter ?? legacyFilter({ labels, match, kind });
+      if (own !== null) return { ...group, filter: own };
       const unseen =
         OTHER_LOOKS_AT[axis] === "earlier" ? groups.slice(index + 1) : groups.slice(0, index);
-      const excluded = unseen.flatMap(({ filter }) => (filter ? [`-(${filter})`] : []));
+      const excluded = unseen.map(filterOf).flatMap((other) => (other ? [`-(${other})`] : []));
       return { ...group, filter: ["other", ...excluded].join(" ") };
     });
+  };
 
-export const SwimlaneSchema = z
-  .object({
-    id,
-    name: z.string().min(1),
-    filter: filterText.optional(),
-    ...LegacyGroupSchema.shape,
-    hideBlocked: z.boolean().default(false),
-  })
-  .transform(migrateGroup);
+export const SwimlaneSchema = z.object({
+  id,
+  name: z.string().min(1),
+  filter: filterText.optional(),
+  ...LegacyGroupSchema.shape,
+  hideBlocked: z.boolean().default(false),
+});
 
-export const ColumnSchema = z
-  .object({
-    id,
-    name: z.string().min(1),
-    filter: filterText.optional(),
-    ...LegacyGroupSchema.shape,
-  })
-  .transform(migrateGroup);
+export const ColumnSchema = z.object({
+  id,
+  name: z.string().min(1),
+  filter: filterText.optional(),
+  ...LegacyGroupSchema.shape,
+});
 
 export const SortBySchema = z.enum(["created", "updated"]);
 export const SortDirSchema = z.enum(["asc", "desc"]);
@@ -133,8 +118,8 @@ export const DashboardSchema = z
     epicLabel: z.string().min(1).optional(),
     sort: SortSchema.default({ by: "updated", dir: "desc" }),
     refreshMinutes: z.number().int().min(1).max(1440).default(5),
-    swimlanes: z.array(SwimlaneSchema).min(1).transform(settleCatchAll("swimlanes")),
-    columns: z.array(ColumnSchema).min(1).transform(settleCatchAll("columns")),
+    swimlanes: z.array(SwimlaneSchema).min(1).transform(migrateAxis("swimlanes")),
+    columns: z.array(ColumnSchema).min(1).transform(migrateAxis("columns")),
   })
   .superRefine((dashboard, ctx) => {
     for (const axis of ["swimlanes", "columns"] as const) {
@@ -158,8 +143,8 @@ export const ConfigSchema = z
     }
   });
 
-export type Swimlane = z.infer<typeof SwimlaneSchema>;
-export type Column = z.infer<typeof ColumnSchema>;
+export type Swimlane = Dashboard["swimlanes"][number];
+export type Column = Dashboard["columns"][number];
 export type Sort = z.infer<typeof SortSchema>;
 export type SortBy = z.infer<typeof SortBySchema>;
 export type SortDir = z.infer<typeof SortDirSchema>;

@@ -1,6 +1,11 @@
-import type { StatusLabel } from "../status";
-
-import { askedLabels, type FilterNode, labelKey, matchesFilter, parseFilter } from "../filter";
+import {
+  askedLabels,
+  type FilterItem,
+  type FilterNode,
+  labelKey,
+  matchesFilter,
+  parseFilter,
+} from "../filter";
 import {
   type Dashboard,
   type Filters,
@@ -61,14 +66,23 @@ export function isBlocked(issue: Issue, byKey: Map<string, Issue>): boolean {
 const keyOf = (ref: { repo: string; number: number }): string => issueKey(ref.repo, ref.number);
 
 /**
- * The statuses of an item among `issues`: a PR's own, plus `is:has-pr` for an item an open
- * PR closes. Only PRs among `issues` count, so one in a repo outside them is never seen.
+ * An issue with what filters test it on: its statuses plus `is:has-pr` when an open PR closes
+ * it, whether an open blocker holds it, and whether it blocks an open issue. Every open item in
+ * `issues` counts, whoever's it is; one in a repo outside them is never seen.
  */
-export function statusesOf(issues: Issue[]): (issue: Issue) => StatusLabel[] {
-  const withPr = new Set(
-    issues.filter((issue) => issue.state === "OPEN").flatMap((pr) => pr.linked.map(keyOf)),
-  );
-  return (issue) => (withPr.has(keyOf(issue)) ? [...issue.statuses, "is:has-pr"] : issue.statuses);
+export function itemsOf(
+  issues: Issue[],
+  byKey: Map<string, Issue>,
+): (issue: Issue) => Omit<Issue, "statuses"> & FilterItem {
+  const opened = issues.filter((issue) => issue.state === "OPEN");
+  const withPr = new Set(opened.flatMap((pr) => pr.linked.map(keyOf)));
+  const blocking = new Set(opened.flatMap((issue) => issue.blockedBy.map(keyOf)));
+  return (issue) => ({
+    ...issue,
+    statuses: withPr.has(keyOf(issue)) ? [...issue.statuses, "is:has-pr"] : issue.statuses,
+    blocked: isBlocked(issue, byKey),
+    blocking: blocking.has(keyOf(issue)),
+  });
 }
 
 /**
@@ -149,12 +163,8 @@ export function buildBoard(
   const repos = new Set(selectedRepos(filters.repo, dashboard.repos));
   const wanted = issueFilter(filters, byKey);
   const open = issues.filter((issue) => issue.state === "OPEN" && listed(issue));
-  // Any open PR in `issues` counts, whoever's it is, so not just `open`.
-  const statusesFor = statusesOf(issues);
-  // Keys of the items an open issue waits on; any issue in `issues` counts, not just `open`.
-  const blocking = new Set(
-    issues.filter((issue) => issue.state === "OPEN").flatMap((issue) => issue.blockedBy.map(keyOf)),
-  );
+  // From all of `issues`, not just `open`.
+  const itemOf = itemsOf(issues, byKey);
   const axes = { swimlanes: compile(dashboard.swimlanes), columns: compile(dashboard.columns) };
   const epicLabel = dashboard.epicLabel && labelKey(dashboard.epicLabel);
   // By `labelKey`, like every label comparison here.
@@ -168,6 +178,7 @@ export function buildBoard(
   const board: Board = {
     cells: {},
     laneTotals: {},
+    columnTotals: {},
     hiddenBlocked: {},
     epics: [],
     unplaced: 0,
@@ -181,6 +192,7 @@ export function buildBoard(
     board.hiddenBlocked[lane.id] = 0;
     for (const column of dashboard.columns) board.cells[cellKey(lane.id, column.id)] = [];
   }
+  for (const column of dashboard.columns) board.columnTotals[column.id] = 0;
 
   const assignees = new Set<string>();
   /** First spelling seen of each label, by its `labelKey`. */
@@ -203,11 +215,9 @@ export function buildBoard(
 
     if (!wanted(issue)) continue;
 
-    const statuses = statusesFor(issue);
-    const blocked = isBlocked(issue, byKey);
-    const item = { ...issue, statuses, blocked, blocking: blocking.has(keyOf(issue)) };
-    const hit = (node: FilterNode, other: boolean) =>
-      matchesFilter(node, { ...item, other }, viewer);
+    const item = itemOf(issue);
+    const { statuses, blocked } = item;
+    const hit = (node: FilterNode, other: boolean) => matchesFilter(node, item, { viewer, other });
     const lanes = placeIn(axes.swimlanes, hit, OTHER_LOOKS_AT.swimlanes);
     const columns = placeIn(axes.columns, hit, OTHER_LOOKS_AT.columns);
     if (lanes.length === 0 || columns.length === 0) {
@@ -240,7 +250,10 @@ export function buildBoard(
       board.laneTotals[lane.id] = (board.laneTotals[lane.id] ?? 0) + 1;
       shownInAny = true;
     }
-    if (shownInAny) board.total += 1;
+    if (!shownInAny) continue;
+    board.total += 1;
+    for (const column of columns)
+      board.columnTotals[column.id] = (board.columnTotals[column.id] ?? 0) + 1;
   }
 
   const compare = compareBy(sort.by, sort.dir);

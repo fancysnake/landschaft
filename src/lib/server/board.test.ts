@@ -207,6 +207,7 @@ describe("buildBoard", () => {
         expect(board.cells[cell(lane, column)]?.map((c) => c.number)).toEqual([1]);
     expect(board.cells[cell("rest", "todo")]).toEqual([]);
     expect(board.laneTotals).toEqual({ high: 1, low: 1, rest: 0 });
+    expect(board.columnTotals).toEqual({ todo: 0, doing: 1, done: 1 });
     expect(board.total).toBe(1);
   });
 

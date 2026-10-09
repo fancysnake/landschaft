@@ -78,13 +78,13 @@ export function parseFilter(text: string): FilterNode | null {
       while (!isBreak(text[pos])) pos += 1;
       throw new FilterError(`expected key:value, got "${text.slice(start, pos)}"`, start);
     }
-    const spec = specOf(key);
-    if (!spec) {
+    if (!isFilterKey(key)) {
       throw new FilterError(
         `unknown key "${key}"; expected one of ${FILTER_KEYS.join(", ")}`,
         start,
       );
     }
+    const spec: KeySpec = KEYS[key];
     pos += 1;
     const values: string[] = [];
     for (;;) {
@@ -97,7 +97,7 @@ export function parseFilter(text: string): FilterNode | null {
       if (text[pos] !== "|") break;
       pos += 1;
     }
-    return { type: "term", key: key as FilterKey, values };
+    return { type: "term", key, values };
   };
 
   const unary = (): FilterNode => {
@@ -190,6 +190,12 @@ export interface FilterItem {
   blocked: boolean;
   /** Blocks an open issue. */
   blocking: boolean;
+}
+
+/** What a filter tests besides the item. */
+export interface FilterContext {
+  /** Who `@me` stands for. */
+  viewer?: string | null;
   /** No swimlane above, or no column to the right, matched. */
   other?: boolean;
 }
@@ -197,7 +203,7 @@ export interface FilterItem {
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
 /** `login` is `value`, where `@me` stands for `viewer` and a `[bot]` suffix is dropped. */
-function isLogin(value: string, login: string | null, viewer: string | null): boolean {
+function isLogin(value: string, login: string | null, viewer: string | null = null): boolean {
   const wanted = same(value, "@me") ? viewer : value.replace(/\[bot\]$/i, "");
   return wanted !== null && login !== null && same(wanted, login);
 }
@@ -205,10 +211,10 @@ function isLogin(value: string, login: string | null, viewer: string | null): bo
 interface KeySpec {
   /** What every value must pass, and how to describe it; absent when any value goes. */
   check?: { test: (value: string) => boolean; expected: string };
-  /** Values to complete after the key. */
-  suggest?: readonly string[];
-  /** Whether `item` has `value` for this key; `viewer` is who `@me` stands for. */
-  holds: (value: string, item: FilterItem, viewer: string | null) => boolean;
+  /** Values to complete after the key, given the labels on offer. */
+  suggest?: (labels: string[]) => readonly string[];
+  /** Whether `item` has `value` for this key. */
+  holds: (value: string, item: FilterItem, ctx: FilterContext) => boolean;
 }
 
 /** A key over a fixed set of values, in any case, each tested by its own predicate. */
@@ -219,7 +225,7 @@ function oneOf(tests: Record<string, (item: FilterItem) => boolean>): KeySpec {
       test: (value) => Object.hasOwn(tests, value.toLowerCase()),
       expected: values.join(", "),
     },
-    suggest: values,
+    suggest: () => values,
     holds: (value, item) => tests[value.toLowerCase()]!(item),
   };
 }
@@ -227,10 +233,11 @@ function oneOf(tests: Record<string, (item: FilterItem) => boolean>): KeySpec {
 const matching = (pattern: RegExp, expected: string) => ({
   check: { test: (value: string) => pattern.test(value), expected },
 });
-const person = { ...matching(LOGIN, "a GitHub login or @me"), suggest: ["@me"] };
+const person = { ...matching(LOGIN, "a GitHub login or @me"), suggest: () => ["@me"] };
 
 const KEYS = {
   label: {
+    suggest: (labels) => labels.map(quoteValue),
     holds: (value, item) => item.labels.some((label) => labelKey(label.name) === labelKey(value)),
   },
   is: oneOf({
@@ -258,15 +265,15 @@ const KEYS = {
     ...matching(REPO, "owner/repo"),
     holds: (value, item) => same(item.repo, value),
   },
-  author: { ...person, holds: (value, item, viewer) => isLogin(value, item.author, viewer) },
+  author: { ...person, holds: (value, item, { viewer }) => isLogin(value, item.author, viewer) },
   assignee: {
     ...person,
-    holds: (value, item, viewer) =>
+    holds: (value, item, { viewer }) =>
       item.assignees.some(({ login }) => isLogin(value, login, viewer)),
   },
   user: {
     ...person,
-    holds: (value, item, viewer) =>
+    holds: (value, item, { viewer }) =>
       isLogin(value, item.author, viewer) ||
       item.assignees.some(({ login }) => isLogin(value, login, viewer)),
   },
@@ -274,28 +281,27 @@ const KEYS = {
 export type FilterKey = keyof typeof KEYS;
 export const FILTER_KEYS = Object.keys(KEYS) as FilterKey[];
 
-/** The spec of `key`, or undefined for an unknown key, inherited `Object` members included. */
-const specOf = (key: string): KeySpec | undefined =>
-  Object.hasOwn(KEYS, key) ? KEYS[key as FilterKey] : undefined;
+/** Whether `key` is a known key; inherited `Object` members are not. */
+const isFilterKey = (key: string): key is FilterKey => Object.hasOwn(KEYS, key);
 
 /** Whether `item` satisfies `node`; an empty filter takes everything. */
 export function matchesFilter(
   node: FilterNode | null,
   item: FilterItem,
-  viewer: string | null = null,
+  ctx: FilterContext = {},
 ): boolean {
   if (!node) return true;
   switch (node.type) {
     case "term":
-      return node.values.some((value) => KEYS[node.key].holds(value, item, viewer));
+      return node.values.some((value) => KEYS[node.key].holds(value, item, ctx));
     case "other":
-      return item.other ?? false;
+      return ctx.other ?? false;
     case "not":
-      return !matchesFilter(node.node, item, viewer);
+      return !matchesFilter(node.node, item, ctx);
     case "and":
-      return node.nodes.every((child) => matchesFilter(child, item, viewer));
+      return node.nodes.every((child) => matchesFilter(child, item, ctx));
     case "or":
-      return node.nodes.some((child) => matchesFilter(child, item, viewer));
+      return node.nodes.some((child) => matchesFilter(child, item, ctx));
   }
 }
 
@@ -311,12 +317,11 @@ export function suggestFilter(text: string, labels: string[]): string[] {
   const key = colon < 0 ? null : word.slice(0, colon);
   const partial = key === null ? word : word.slice(Math.max(colon, word.lastIndexOf("|")) + 1);
   const head = text.slice(0, text.length - partial.length);
+  const spec: KeySpec | undefined = key !== null && isFilterKey(key) ? KEYS[key] : undefined;
   const candidates =
     key === null
       ? [...FILTER_KEYS.map((name) => `${name}:`), "other"]
-      : key === "label"
-        ? labels.map(quoteValue)
-        : (specOf(key)?.suggest ?? []);
+      : (spec?.suggest?.(labels) ?? []);
   return candidates
     .filter((option) => option !== partial && same(option.slice(0, partial.length), partial))
     .map((option) => head + option);

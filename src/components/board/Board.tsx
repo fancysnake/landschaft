@@ -27,15 +27,6 @@ export default function Board({ dashboardId }: Props) {
   }
   const { dashboard, users, board, status } = data;
   const showRepo = dashboard.repos.length > 1;
-  const columnTotals = Object.fromEntries(
-    dashboard.columns.map((column) => [
-      column.id,
-      dashboard.swimlanes.reduce(
-        (sum, lane) => sum + (board.cells[cellKey(lane.id, column.id)]?.length ?? 0),
-        0,
-      ),
-    ]),
-  );
 
   return (
     <div className="flex h-full flex-col gap-3 p-4">
@@ -103,7 +94,7 @@ export default function Board({ dashboardId }: Props) {
               className="sticky top-0 z-10 rounded-md bg-neutral-200/90 px-2 py-1 text-sm font-medium backdrop-blur"
             >
               {column.name}
-              <span className="ml-2 text-neutral-500">{columnTotals[column.id]}</span>
+              <span className="ml-2 text-neutral-500">{board.columnTotals[column.id] ?? 0}</span>
             </div>
           ))}
           {dashboard.swimlanes.map((lane) => (
