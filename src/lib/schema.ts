@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { filterError, ISSUE_REF, LOGIN, quoteValue, REPO } from "./filter";
+import { filterError, ISSUE_REF, LOGIN, parseFilter, quoteValue, REPO, usesOther } from "./filter";
 import { isStatusLabel } from "./status";
 
 const id = z
@@ -100,26 +100,45 @@ function hasUniqueIds(items: { id: string }[]): boolean {
   return new Set(items.map((item) => item.id)).size === items.length;
 }
 
-/** Stands for the token's account in a dashboard's `users`. */
+/** Stands for the token's account in `users` and in filters. */
 export const ME = "@me";
 
 /** A GitHub login, or `@me`. */
 export const userName = z.string().regex(LOGIN, "expected a GitHub login or @me");
 
+const refreshMinutes = z.number().int().min(1).max(1440);
+
+/**
+ * What is wrong with a dashboard filter, or null: like a swimlane's, minus `other`, since a
+ * dashboard has nothing before or after it.
+ */
+export function dashboardFilterError(text: string): string | null {
+  const message = filterError(text);
+  if (message) return message;
+  return usesOther(parseFilter(text)) ? "`other` only works in swimlanes and columns" : null;
+}
+
+const dashboardFilter = z.string().superRefine((text, ctx) => {
+  const message = dashboardFilterError(text);
+  if (message) ctx.addIssue({ code: "custom", message });
+});
+
 export const DashboardSchema = z
   .object({
     id,
     name: z.string().min(1),
-    repos: z.array(repoName).min(1),
-    /** Only items these users authored or are assigned to; empty takes everyone's. */
+    /** Narrows the global base set; empty takes all of it. */
+    filter: dashboardFilter.default(""),
+    epicLabel: z.string().min(1).optional(),
+    sort: SortSchema.default({ by: "updated", dir: "desc" }),
+    swimlanes: z.array(SwimlaneSchema).min(1).transform(migrateAxis("swimlanes")),
+    columns: z.array(ColumnSchema).min(1).transform(migrateAxis("columns")),
+    /** Legacy, folded into the global scope by `migrateScope`. */
+    repos: z.array(repoName).optional(),
     users: z.array(userName).optional(),
     /** Legacy: "mine" reads as `users: ["@me"]`, "all" as `users: []`. */
     scope: z.enum(["mine", "all"]).optional(),
-    epicLabel: z.string().min(1).optional(),
-    sort: SortSchema.default({ by: "updated", dir: "desc" }),
-    refreshMinutes: z.number().int().min(1).max(1440).default(5),
-    swimlanes: z.array(SwimlaneSchema).min(1).transform(migrateAxis("swimlanes")),
-    columns: z.array(ColumnSchema).min(1).transform(migrateAxis("columns")),
+    refreshMinutes: refreshMinutes.optional(),
   })
   .superRefine((dashboard, ctx) => {
     for (const axis of ["swimlanes", "columns"] as const) {
@@ -127,30 +146,77 @@ export const DashboardSchema = z
         ctx.addIssue({ code: "custom", path: [axis], message: "ids must be unique" });
       }
     }
-  })
-  .transform(({ scope, users, ...dashboard }) => ({
-    ...dashboard,
-    users: users ?? (scope === "all" ? [] : [ME]),
-  }));
-
-export const ConfigSchema = z
-  .object({
-    dashboards: z.array(DashboardSchema).default([]),
-  })
-  .superRefine((config, ctx) => {
-    if (!hasUniqueIds(config.dashboards)) {
-      ctx.addIssue({ code: "custom", path: ["dashboards"], message: "ids must be unique" });
-    }
   });
+type LegacyDashboard = z.infer<typeof DashboardSchema>;
+
+const ConfigShape = z.object({
+  /** Every board starts from the open items in these repos… */
+  repos: z.array(repoName).optional(),
+  /** …that these users authored or are assigned to; empty takes everyone's. */
+  users: z.array(userName).optional(),
+  refreshMinutes: refreshMinutes.optional(),
+  dashboards: z.array(DashboardSchema).default([]),
+});
+
+const union = (lists: string[][]) => [...new Set(lists.flat())];
+const sameSet = (a: string[], b: string[]) =>
+  a.length === b.length && a.every((value) => b.includes(value));
+const legacyUsers = (dashboard: LegacyDashboard) =>
+  dashboard.users ?? (dashboard.scope === "all" ? [] : [ME]);
+
+/**
+ * Fills in the global scope. A config without global `repos` predates it: its repos and users
+ * are the unions of the dashboards' (users empty when any dashboard took everyone's), its
+ * refresh interval the shortest any had, and a dashboard narrower than the union gets a
+ * `repo:`/`user:` filter.
+ */
+function migrateScope(config: z.infer<typeof ConfigShape>) {
+  const { repos, users, dashboards } = config;
+  const legacy = repos === undefined;
+  const intervals = legacy ? dashboards.map((dashboard) => dashboard.refreshMinutes ?? 5) : [];
+  const global = {
+    repos: repos ?? union(dashboards.map((dashboard) => dashboard.repos ?? [])),
+    users:
+      users ??
+      (legacy && dashboards.every((dashboard) => legacyUsers(dashboard).length > 0)
+        ? union(dashboards.map(legacyUsers))
+        : []),
+    refreshMinutes: config.refreshMinutes ?? (intervals.length > 0 ? Math.min(...intervals) : 5),
+  };
+  const narrowing = (dashboard: LegacyDashboard) => {
+    if (!legacy) return [];
+    const own = { repos: dashboard.repos ?? [], users: legacyUsers(dashboard) };
+    return (["repos", "users"] as const).flatMap((key) =>
+      own[key].length === 0 || sameSet(own[key], global[key])
+        ? []
+        : [`${key.slice(0, -1)}:${own[key].join("|")}`],
+    );
+  };
+  return {
+    ...global,
+    dashboards: dashboards.map((dashboard) => {
+      const { name, filter, epicLabel, sort, swimlanes, columns } = dashboard;
+      const parts = narrowing(dashboard);
+      const own = filter && parts.length > 0 ? `(${filter})` : filter;
+      const narrowed = [own, ...parts].filter(Boolean).join(" ");
+      return { id: dashboard.id, name, filter: narrowed, epicLabel, sort, swimlanes, columns };
+    }),
+  };
+}
+
+export const ConfigSchema = ConfigShape.superRefine((config, ctx) => {
+  if (!hasUniqueIds(config.dashboards)) {
+    ctx.addIssue({ code: "custom", path: ["dashboards"], message: "ids must be unique" });
+  }
+}).transform(migrateScope);
 
 export type Swimlane = Dashboard["swimlanes"][number];
 export type Column = Dashboard["columns"][number];
 export type Sort = z.infer<typeof SortSchema>;
 export type SortBy = z.infer<typeof SortBySchema>;
 export type SortDir = z.infer<typeof SortDirSchema>;
-export type Dashboard = z.infer<typeof DashboardSchema>;
 export type Config = z.infer<typeof ConfigSchema>;
-export type ConfigInput = z.input<typeof ConfigSchema>;
+export type Dashboard = Config["dashboards"][number];
 
 export const StarEpicRequestSchema = z.object({ epic: issueRef, starred: z.boolean() });
 export type StarEpicRequest = z.infer<typeof StarEpicRequestSchema>;
@@ -168,6 +234,8 @@ export type TextFilterKey = (typeof TEXT_FILTER_KEYS)[number];
 export type Filters = { [K in TextFilterKey]?: string } & {
   /** Repos to show, set by the repo chips; unset shows all, empty shows none. */
   repo?: string[];
+  /** Repos turned off on any board, kept per browser; only read while `repo` is unset. */
+  hide?: string[];
   sort?: SortBy;
   dir?: SortDir;
 };
@@ -175,6 +243,22 @@ export type Filters = { [K in TextFilterKey]?: string } & {
 /** The `repo` query value (`owner/a,owner/b`) as a list; absent is unset, `repo=` is empty. */
 export function parseRepoFilter(value: string | null | undefined): string[] | undefined {
   return value?.split(",").filter(Boolean);
+}
+
+/**
+ * The board repos shown: those the URL's `repo` selects when set, else all but the hidden.
+ */
+export function shownRepos(filters: Filters, boardRepos: string[]): string[] {
+  const listed = filters.repo ?? boardRepos.filter((repo) => !filters.hide?.includes(repo));
+  return selectedRepos(listed, boardRepos);
+}
+
+/** The hidden repos once `selected` is chosen on a board of `boardRepos`; others keep theirs. */
+export function hiddenRepos(selected: string[], boardRepos: string[], hidden: string[]): string[] {
+  return [
+    ...hidden.filter((repo) => !boardRepos.includes(repo)),
+    ...boardRepos.filter((repo) => !selected.includes(repo)),
+  ];
 }
 
 /**
@@ -205,6 +289,7 @@ export const FiltersSchema: z.ZodType<Filters, Record<string, unknown>> = z.obje
     typeof optionalText
   >),
   repo: z.string().optional().transform(parseRepoFilter),
+  hide: z.string().optional().transform(parseRepoFilter),
   sort: SortBySchema.optional(),
   dir: SortDirSchema.optional(),
 });

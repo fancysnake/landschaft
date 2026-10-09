@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 
+import type { LabelDef } from "../../lib/types";
+
 import { api, errorMessage } from "../../lib/client/api";
-import { type Config, type Dashboard, ME } from "../../lib/schema";
+import { type Config, type Dashboard } from "../../lib/schema";
 import { DashboardEditor } from "./DashboardEditor";
+import { ScopeEditor } from "./ScopeEditor";
 
 function newId(): string {
   return crypto.randomUUID().slice(0, 8);
@@ -12,18 +15,25 @@ function newDashboard(): Dashboard {
   return {
     id: newId(),
     name: "New dashboard",
-    repos: [],
-    users: [ME],
+    filter: "",
+    epicLabel: undefined,
     sort: { by: "updated", dir: "desc" },
-    refreshMinutes: 5,
     swimlanes: [{ id: "all", name: "Everything", filter: "", hideBlocked: false }],
     columns: [{ id: "todo", name: "Todo", filter: "" }],
   };
 }
 
+/** Selects the global panel; no dashboard id is empty. */
+const SCOPE = "";
+
 type Notice = { kind: "ok" | "error"; text: string } | null;
 
 const button = "rounded-md border px-3 py-1 text-sm";
+
+const entry = (active: boolean) =>
+  `block w-full truncate rounded-md px-2 py-1 text-left text-sm ${
+    active ? "bg-neutral-800 text-white" : "hover:bg-neutral-200"
+  }`;
 
 export default function Settings() {
   const [config, setConfig] = useState<Config | null>(null);
@@ -32,16 +42,31 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
   const [jsonText, setJsonText] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<LabelDef[]>([]);
+  const reposKey = config?.repos.join(",") ?? "";
 
   useEffect(() => {
     api
       .config()
       .then((loaded) => {
         setConfig(loaded);
-        setSelected(loaded.dashboards[0]?.id ?? null);
+        setSelected(loaded.repos.length > 0 ? (loaded.dashboards[0]?.id ?? SCOPE) : SCOPE);
       })
       .catch((cause: unknown) => setNotice({ kind: "error", text: errorMessage(cause) }));
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const request = reposKey ? api.labels(reposKey.split(",")) : Promise.resolve([]);
+    request
+      .then((labels) => {
+        if (!cancelled) setCatalog(labels);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [reposKey]);
 
   if (!config) {
     return <p className="p-6 text-sm text-neutral-500">{notice?.text ?? "Loading settings…"}</p>;
@@ -67,7 +92,7 @@ export default function Settings() {
   const removeDashboard = (id: string) => {
     const dashboards = config.dashboards.filter((d) => d.id !== id);
     update({ ...config, dashboards });
-    if (selected === id) setSelected(dashboards[0]?.id ?? null);
+    if (selected === id) setSelected(dashboards[0]?.id ?? SCOPE);
   };
 
   const save = async () => {
@@ -81,8 +106,8 @@ export default function Settings() {
       setConfig(saved);
       setJsonText(null);
       setDirty(false);
-      if (!saved.dashboards.some((d) => d.id === selected))
-        setSelected(saved.dashboards[0]?.id ?? null);
+      if (selected !== SCOPE && !saved.dashboards.some((d) => d.id === selected))
+        setSelected(saved.dashboards[0]?.id ?? SCOPE);
       setNotice({
         kind: "ok",
         text: "Saved. Newly added repositories are syncing in the background.",
@@ -95,6 +120,11 @@ export default function Settings() {
   };
 
   const current = config.dashboards.find((d) => d.id === selected) ?? null;
+  const offer = {
+    labels: [...new Set(catalog.map((label) => label.name))],
+    repos: config.repos,
+    users: config.users,
+  };
 
   return (
     <div className="mx-auto flex h-full max-w-6xl flex-col p-4">
@@ -137,14 +167,19 @@ export default function Settings() {
       ) : (
         <div className="grid min-h-0 flex-1 gap-4 sm:grid-cols-[14rem_1fr]">
           <aside className="space-y-1">
+            <button
+              type="button"
+              onClick={() => setSelected(SCOPE)}
+              className={`${entry(selected === SCOPE)} mb-3`}
+            >
+              Repositories &amp; users
+            </button>
             {config.dashboards.map((dashboard) => (
               <button
                 key={dashboard.id}
                 type="button"
                 onClick={() => setSelected(dashboard.id)}
-                className={`block w-full truncate rounded-md px-2 py-1 text-left text-sm ${
-                  dashboard.id === selected ? "bg-neutral-800 text-white" : "hover:bg-neutral-200"
-                }`}
+                className={entry(dashboard.id === selected)}
               >
                 {dashboard.name}
               </button>
@@ -158,7 +193,9 @@ export default function Settings() {
             </button>
           </aside>
           <div className="min-h-0 overflow-auto rounded-md border border-neutral-200 bg-white p-4">
-            {current ? (
+            {selected === SCOPE ? (
+              <ScopeEditor scope={config} onChange={(scope) => update({ ...config, ...scope })} />
+            ) : current ? (
               <>
                 <div className="mb-4 flex justify-end gap-2">
                   <button
@@ -176,7 +213,13 @@ export default function Settings() {
                     Delete
                   </button>
                 </div>
-                <DashboardEditor key={current.id} dashboard={current} onChange={updateDashboard} />
+                <DashboardEditor
+                  key={current.id}
+                  dashboard={current}
+                  onChange={updateDashboard}
+                  catalog={catalog}
+                  offer={offer}
+                />
               </>
             ) : (
               <p className="text-sm text-neutral-500">Create a dashboard to get started.</p>

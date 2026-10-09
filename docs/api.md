@@ -14,11 +14,12 @@ localhost only. Errors are `{ "error": "message" }` with a matching status.
 
 ## Board
 
-`GET /api/dashboards/:id/board?q=&repo=&assignee=&label=&epic=&sort=updated&dir=desc` returns the
-grid as cells keyed by swimlane and column id, the epic strip, the unplaced count and the
-label catalogue used for colouring. The React island renders it as-is; all placement logic is
+`GET /api/dashboards/:id/board?q=&repo=&hide=&assignee=&label=&epic=&sort=updated&dir=desc`
+returns the grid as cells keyed by swimlane and column id, the epic strip, the unplaced count,
+the repositories among the dashboard's items and the label catalogue used for colouring.
+`hide` lists repositories to leave out while `repo` is unset. The React island renders it as-is; all placement logic is
 server-side and unit-tested.
 
 `POST /api/dashboards/:id/starred-epics` with `{ "epic": "owner/repo#12", "starred": true }`
 marks the epic as in active development (`false` clears the mark) and returns the dashboard's
-`starredEpics`. Starring rejects an epic outside the dashboard's repositories with `400`.
+`starredEpics`. Starring rejects an epic outside the global repositories with `400`.

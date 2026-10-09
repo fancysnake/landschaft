@@ -5,19 +5,20 @@ import { buildBoard, resolveUsers } from "../../../../lib/server/board";
 import { findDashboard, loadConfig } from "../../../../lib/server/config";
 
 export const GET = route(async ({ params, url }) => {
-  const dashboard = findDashboard(loadConfig(), params.id ?? "");
+  const config = loadConfig();
+  const dashboard = findDashboard(config, params.id ?? "");
   if (!dashboard) throw new ApiError(404, "dashboard not found");
   const filters = parseQuery(FiltersSchema, url);
   const { db, syncer } = getApp();
   const viewer = await syncer.viewer().catch(() => null);
-  const users = resolveUsers(dashboard.users, viewer);
+  const users = config.users.length > 0 ? resolveUsers(config.users, viewer) : null;
   const board = buildBoard(
-    db.listIssues(dashboard.repos),
+    db.listIssues(config.repos),
     dashboard,
     filters,
     users,
     db.starredEpics(dashboard.id),
     viewer,
   );
-  return json({ dashboard, users, board, status: syncer.status() });
+  return json({ dashboard, board, status: syncer.status() });
 });

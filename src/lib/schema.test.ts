@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { filtersToQuery } from "./client/api";
 import { readFilters } from "./client/useUrlFilters";
-import { FiltersSchema, repoFilter, selectedRepos } from "./schema";
+import { FiltersSchema, hiddenRepos, repoFilter, selectedRepos, shownRepos } from "./schema";
 
 describe("repo filter", () => {
   const repos = ["acme/a", "acme/b", "acme/c"];
@@ -28,5 +28,21 @@ describe("repo filter", () => {
   it("falls back to every repo for a stale list or a single-repo dashboard", () => {
     expect(selectedRepos(["acme/gone"], repos)).toEqual(repos);
     expect(selectedRepos([], ["acme/a"])).toEqual(["acme/a"]);
+  });
+});
+
+describe("hidden repos", () => {
+  const board = ["acme/a", "acme/b"];
+
+  it("hides what a board turned off and keeps what other boards hid", () => {
+    expect(hiddenRepos(["acme/a"], board, ["acme/b", "acme/x"])).toEqual(["acme/x", "acme/b"]);
+    expect(hiddenRepos(board, board, ["acme/a", "acme/x"])).toEqual(["acme/x"]);
+  });
+
+  it("shows all but the hidden, unless the URL picks repos", () => {
+    expect(shownRepos({ hide: ["acme/b", "acme/x"] }, board)).toEqual(["acme/a"]);
+    expect(shownRepos({ hide: ["acme/b"], repo: ["acme/b"] }, board)).toEqual(["acme/b"]);
+    expect(shownRepos({ hide: board }, board)).toEqual([]);
+    expect(shownRepos({}, board)).toEqual(board);
   });
 });

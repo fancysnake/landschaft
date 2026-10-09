@@ -3,8 +3,6 @@ import type { Board, LabelDef, SyncStatus } from "../types";
 
 export interface BoardResponse {
   dashboard: Dashboard;
-  /** The dashboard's users with `@me` resolved; see `resolveUsers`. */
-  users: string[];
   board: Board;
   status: SyncStatus;
 }

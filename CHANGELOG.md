@@ -7,6 +7,18 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- Settings suggest repos after `repo:` and users after `user:`, `author:` and `assignee:`.
+
+### Changed
+
+- Repositories, users and the refresh interval are global, set in a new settings panel. Each
+  dashboard narrows them with an optional filter, such as `repo:acme/app user:@me`, which may
+  not use `other`. Old configs migrate on load.
+- A board's repo chips list the repositories among its items. A repo switched off stays off on
+  every board in this browser; a `repo=` in the URL still wins.
+
 ### Fixed
 
 - The board no longer shows items from a deselected repo after a sync. A reload after sync or

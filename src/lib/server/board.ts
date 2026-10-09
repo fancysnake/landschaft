@@ -11,7 +11,7 @@ import {
   type Filters,
   ME,
   OTHER_LOOKS_AT,
-  selectedRepos,
+  shownRepos,
   type SortBy,
   type SortDir,
 } from "../schema";
@@ -127,7 +127,7 @@ function compareBy(by: SortBy, dir: SortDir) {
 }
 
 /**
- * The dashboard's users as plain logins: `@me` becomes `viewer`, or drops out while that is
+ * The global users as plain logins: `@me` becomes `viewer`, or drops out while that is
  * unknown, and a `[bot]` suffix comes off, since synced bot logins lack it.
  */
 export function resolveUsers(users: string[], viewer: string | null): string[] {
@@ -137,38 +137,44 @@ export function resolveUsers(users: string[], viewer: string | null): string[] {
   });
 }
 
-function byUsers(dashboard: Dashboard, users: string[]): (issue: Issue) => boolean {
-  if (dashboard.users.length === 0) return () => true;
+function byUsers(users: string[] | null): (issue: Issue) => boolean {
+  if (users === null) return () => true;
   const logins = new Set(users.map((user) => user.toLowerCase()));
   const listed = (login: string | null) => login !== null && logins.has(login.toLowerCase());
   return (issue) => listed(issue.author) || issue.assignees.some(({ login }) => listed(login));
 }
 
 /**
- * Lays the open issues out on the dashboard's grid. `users` is the dashboard's users through
- * `resolveUsers`; when the dashboard lists any, only issues one of them authored or is
- * assigned to take part. `starred` epic keys lead the epic strip. `viewer` is what `@me`
- * in a filter stands for.
+ * Lays the open issues out on the dashboard's grid. `issues` are the global repos'; of them,
+ * only those one of `users` (the global users through `resolveUsers`, null for everyone)
+ * authored or is assigned to and that pass the dashboard's filter take part. `starred` epic
+ * keys lead the epic strip. `viewer` is what `@me` in a filter stands for.
  */
 export function buildBoard(
   issues: Issue[],
   dashboard: Dashboard,
   filters: Filters = {},
-  users: string[] = [],
+  users: string[] | null = null,
   starred: ReadonlySet<string> = new Set(),
   viewer: string | null = null,
 ): Board {
   const byKey = new Map(issues.map((issue) => [issueKey(issue.repo, issue.number), issue]));
-  const listed = byUsers(dashboard, users);
-  const repos = new Set(selectedRepos(filters.repo, dashboard.repos));
+  const listed = byUsers(users);
   const wanted = issueFilter(filters, byKey);
-  const open = issues.filter((issue) => issue.state === "OPEN" && listed(issue));
   // From all of `issues`, not just `open`.
   const itemOf = itemsOf(issues, byKey);
+  const scope = parseFilter(dashboard.filter);
+  const open = issues.filter(
+    (issue) =>
+      issue.state === "OPEN" && listed(issue) && matchesFilter(scope, itemOf(issue), { viewer }),
+  );
+  const present = [...new Set(open.map((issue) => issue.repo))].toSorted();
+  const repos = new Set(shownRepos(filters, present));
   const axes = { swimlanes: compile(dashboard.swimlanes), columns: compile(dashboard.columns) };
   const epicLabel = dashboard.epicLabel && labelKey(dashboard.epicLabel);
   // By `labelKey`, like every label comparison here.
   const structural = new Set<string>([
+    ...askedLabels(scope),
     ...[...axes.swimlanes, ...axes.columns].flatMap((group) => askedLabels(group.node)),
     ...(epicLabel ? [epicLabel] : []),
   ]);
@@ -183,6 +189,7 @@ export function buildBoard(
     epics: [],
     unplaced: 0,
     total: 0,
+    repos: present,
     assignees: [],
     labels: [],
     sort,

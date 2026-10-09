@@ -1,9 +1,8 @@
 import { useId } from "react";
 
 import type { Axis } from "../../lib/schema";
-import type { LabelDef } from "../../lib/types";
 
-import { filterError, suggestFilter } from "../../lib/filter";
+import { filterError, type Offer, suggestFilter } from "../../lib/filter";
 
 interface Group {
   id: string;
@@ -17,8 +16,8 @@ interface Props<T extends Group> {
   items: T[];
   onChange(items: T[]): void;
   create(id: string): T;
-  /** Suggested after `label:`. */
-  labels: LabelDef[];
+  /** Completed in filters. */
+  offer: Offer;
   /** Swimlanes get the "hide blocked" toggle. */
   axis: Axis;
 }
@@ -42,7 +41,7 @@ export function LaneColumnEditor<T extends Group>({
   items,
   onChange,
   create,
-  labels,
+  offer,
   axis,
 }: Props<T>) {
   const replace = (index: number, item: T) =>
@@ -53,7 +52,6 @@ export function LaneColumnEditor<T extends Group>({
     next.splice(b, 0, item!);
     onChange(next);
   };
-  const labelNames = [...new Set(labels.map((label) => label.name))];
 
   return (
     <section>
@@ -91,7 +89,7 @@ export function LaneColumnEditor<T extends Group>({
             <FilterInput
               value={item.filter}
               onChange={(filter) => replace(index, { ...item, filter })}
-              labels={labelNames}
+              offer={offer}
             />
             <div className="flex gap-1">
               <button
@@ -134,25 +132,30 @@ export function LaneColumnEditor<T extends Group>({
 }
 
 /** A filter expression with completions for its last term and the parse error below it. */
-function FilterInput({
+export function FilterInput({
   value,
   onChange,
-  labels,
+  offer,
+  validate = filterError,
+  placeholder = "empty = all, e.g. label:bug -is:pr, other label:bug",
 }: {
   value: string;
   onChange(value: string): void;
-  labels: string[];
+  offer: Offer;
+  /** The error to show for `value`, or null. */
+  validate?: (value: string) => string | null;
+  placeholder?: string;
 }) {
   const listId = useId();
   const errorId = useId();
-  const error = filterError(value);
+  const error = validate(value);
   return (
     <div>
       <input
         list={listId}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder="empty = all, e.g. label:bug -is:pr, other label:bug"
+        placeholder={placeholder}
         aria-invalid={error !== null}
         aria-describedby={error ? errorId : undefined}
         spellCheck={false}
@@ -161,7 +164,7 @@ function FilterInput({
         }`}
       />
       <datalist id={listId}>
-        {suggestFilter(value, labels).map((option) => (
+        {suggestFilter(value, offer).map((option) => (
           <option key={option} value={option} />
         ))}
       </datalist>

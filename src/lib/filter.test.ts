@@ -6,9 +6,11 @@ import {
   type FilterItem,
   filterError,
   matchesFilter,
+  type Offer,
   parseFilter,
   quoteValue,
   suggestFilter,
+  usesOther,
 } from "./filter";
 
 const item = (extra: Partial<FilterItem> = {}): FilterItem => ({
@@ -183,19 +185,45 @@ describe("quoteValue", () => {
   });
 });
 
+const offer = (extra: Partial<Offer> = {}): Offer => ({
+  labels: [],
+  repos: [],
+  users: [],
+  ...extra,
+});
+
 describe("suggestFilter", () => {
   it("completes keys, then the key's values", () => {
-    expect(suggestFilter("", [])).toContain("label:");
-    expect(suggestFilter("oth", [])).toEqual(["other"]);
-    expect(suggestFilter("is:pr -la", [])).toEqual(["is:pr -label:"]);
-    expect(suggestFilter("label:", ["bug", "needs review"])).toEqual([
+    expect(suggestFilter("", offer())).toContain("label:");
+    expect(suggestFilter("oth", offer())).toEqual(["other"]);
+    expect(suggestFilter("is:pr -la", offer())).toEqual(["is:pr -label:"]);
+    expect(suggestFilter("label:", offer({ labels: ["bug", "needs review"] }))).toEqual([
       "label:bug",
       'label:"needs review"',
     ]);
-    expect(suggestFilter("(label:x|B", ["bug", "x"])).toEqual(["(label:x|bug"]);
-    expect(suggestFilter("is:ci", [])).toEqual(["is:ci:failed", "is:ci:running"]);
-    expect(suggestFilter("repo:", [])).toEqual([]);
-    expect(suggestFilter("constructor:", [])).toEqual([]);
-    expect(suggestFilter("has:", [])).toEqual(["has:parent-issue", "has:sub-issues"]);
+    expect(suggestFilter("(label:x|B", offer({ labels: ["bug", "x"] }))).toEqual(["(label:x|bug"]);
+    expect(suggestFilter("is:ci", offer())).toEqual(["is:ci:failed", "is:ci:running"]);
+    expect(suggestFilter("constructor:", offer())).toEqual([]);
+    expect(suggestFilter("has:", offer())).toEqual(["has:parent-issue", "has:sub-issues"]);
+  });
+
+  it("completes repos and users from the offer", () => {
+    const repos = ["acme/app", "acme/lib"];
+    expect(suggestFilter("repo:", offer())).toEqual([]);
+    expect(suggestFilter("repo:acme/l", offer({ repos }))).toEqual(["repo:acme/lib"]);
+    expect(suggestFilter("user:", offer({ users: ["ann", "@me"] }))).toEqual([
+      "user:@me",
+      "user:ann",
+    ]);
+    expect(suggestFilter("author:a", offer({ users: ["ann"] }))).toEqual(["author:ann"]);
+  });
+});
+
+describe("usesOther", () => {
+  it("finds `other` at any depth", () => {
+    expect(usesOther(parseFilter("label:a"))).toBe(false);
+    expect(usesOther(parseFilter(""))).toBe(false);
+    expect(usesOther(parseFilter("other"))).toBe(true);
+    expect(usesOther(parseFilter("label:a (is:pr OR -other)"))).toBe(true);
   });
 });

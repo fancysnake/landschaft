@@ -2,7 +2,6 @@ import type { Config } from "../schema";
 import type { SyncStatus } from "../types";
 import type { Db } from "./db";
 
-import { refreshMinutesByRepo } from "./config";
 import {
   fetchIssuesPage,
   fetchPullStatuses,
@@ -191,8 +190,7 @@ export class Syncer {
 }
 
 /**
- * Every tick, syncs each configured repo whose last sync is older than the smallest
- * refreshMinutes among the dashboards using it. Re-reads the config each tick, so
+ * Every tick, syncs each configured repo whose last sync is older than the refresh interval. Re-reads the config each tick, so
  * settings changes apply without a restart. Returns a stop function.
  */
 export function startScheduler(
@@ -211,11 +209,12 @@ export function startScheduler(
       syncer.lastError = `config: ${errorMessage(error)}`;
       return;
     }
-    for (const [repo, minutes] of refreshMinutesByRepo(config)) {
+    for (const repo of config.repos) {
       if (stopped || syncer.inFlight.has(repo)) continue;
       const state = syncer.db.getSyncState(repo);
       const due =
-        !state?.lastSyncAt || Date.now() - Date.parse(state.lastSyncAt) >= minutes * 60_000;
+        !state?.lastSyncAt ||
+        Date.now() - Date.parse(state.lastSyncAt) >= config.refreshMinutes * 60_000;
       if (!due) continue;
       await syncer.syncRepo(repo).catch(() => undefined);
     }
