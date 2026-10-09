@@ -53,8 +53,8 @@ describe("config file", () => {
       sort: { by: "updated", dir: "desc" },
       refreshMinutes: 5,
       users: ["@me"],
-      swimlanes: [{ id: "all", filter: "", hideBlocked: false }],
-      columns: [{ id: "todo", filter: "" }],
+      swimlanes: [{ id: "all", filter: "other", hideBlocked: false }],
+      columns: [{ id: "todo", filter: "other" }],
     });
     expect(loadConfig(file)).toEqual(saved);
     expect(existsSync(`${file}.tmp`)).toBe(false);
@@ -97,21 +97,6 @@ describe("config schema rules", () => {
     expect(() => saveConfig(dupLanes, "/dev/null/never")).toThrow(/unique/);
   });
 
-  it("rejects two catch-alls on one axis", () => {
-    const twoCatchAlls = {
-      dashboards: [
-        {
-          ...base,
-          columns: [
-            { id: "a", name: "A" },
-            { id: "b", name: "B" },
-          ],
-        },
-      ],
-    };
-    expect(() => saveConfig(twoCatchAlls, "/dev/null/never")).toThrow(/catch-all/);
-  });
-
   const laneFiltered = (filter: string) => ({
     dashboards: [{ ...base, swimlanes: [{ id: "a", name: "A", filter }] }],
   });
@@ -144,8 +129,34 @@ describe("config schema rules", () => {
     );
     expect(lane({ labels: ["x OR y"], kind: "pr" })?.filter).toBe('is:pr label:"x OR y"');
     expect(lane({ kind: "pr" })?.filter).toBe("is:pr");
-    expect(lane({ labels: [], match: "any", kind: "any" })?.filter).toBe("");
+    expect(lane({ labels: [], match: "any", kind: "any" })?.filter).toBe("other");
     expect(lane({ filter: "label:x", labels: ["y"] })?.filter).toBe("label:x");
+  });
+
+  it("turns a legacy catch-all into `other` minus the entries it does not look at", () => {
+    const swimlanes = [
+      { id: "a", name: "A", labels: ["a"] },
+      { id: "rest", name: "Rest" },
+      { id: "b", name: "B", labels: ["b"] },
+    ];
+    const columns = [
+      { id: "a", name: "A", labels: ["a"] },
+      { id: "rest", name: "Rest" },
+      { id: "b", name: "B", labels: ["b"], kind: "pr" },
+      { id: "c", name: "C", filter: "" },
+    ];
+    const parsed = ConfigSchema.parse({ dashboards: [{ ...base, swimlanes, columns }] });
+    expect(parsed.dashboards[0]?.swimlanes.map((group) => group.filter)).toEqual([
+      "label:a",
+      "other -(label:b)",
+      "label:b",
+    ]);
+    expect(parsed.dashboards[0]?.columns.map((column) => column.filter)).toEqual([
+      "label:a",
+      "other -(label:a)",
+      "is:pr label:b",
+      "",
+    ]);
   });
 
   it("rejects malformed repo names", () => {

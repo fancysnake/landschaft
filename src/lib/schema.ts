@@ -11,7 +11,7 @@ const id = z
 export const repoName = z.string().regex(REPO, "expected owner/repo");
 const issueRef = z.string().regex(ISSUE_REF, "expected owner/repo#number");
 
-/** A filter expression (see `filter.ts`); empty is the catch-all. */
+/** A filter expression (see `filter.ts`); empty matches everything. */
 const filterText = z.string().superRefine((text, ctx) => {
   const message = filterError(text);
   if (message) ctx.addIssue({ code: "custom", message });
@@ -25,7 +25,10 @@ const LegacyGroupSchema = z.object({
 });
 type LegacyGroup = z.infer<typeof LegacyGroupSchema>;
 
-/** The filter a legacy group stands for: any → `label:a|b`, all → `label:a label:b`. */
+/**
+ * The filter a legacy group stands for: any → `label:a|b`, all → `label:a label:b`; empty for
+ * the catch-all, which `settleCatchAll` rewrites.
+ */
 function legacyFilter({ labels = [], match = "any", kind = "any" }: LegacyGroup): string {
   const plain = labels.filter((name) => !isStatusLabel(name)).map(quoteValue);
   const statuses = labels.filter(isStatusLabel);
@@ -39,6 +42,9 @@ function legacyFilter({ labels = [], match = "any", kind = "any" }: LegacyGroup)
   return [`is:${kind}`, ored ? `(${body})` : body].filter(Boolean).join(" ");
 }
 
+/** Migrated groups that were the legacy catch-all. */
+const legacyCatchAlls = new WeakSet<object>();
+
 /** Old configs carry `labels`/`match`/`kind`; they turn into `filter` unless one is set. */
 function migrateGroup<T extends LegacyGroup & { filter?: string }>({
   labels,
@@ -47,8 +53,36 @@ function migrateGroup<T extends LegacyGroup & { filter?: string }>({
   filter: text,
   ...group
 }: T) {
-  return { ...group, filter: text ?? legacyFilter({ labels, match, kind }) };
+  const migrated = { ...group, filter: text ?? legacyFilter({ labels, match, kind }) };
+  if (text === undefined && migrated.filter === "") legacyCatchAlls.add(migrated);
+  return migrated;
 }
+
+export type Axis = "swimlanes" | "columns";
+
+/**
+ * Which way `other` looks on each axis: up the swimlanes, so the bottom one is the catch-all,
+ * and rightward across the columns, so the leftmost one is.
+ */
+export const OTHER_LOOKS_AT: Record<Axis, "earlier" | "later"> = {
+  swimlanes: "earlier",
+  columns: "later",
+};
+
+/**
+ * A legacy catch-all took what no other entry took: `other` excludes the entries it looks at,
+ * a `-(…)` each of the rest.
+ */
+const settleCatchAll =
+  (axis: Axis) =>
+  <T extends { filter: string }>(groups: T[]): T[] =>
+    groups.map((group, index) => {
+      if (!legacyCatchAlls.has(group)) return group;
+      const unseen =
+        OTHER_LOOKS_AT[axis] === "earlier" ? groups.slice(index + 1) : groups.slice(0, index);
+      const excluded = unseen.flatMap(({ filter }) => (filter ? [`-(${filter})`] : []));
+      return { ...group, filter: ["other", ...excluded].join(" ") };
+    });
 
 export const SwimlaneSchema = z
   .object({
@@ -81,19 +115,6 @@ function hasUniqueIds(items: { id: string }[]): boolean {
   return new Set(items.map((item) => item.id)).size === items.length;
 }
 
-/** An empty filter: takes whatever no other entry does. */
-export function isCatchAll(group: { filter: string }): boolean {
-  return group.filter.trim() === "";
-}
-
-/**
- * Which matching entry wins on each axis: the first swimlane, but the last column, so a card
- * carrying two stages' labels sits in the later one.
- */
-export const AXIS_PRECEDENCE = { swimlanes: "first", columns: "last" } as const;
-export type Axis = keyof typeof AXIS_PRECEDENCE;
-export type Precedence = (typeof AXIS_PRECEDENCE)[Axis];
-
 /** Stands for the token's account in a dashboard's `users`. */
 export const ME = "@me";
 
@@ -112,20 +133,13 @@ export const DashboardSchema = z
     epicLabel: z.string().min(1).optional(),
     sort: SortSchema.default({ by: "updated", dir: "desc" }),
     refreshMinutes: z.number().int().min(1).max(1440).default(5),
-    swimlanes: z.array(SwimlaneSchema).min(1),
-    columns: z.array(ColumnSchema).min(1),
+    swimlanes: z.array(SwimlaneSchema).min(1).transform(settleCatchAll("swimlanes")),
+    columns: z.array(ColumnSchema).min(1).transform(settleCatchAll("columns")),
   })
   .superRefine((dashboard, ctx) => {
     for (const axis of ["swimlanes", "columns"] as const) {
       if (!hasUniqueIds(dashboard[axis])) {
         ctx.addIssue({ code: "custom", path: [axis], message: "ids must be unique" });
-      }
-      if (dashboard[axis].filter(isCatchAll).length > 1) {
-        ctx.addIssue({
-          code: "custom",
-          path: [axis],
-          message: "at most one catch-all (empty filter) allowed",
-        });
       }
     }
   })

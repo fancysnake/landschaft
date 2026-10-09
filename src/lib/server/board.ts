@@ -2,11 +2,10 @@ import type { StatusLabel } from "../status";
 
 import { askedLabels, type FilterNode, labelKey, matchesFilter, parseFilter } from "../filter";
 import {
-  AXIS_PRECEDENCE,
   type Dashboard,
   type Filters,
   ME,
-  type Precedence,
+  OTHER_LOOKS_AT,
   selectedRepos,
   type SortBy,
   type SortDir,
@@ -21,7 +20,7 @@ import {
   type IssueRef,
 } from "../types";
 
-/** A swimlane or column with its filter parsed; a null `node` is the catch-all. */
+/** A swimlane or column with its filter parsed; a null `node` matches everything. */
 export interface Group {
   id: string;
   node: FilterNode | null;
@@ -32,27 +31,22 @@ export const compile = <T extends { id: string; filter: string }>(groups: T[]): 
   groups.map((group) => ({ ...group, node: parseFilter(group.filter) }));
 
 /**
- * The `first` (or `last`) group in the list whose filter `hit` accepts; otherwise the
- * catch-all, wherever it sits in the list; otherwise null.
+ * Every group whose filter `hit` accepts, in list order. `hit` gets whether `other` holds:
+ * no group it looks at (see `OTHER_LOOKS_AT`) matched.
  */
 export function placeIn<T extends Group>(
   groups: T[],
-  hit: (node: FilterNode) => boolean,
-  precedence: Precedence = "first",
-): T | null {
-  const matched = (group: T) => group.node !== null && hit(group.node);
-  const found = precedence === "first" ? groups.find(matched) : groups.findLast(matched);
-  return found ?? groups.find((group) => group.node === null) ?? null;
-}
-
-/** The lane and column an item lands in, each picked by its axis's `AXIS_PRECEDENCE`. */
-export function placeCard<L extends Group, C extends Group>(
-  axes: { swimlanes: L[]; columns: C[] },
-  hit: (node: FilterNode) => boolean,
-): { lane: L; column: C } | null {
-  const lane = placeIn(axes.swimlanes, hit, AXIS_PRECEDENCE.swimlanes);
-  const column = placeIn(axes.columns, hit, AXIS_PRECEDENCE.columns);
-  return lane && column ? { lane, column } : null;
+  hit: (node: FilterNode, other: boolean) => boolean,
+  looksAt: "earlier" | "later" = "earlier",
+): T[] {
+  let caught = false;
+  const accepted = new Set<T>();
+  for (const group of looksAt === "earlier" ? groups : groups.toReversed()) {
+    if (group.node !== null && !hit(group.node, !caught)) continue;
+    accepted.add(group);
+    caught = true;
+  }
+  return groups.filter((group) => accepted.has(group));
 }
 
 /** Blocked while any blocker is open. Prefers the blocker's cached row over the snapshot state. */
@@ -177,6 +171,7 @@ export function buildBoard(
     hiddenBlocked: {},
     epics: [],
     unplaced: 0,
+    total: 0,
     assignees: [],
     labels: [],
     sort,
@@ -211,17 +206,15 @@ export function buildBoard(
     const statuses = statusesFor(issue);
     const blocked = isBlocked(issue, byKey);
     const item = { ...issue, statuses, blocked, blocking: blocking.has(keyOf(issue)) };
-    const placed = placeCard(axes, (node) => matchesFilter(node, item, viewer));
-    if (!placed) {
+    const hit = (node: FilterNode, other: boolean) =>
+      matchesFilter(node, { ...item, other }, viewer);
+    const lanes = placeIn(axes.swimlanes, hit, OTHER_LOOKS_AT.swimlanes);
+    const columns = placeIn(axes.columns, hit, OTHER_LOOKS_AT.columns);
+    if (lanes.length === 0 || columns.length === 0) {
       board.unplaced += 1;
       continue;
     }
-    const { lane, column } = placed;
-    if (lane.hideBlocked && blocked) {
-      board.hiddenBlocked[lane.id] = (board.hiddenBlocked[lane.id] ?? 0) + 1;
-      continue;
-    }
-    board.cells[cellKey(lane.id, column.id)]!.push({
+    const card: Card = {
       key: issueKey(issue.repo, issue.number),
       kind: issue.kind,
       repo: issue.repo,
@@ -236,8 +229,18 @@ export function buildBoard(
       statuses,
       createdAt: issue.createdAt,
       updatedAt: issue.updatedAt,
-    });
-    board.laneTotals[lane.id] = (board.laneTotals[lane.id] ?? 0) + 1;
+    };
+    let shownInAny = false;
+    for (const lane of lanes) {
+      if (lane.hideBlocked && blocked) {
+        board.hiddenBlocked[lane.id] = (board.hiddenBlocked[lane.id] ?? 0) + 1;
+        continue;
+      }
+      for (const column of columns) board.cells[cellKey(lane.id, column.id)]!.push(card);
+      board.laneTotals[lane.id] = (board.laneTotals[lane.id] ?? 0) + 1;
+      shownInAny = true;
+    }
+    if (shownInAny) board.total += 1;
   }
 
   const compare = compareBy(sort.by, sort.dir);

@@ -15,9 +15,15 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Changed
 
+- An item shows in every swimlane and column whose filter it matches, not only the first lane
+  and last column.
+- An empty filter matches every item. The term `other` holds for items no swimlane above, or
+  no column to the right, matched: `other` alone makes the bottom swimlane or the leftmost
+  column a catch-all, and `other label:b` below a `label:a` lane takes the `b` items that lane
+  did not.
 - Labels, the epic label among them, match by name, ignoring case.
 - `labels`, `match` and `kind` on swimlanes and columns become `filter`; old configs convert
-  on load.
+  on load, a catch-all to `other` minus the entries `other` does not look at.
 
 ### Removed
 

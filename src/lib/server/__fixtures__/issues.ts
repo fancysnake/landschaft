@@ -45,10 +45,10 @@ export const DASHBOARD: Dashboard = {
   swimlanes: [
     { id: "high", name: "High", filter: "label:prio:high", hideBlocked: false },
     { id: "low", name: "Low", filter: "label:prio:low", hideBlocked: true },
-    { id: "rest", name: "Rest", filter: "", hideBlocked: false },
+    { id: "rest", name: "Rest", filter: "other", hideBlocked: false },
   ],
   columns: [
-    { id: "todo", name: "Todo", filter: "" },
+    { id: "todo", name: "Todo", filter: "other" },
     { id: "doing", name: "Doing", filter: "label:phase:doing" },
     { id: "done", name: "Done", filter: "label:phase:done|phase:shipped" },
   ],

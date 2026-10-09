@@ -117,6 +117,8 @@ export interface Board {
   hiddenBlocked: Record<string, number>;
   epics: Epic[];
   unplaced: number;
+  /** Issues shown in at least one cell; one in several cells counts once. */
+  total: number;
   assignees: string[];
   labels: string[];
   sort: { by: SortBy; dir: SortDir };

@@ -21,13 +21,21 @@
           "hideBlocked": false
         },
         { "id": "normal", "name": "Normal", "filter": "label:prio:normal", "hideBlocked": true },
-        { "id": "rest", "name": "Unprioritised", "filter": "", "hideBlocked": true }
+        { "id": "rest", "name": "Unprioritised", "filter": "other", "hideBlocked": true }
       ],
       "columns": [
         { "id": "backlog", "name": "Backlog", "filter": "label:backlog" },
-        { "id": "ready", "name": "Ready", "filter": "" },
+        {
+          "id": "ready",
+          "name": "Ready",
+          "filter": "other -label:backlog"
+        },
         { "id": "doing", "name": "In progress", "filter": "label:phase:doing" },
-        { "id": "review", "name": "In review", "filter": "label:phase:review|\"needs review\"" },
+        {
+          "id": "review",
+          "name": "In review",
+          "filter": "label:phase:review|\"needs review\" -label:wait"
+        },
         { "id": "stuck", "name": "Review blocked", "filter": "label:phase:review label:wait" }
       ]
     }

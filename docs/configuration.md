@@ -23,21 +23,21 @@ the file is plain JSON you can also edit by hand (it is validated on load and on
 
 ## Swimlane and column
 
-| Field         | Type                | Default  | Meaning                                                                  |
-| ------------- | ------------------- | -------- | ------------------------------------------------------------------------ |
-| `id`          | `[a-z0-9_-]{1,32}`  | required | Unique within its axis; keys the board's cells                           |
-| `name`        | string              | required | Header text                                                              |
-| `filter`      | string              | `""`     | Items this entry takes, in GitHub search syntax; **empty = catch-all**   |
-| `hideBlocked` | boolean (swimlanes) | `false`  | Drop issues with at least one open blocker, and show how many it dropped |
+| Field         | Type                | Default  | Meaning                                                                                                                      |
+| ------------- | ------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `id`          | `[a-z0-9_-]{1,32}`  | required | Unique within its axis; keys the board's cells                                                                               |
+| `name`        | string              | required | Header text                                                                                                                  |
+| `filter`      | string              | `""`     | Items this entry takes, in GitHub search syntax; empty = everything, `other` = what no lane above / column to the right took |
+| `hideBlocked` | boolean (swimlanes) | `false`  | Drop issues with at least one open blocker, and show how many it dropped                                                     |
 
 A filter combines terms such as `label:prio:high`, `is:pr`, `is:ci:failed` or `user:@me`; see
 [How the board works](board.md#placement) for the syntax and every term.
 
-Rules the validator enforces: ids are unique per axis and across dashboards, each filter parses,
-and each axis has at most one catch-all.
+Rules the validator enforces: ids are unique per axis and across dashboards, and each filter
+parses.
 
 Configs from before filters keep loading: `labels`, `match` and `kind` turn into a filter
-(`any` → `label:a|b`, `all` → `label:a label:b`, `kind` → `is:pr …`), and the next save
+(`any` → `label:a|b`, `all` → `label:a label:b`, `kind` → `is:pr …`, no labels → `other` minus the entries it does not look at), and the next save
 writes it.
 
 ## Files and environment

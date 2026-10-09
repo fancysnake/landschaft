@@ -3,11 +3,10 @@ import { describe, expect, it } from "vitest";
 import { askedLabels, type FilterNode } from "../filter";
 import { cellKey } from "../types";
 import { DASHBOARD, label, makeIssue, REPO } from "./__fixtures__/issues";
-import { buildBoard, compile, isBlocked, placeCard, placeIn, resolveUsers } from "./board";
+import { buildBoard, compile, isBlocked, placeIn, resolveUsers } from "./board";
 
 const cell = (laneId: string, colId: string) => cellKey(laneId, colId);
 const TWO_REPOS = { ...DASHBOARD, repos: [REPO, "acme/other"] };
-const AXES = { swimlanes: compile(DASHBOARD.swimlanes), columns: compile(DASHBOARD.columns) };
 const numbers = (board: ReturnType<typeof buildBoard>) =>
   board.cells[cell("rest", "todo")]?.map((c) => c.number);
 
@@ -17,54 +16,21 @@ const hitting =
   (node: FilterNode) =>
     askedLabels(node).some((name) => hits.includes(name));
 
+const ids = (groups: { id: string }[]) => groups.map((group) => group.id);
+
 describe("placeIn", () => {
-  it("takes the first group that matches", () => {
+  it("takes every group that matches, an empty filter matching all", () => {
     const groups = compile([
       { id: "a", filter: "label:x" },
       { id: "b", filter: "label:y" },
-    ]);
-    expect(placeIn(groups, hitting("y", "x"))?.id).toBe("a");
-    expect(placeIn(groups, hitting("y"))?.id).toBe("b");
-  });
-
-  it("falls back to the catch-all wherever it is listed", () => {
-    const groups = compile([
       { id: "all", filter: "" },
-      { id: "a", filter: "label:x" },
     ]);
-    expect(placeIn(groups, hitting("x"))?.id).toBe("a");
-    expect(placeIn(groups, () => false)?.id).toBe("all");
-    expect(placeIn(groups, () => true)?.id).toBe("a");
+    expect(ids(placeIn(groups, hitting("y", "x")))).toEqual(["a", "b", "all"]);
+    expect(ids(placeIn(groups, hitting("y")))).toEqual(["b", "all"]);
   });
 
-  it("returns null without a match and without a catch-all", () => {
-    expect(placeIn(compile([{ id: "a", filter: "label:x" }]), () => false)).toBeNull();
-  });
-
-  it("takes the last match when asked, the catch-all still only as a fallback", () => {
-    const groups = compile([
-      { id: "a", filter: "label:x" },
-      { id: "rest", filter: "" },
-      { id: "b", filter: "label:y" },
-    ]);
-    expect(placeIn(groups, hitting("x", "y"), "last")?.id).toBe("b");
-    expect(placeIn(groups, hitting("x"), "last")?.id).toBe("a");
-    expect(placeIn(groups, () => false, "last")?.id).toBe("rest");
-  });
-});
-
-describe("placeCard", () => {
-  it("puts a card matching two columns in the later one, two lanes in the earlier", () => {
-    const hit = hitting("prio:high", "prio:low", "phase:doing", "phase:done");
-    expect(placeCard(AXES, hit)).toMatchObject({
-      lane: { id: "high" },
-      column: { id: "done" },
-    });
-  });
-
-  it("returns null when no column matches and none is the catch-all", () => {
-    const columns = AXES.columns.filter((column) => column.node !== null);
-    expect(placeCard({ ...AXES, columns }, () => false)).toBeNull();
+  it("returns nothing without a match and without `other`", () => {
+    expect(placeIn(compile([{ id: "a", filter: "label:x" }]), () => false)).toEqual([]);
   });
 });
 
@@ -110,7 +76,7 @@ describe("buildBoard", () => {
     const dashboard = {
       ...DASHBOARD,
       columns: [
-        { id: "todo", name: "Todo", filter: "" },
+        { id: "todo", name: "Todo", filter: "-label:phase:doing" },
         { id: "doing", name: "Doing", filter: "label:phase:doing" },
         { id: "waiting", name: "Waiting", filter: "label:phase:doing label:wait" },
       ],
@@ -122,7 +88,7 @@ describe("buildBoard", () => {
     ];
     const board = buildBoard(issues, dashboard);
     expect(board.cells[cell("rest", "waiting")]?.map((c) => c.number)).toEqual([1]);
-    expect(board.cells[cell("rest", "doing")]?.map((c) => c.number)).toEqual([2]);
+    expect(board.cells[cell("rest", "doing")]?.map((c) => c.number)).toEqual([2, 1]);
     expect(board.cells[cell("rest", "todo")]?.map((c) => c.number)).toEqual([3]);
     expect(board.labels).toEqual([]);
   });
@@ -169,7 +135,49 @@ describe("buildBoard", () => {
     expect(resolveUsers(["@me", "ann"], null)).toEqual(["ann"]);
   });
 
-  it("puts pull requests in a PR swimlane", () => {
+  it("gives `other` what no earlier lane took", () => {
+    const dashboard = {
+      ...DASHBOARD,
+      swimlanes: [
+        { id: "a", name: "A", filter: "label:a", hideBlocked: false },
+        { id: "b", name: "B", filter: "other label:b", hideBlocked: false },
+        { id: "rest", name: "Rest", filter: "other", hideBlocked: false },
+      ],
+    };
+    const issues = [
+      makeIssue({ number: 1, labels: [label("a"), label("b")] }),
+      makeIssue({ number: 2, labels: [label("b")] }),
+      makeIssue({ number: 3 }),
+    ];
+    const board = buildBoard(issues, dashboard);
+    const lane = (id: string) => board.cells[cell(id, "todo")]?.map((c) => c.number);
+    expect(lane("a")).toEqual([1]);
+    expect(lane("b")).toEqual([2]);
+    expect(lane("rest")).toEqual([3]);
+  });
+
+  it("gives a column's `other` what no column to its right took", () => {
+    const dashboard = {
+      ...DASHBOARD,
+      columns: [
+        { id: "rest", name: "Rest", filter: "other" },
+        { id: "b", name: "B", filter: "other label:b" },
+        { id: "a", name: "A", filter: "label:a" },
+      ],
+    };
+    const issues = [
+      makeIssue({ number: 1, labels: [label("a"), label("b")] }),
+      makeIssue({ number: 2, labels: [label("b")] }),
+      makeIssue({ number: 3 }),
+    ];
+    const board = buildBoard(issues, dashboard);
+    const column = (id: string) => board.cells[cell("rest", id)]?.map((c) => c.number);
+    expect(column("a")).toEqual([1]);
+    expect(column("b")).toEqual([2]);
+    expect(column("rest")).toEqual([3]);
+  });
+
+  it("puts pull requests in a PR swimlane and in every other lane they match", () => {
     const dashboard = {
       ...DASHBOARD,
       swimlanes: [
@@ -183,7 +191,23 @@ describe("buildBoard", () => {
     ];
     const board = buildBoard(issues, dashboard);
     expect(board.cells[cell("prs", "todo")]?.map((c) => c.number)).toEqual([1]);
-    expect(board.cells[cell("high", "todo")]?.map((c) => c.number)).toEqual([2]);
+    expect(board.cells[cell("high", "todo")]?.map((c) => c.number)).toEqual([2, 1]);
+  });
+
+  it("shows an issue in every lane and column it matches, counting it once", () => {
+    const issues = [
+      makeIssue({
+        number: 1,
+        labels: [label("prio:high"), label("prio:low"), label("phase:doing"), label("phase:done")],
+      }),
+    ];
+    const board = buildBoard(issues, DASHBOARD);
+    for (const lane of ["high", "low"])
+      for (const column of ["doing", "done"])
+        expect(board.cells[cell(lane, column)]?.map((c) => c.number)).toEqual([1]);
+    expect(board.cells[cell("rest", "todo")]).toEqual([]);
+    expect(board.laneTotals).toEqual({ high: 1, low: 1, rest: 0 });
+    expect(board.total).toBe(1);
   });
 
   it("matches PR statuses, so one lane gathers unfinished PRs", () => {

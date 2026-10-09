@@ -93,9 +93,9 @@ Saving triggers the first sync; once labels are cached the filter inputs suggest
 - A dashboard shows only open issues **its users created or are assigned to**. The default is
   `@me`, the account behind the token; list other GitHub logins in settings to follow them too,
   or remove every user to see everyone's.
-- Each swimlane and column has a **filter**. An issue lands in the **first** swimlane and the
-  **last** column (in order) whose filter it satisfies, so a card carrying two stages' labels
-  sits in the later one.
+- Each swimlane and column has a **filter**. An issue shows up in **every** swimlane and
+  column whose filter it satisfies: with lanes `label:a` and `label:b`, an issue carrying
+  both appears in both. An empty filter matches everything.
 - Filters follow GitHub search: `label:bug is:pr` needs both (`AND` works too),
   `label:a OR -label:b` either, `-` negates, parens group, `label:a|b|c` takes any of the
   values, and quotes hold spaces: `label:"needs review"`. `AND` and `OR` count only in
@@ -113,8 +113,10 @@ Saving triggers the first sync; once labels are cached the filter inputs suggest
   - `is:has-pr` picks issues an open PR closes (GitHub's "linked pull requests"), whoever
     opened the PR, as long as the PR is in one of the dashboard's repos.
 - Labels a filter asks for (outside a `-`) are hidden on cards.
-- An entry with an **empty filter is the catch-all** for issues matching nothing else. At most
-  one per axis. Issues that fit neither are counted as "unplaced" on the board.
+- The term **`other`** holds for issues no swimlane above, or no column to the right,
+  matched, so order matters. Alone it makes the bottom swimlane or the leftmost column the
+  catch-all; `other label:b` below a `label:a` lane takes the `b` issues the `a` lane did
+  not. Issues that fit no lane or no column are counted as "unplaced" on the board.
 - **Hide blocked** (per swimlane) drops issues that have at least one open blocker
   (GitHub "blocked by" relationships).
 - Issues carrying the **epic label** appear in the strip above the board with sub-issue

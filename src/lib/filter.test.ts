@@ -147,6 +147,17 @@ describe("matchesFilter", () => {
     expect(fits(filter, item({ kind: "pr", statuses: ["is:unanswered"] }))).toBe(true);
     expect(fits(filter, item({ labels: [{ name: "a" }] }))).toBe(false);
   });
+
+  it("reads a bare `other` as a term the item's `other` flag decides", () => {
+    expect(parseFilter("other label:b")).toEqual({
+      type: "and",
+      nodes: [{ type: "other" }, { type: "term", key: "label", values: ["b"] }],
+    });
+    expect(fits("other label:b", { ...labels("b"), other: true })).toBe(true);
+    expect(fits("other label:b", labels("b"))).toBe(false);
+    expect(fits("-other", labels())).toBe(true);
+    expect(filterError("others")).toMatch(/expected key:value/);
+  });
 });
 
 describe("askedLabels", () => {
@@ -174,6 +185,7 @@ describe("quoteValue", () => {
 describe("suggestFilter", () => {
   it("completes keys, then the key's values", () => {
     expect(suggestFilter("", [])).toContain("label:");
+    expect(suggestFilter("oth", [])).toEqual(["other"]);
     expect(suggestFilter("is:pr -la", [])).toEqual(["is:pr -label:"]);
     expect(suggestFilter("label:", ["bug", "needs review"])).toEqual([
       "label:bug",

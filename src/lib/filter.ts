@@ -6,10 +6,12 @@ import { STATUS_LABEL_NAMES, type StatusLabel } from "./status";
  * Filter expressions for swimlanes and columns, in GitHub search syntax: `key:value` terms,
  * `a|b` for any of several values, a leading `-` to negate, side by side (or `AND`) for all,
  * `OR` for either, parens to group, quotes around values with spaces, parens, `|` or `"`.
- * `-` binds tightest, then AND, then OR.
+ * `-` binds tightest, then AND, then OR. The bare term `other` holds for an item no swimlane
+ * above, or no column to the right, matched.
  */
 export type FilterNode =
   | { type: "term"; key: FilterKey; values: string[] }
+  | { type: "other" }
   | { type: "not"; node: FilterNode }
   | { type: "and" | "or"; nodes: FilterNode[] };
 
@@ -36,7 +38,7 @@ const isSpace = (char: string | undefined) => char !== undefined && /\s/.test(ch
 const isBreak = (char: string | undefined) =>
   char === undefined || isSpace(char) || '()|"'.includes(char);
 
-/** The expression tree, or null for an empty (catch-all) filter; throws `FilterError`. */
+/** The expression tree, or null for an empty filter (matches everything); throws `FilterError`. */
 export function parseFilter(text: string): FilterNode | null {
   let pos = 0;
   const skipSpace = () => {
@@ -71,6 +73,7 @@ export function parseFilter(text: string): FilterNode | null {
     const start = pos;
     while (/[a-z-]/i.test(text[pos] ?? "")) pos += 1;
     const key = text.slice(start, pos);
+    if (key === "other" && isBreak(text[pos])) return { type: "other" };
     if (text[pos] !== ":") {
       while (!isBreak(text[pos])) pos += 1;
       throw new FilterError(`expected key:value, got "${text.slice(start, pos)}"`, start);
@@ -166,7 +169,7 @@ export function quoteValue(value: string): string {
 
 /** Labels a filter asks for outside a `-`, as `labelKey`s. */
 export function askedLabels(node: FilterNode | null): string[] {
-  if (!node || node.type === "not") return [];
+  if (!node || node.type === "not" || node.type === "other") return [];
   if (node.type === "term") {
     return node.key === "label" ? node.values.map(labelKey) : [];
   }
@@ -187,6 +190,8 @@ export interface FilterItem {
   blocked: boolean;
   /** Blocks an open issue. */
   blocking: boolean;
+  /** No swimlane above, or no column to the right, matched. */
+  other?: boolean;
 }
 
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
@@ -283,6 +288,8 @@ export function matchesFilter(
   switch (node.type) {
     case "term":
       return node.values.some((value) => KEYS[node.key].holds(value, item, viewer));
+    case "other":
+      return item.other ?? false;
     case "not":
       return !matchesFilter(node.node, item, viewer);
     case "and":
@@ -306,7 +313,7 @@ export function suggestFilter(text: string, labels: string[]): string[] {
   const head = text.slice(0, text.length - partial.length);
   const candidates =
     key === null
-      ? FILTER_KEYS.map((name) => `${name}:`)
+      ? [...FILTER_KEYS.map((name) => `${name}:`), "other"]
       : key === "label"
         ? labels.map(quoteValue)
         : (specOf(key)?.suggest ?? []);
