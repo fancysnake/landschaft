@@ -1,70 +1,91 @@
 import { z } from "zod";
 
-import type { IssueKind } from "./types";
+import { filterError, ISSUE_REF, LOGIN, quoteValue, REPO } from "./filter";
+import { isStatusLabel } from "./status";
 
 const id = z
   .string()
   .min(1)
   .max(32)
   .regex(/^[a-z0-9_-]+$/i, "letters, digits, - and _ only");
-export const repoName = z.string().regex(/^[\w.-]+\/[\w.-]+$/, "expected owner/repo");
-const issueRef = z.string().regex(/^[\w.-]+\/[\w.-]+#\d+$/, "expected owner/repo#number");
+export const repoName = z.string().regex(REPO, "expected owner/repo");
+const issueRef = z.string().regex(ISSUE_REF, "expected owner/repo#number");
 
-/** PR states the sync reads from GitHub for every open PR. */
-export const PULL_STATUS_NAMES = [
-  "is:conflicting",
-  "is:ci:failed",
-  "is:ci:running",
-  "is:unanswered",
-] as const;
-export type PullStatusLabel = (typeof PULL_STATUS_NAMES)[number];
+/** A filter expression (see `filter.ts`); empty matches everything. */
+const filterText = z.string().superRefine((text, ctx) => {
+  const message = filterError(text);
+  if (message) ctx.addIssue({ code: "custom", message });
+});
 
-export function isPullStatusLabel(name: string): name is PullStatusLabel {
-  return (PULL_STATUS_NAMES as readonly string[]).includes(name);
-}
+/** Pre-filter fields: a label list, matched by any or all of them, and an item kind. */
+const LegacyGroupSchema = z.object({
+  labels: z.array(z.string().min(1)).optional(),
+  match: z.enum(["any", "all"]).optional(),
+  kind: z.enum(["any", "issue", "pr"]).optional(),
+});
+type LegacyGroup = z.infer<typeof LegacyGroupSchema>;
 
 /**
- * States an entry lists among its labels and matches like labels; derived from GitHub, never
- * written to it. `is:has-pr` holds for an issue an open PR closes.
+ * The filter a legacy group stands for: any → `label:a|b`, all → `label:a label:b`; null for
+ * the catch-all, which `migrateAxis` rewrites.
  */
-export const STATUS_LABEL_NAMES = [...PULL_STATUS_NAMES, "is:has-pr"] as const;
-export type StatusLabel = (typeof STATUS_LABEL_NAMES)[number];
-
-export function isStatusLabel(name: string): name is StatusLabel {
-  return (STATUS_LABEL_NAMES as readonly string[]).includes(name);
+function legacyFilter({ labels = [], match = "any", kind = "any" }: LegacyGroup): string | null {
+  const plain = labels.filter((name) => !isStatusLabel(name)).map(quoteValue);
+  const statuses = labels.filter(isStatusLabel);
+  const parts =
+    match === "all"
+      ? [...plain.map((name) => `label:${name}`), ...statuses]
+      : [...(plain.length > 0 ? [`label:${plain.join("|")}`] : []), ...statuses];
+  const body = parts.join(match === "all" ? " " : " OR ");
+  if (kind === "any") return body || null;
+  const ored = match === "any" && parts.length > 1;
+  return [`is:${kind}`, ored ? `(${body})` : body].filter(Boolean).join(" ");
 }
 
-/** `is:issue` / `is:pr` live in `kind`, so the only `is:` labels are statuses. */
-const label = z
-  .string()
-  .min(1)
-  .refine(
-    (name) => !name.startsWith("is:") || isStatusLabel(name),
-    `not a status label; expected one of ${STATUS_LABEL_NAMES.join(", ")}`,
-  );
-const labelList = z.array(label).default([]);
-/** "any": the issue carries at least one of the labels; "all": it carries every one. */
-export const MatchSchema = z.enum(["any", "all"]);
-export type Match = z.infer<typeof MatchSchema>;
-/** Which items a swimlane or column takes: both, only issues, or only pull requests. */
-export const KindFilterSchema = z.enum(["any", "issue", "pr"]);
-export type KindFilter = z.infer<typeof KindFilterSchema>;
+export type Axis = "swimlanes" | "columns";
+
+/**
+ * Which way `other` looks on each axis: up the swimlanes, so the bottom one is the catch-all,
+ * and rightward across the columns, so the leftmost one is.
+ */
+export const OTHER_LOOKS_AT: Record<Axis, "earlier" | "later"> = {
+  swimlanes: "earlier",
+  columns: "later",
+};
+
+/**
+ * Old configs carry `labels`/`match`/`kind`; they turn into `filter` unless one is set. A legacy
+ * catch-all took what no other entry took: `other` excludes the entries it looks at, a `-(…)`
+ * each of the rest.
+ */
+const migrateAxis =
+  (axis: Axis) =>
+  <T extends LegacyGroup & { filter?: string }>(groups: T[]) => {
+    const filterOf = ({ labels, match, kind, filter }: T) =>
+      filter ?? legacyFilter({ labels, match, kind });
+    return groups.map(({ labels, match, kind, filter, ...group }, index) => {
+      const own = filter ?? legacyFilter({ labels, match, kind });
+      if (own !== null) return { ...group, filter: own };
+      const unseen =
+        OTHER_LOOKS_AT[axis] === "earlier" ? groups.slice(index + 1) : groups.slice(0, index);
+      const excluded = unseen.map(filterOf).flatMap((other) => (other ? [`-(${other})`] : []));
+      return { ...group, filter: ["other", ...excluded].join(" ") };
+    });
+  };
 
 export const SwimlaneSchema = z.object({
   id,
   name: z.string().min(1),
-  labels: labelList,
-  match: MatchSchema.default("any"),
-  kind: KindFilterSchema.default("any"),
+  filter: filterText.optional(),
+  ...LegacyGroupSchema.shape,
   hideBlocked: z.boolean().default(false),
 });
 
 export const ColumnSchema = z.object({
   id,
   name: z.string().min(1),
-  labels: labelList,
-  match: MatchSchema.default("any"),
-  kind: KindFilterSchema.default("any"),
+  filter: filterText.optional(),
+  ...LegacyGroupSchema.shape,
 });
 
 export const SortBySchema = z.enum(["created", "updated"]);
@@ -79,31 +100,11 @@ function hasUniqueIds(items: { id: string }[]): boolean {
   return new Set(items.map((item) => item.id)).size === items.length;
 }
 
-/** No labels and no kind restriction: takes whatever no other entry does. */
-export function isCatchAll(group: { labels: string[]; kind?: KindFilter }): boolean {
-  return group.labels.length === 0 && (group.kind ?? "any") === "any";
-}
-
-/** Whether a kind filter lets an item of this kind in. */
-export function fitsKind(filter: KindFilter, kind: IssueKind): boolean {
-  return filter === "any" || filter === kind;
-}
-
-/**
- * Which matching entry wins on each axis: the first swimlane, but the last column, so a card
- * carrying two stages' labels sits in the later one.
- */
-export const AXIS_PRECEDENCE = { swimlanes: "first", columns: "last" } as const;
-export type Axis = keyof typeof AXIS_PRECEDENCE;
-export type Precedence = (typeof AXIS_PRECEDENCE)[Axis];
-
 /** Stands for the token's account in a dashboard's `users`. */
 export const ME = "@me";
 
 /** A GitHub login, or `@me`. */
-export const userName = z
-  .string()
-  .regex(/^(@me|[a-z\d](?:[a-z\d_-]*[a-z\d])?(\[bot\])?)$/i, "expected a GitHub login or @me");
+export const userName = z.string().regex(LOGIN, "expected a GitHub login or @me");
 
 export const DashboardSchema = z
   .object({
@@ -117,20 +118,13 @@ export const DashboardSchema = z
     epicLabel: z.string().min(1).optional(),
     sort: SortSchema.default({ by: "updated", dir: "desc" }),
     refreshMinutes: z.number().int().min(1).max(1440).default(5),
-    swimlanes: z.array(SwimlaneSchema).min(1),
-    columns: z.array(ColumnSchema).min(1),
+    swimlanes: z.array(SwimlaneSchema).min(1).transform(migrateAxis("swimlanes")),
+    columns: z.array(ColumnSchema).min(1).transform(migrateAxis("columns")),
   })
   .superRefine((dashboard, ctx) => {
     for (const axis of ["swimlanes", "columns"] as const) {
       if (!hasUniqueIds(dashboard[axis])) {
         ctx.addIssue({ code: "custom", path: [axis], message: "ids must be unique" });
-      }
-      if (dashboard[axis].filter(isCatchAll).length > 1) {
-        ctx.addIssue({
-          code: "custom",
-          path: [axis],
-          message: "at most one catch-all (no labels, any kind) allowed",
-        });
       }
     }
   })
@@ -149,8 +143,8 @@ export const ConfigSchema = z
     }
   });
 
-export type Swimlane = z.infer<typeof SwimlaneSchema>;
-export type Column = z.infer<typeof ColumnSchema>;
+export type Swimlane = Dashboard["swimlanes"][number];
+export type Column = Dashboard["columns"][number];
 export type Sort = z.infer<typeof SortSchema>;
 export type SortBy = z.infer<typeof SortBySchema>;
 export type SortDir = z.infer<typeof SortDirSchema>;

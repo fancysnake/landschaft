@@ -1,128 +1,36 @@
 import { describe, expect, it } from "vitest";
 
-import type { Swimlane } from "../schema";
-
+import { askedLabels, type FilterNode } from "../filter";
 import { cellKey } from "../types";
 import { DASHBOARD, label, makeIssue, REPO } from "./__fixtures__/issues";
-import { buildBoard, isBlocked, placeCard, placeIn, resolveUsers } from "./board";
+import { buildBoard, compile, isBlocked, placeIn, resolveUsers } from "./board";
 
 const cell = (laneId: string, colId: string) => cellKey(laneId, colId);
 const TWO_REPOS = { ...DASHBOARD, repos: [REPO, "acme/other"] };
 const numbers = (board: ReturnType<typeof buildBoard>) =>
   board.cells[cell("rest", "todo")]?.map((c) => c.number);
 
+/** A filter hits when it asks for one of the labels `hits`. */
+const hitting =
+  (...hits: string[]) =>
+  (node: FilterNode) =>
+    askedLabels(node).some((name) => hits.includes(name));
+
+const ids = (groups: { id: string }[]) => groups.map((group) => group.id);
+
 describe("placeIn", () => {
-  it("takes the first labeled group that matches", () => {
-    const groups = [
-      { id: "a", labels: ["x"] },
-      { id: "b", labels: ["y", "z"] },
-    ];
-    expect(placeIn(groups, new Set(["z", "x"]))?.id).toBe("a");
-    expect(placeIn(groups, new Set(["z"]))?.id).toBe("b");
+  it("takes every group that matches, an empty filter matching all", () => {
+    const groups = compile([
+      { id: "a", filter: "label:x" },
+      { id: "b", filter: "label:y" },
+      { id: "all", filter: "" },
+    ]);
+    expect(ids(placeIn(groups, hitting("y", "x")))).toEqual(["a", "b", "all"]);
+    expect(ids(placeIn(groups, hitting("y")))).toEqual(["b", "all"]);
   });
 
-  it("falls back to the catch-all wherever it is listed", () => {
-    const groups = [
-      { id: "all", labels: [] },
-      { id: "a", labels: ["x"] },
-    ];
-    expect(placeIn(groups, new Set(["x"]))?.id).toBe("a");
-    expect(placeIn(groups, new Set(["nope"]))?.id).toBe("all");
-  });
-
-  it("returns null without a match and without a catch-all", () => {
-    expect(placeIn([{ id: "a", labels: ["x"] }], new Set())).toBeNull();
-  });
-
-  it('requires every label for an "all" group and falls through otherwise', () => {
-    const groups = [
-      { id: "both", labels: ["x", "y"], match: "all" as const },
-      { id: "either", labels: ["x", "y"], match: "any" as const },
-      { id: "rest", labels: [] },
-    ];
-    expect(placeIn(groups, new Set(["x", "y", "z"]))?.id).toBe("both");
-    expect(placeIn(groups, new Set(["x"]))?.id).toBe("either");
-    expect(placeIn(groups, new Set(["z"]))?.id).toBe("rest");
-    expect(placeIn([groups[0]!], new Set(["y"]))).toBeNull();
-  });
-
-  it("matches a kind-only group in list order, not as the catch-all", () => {
-    const groups = [
-      { id: "bugs", labels: ["bug"] },
-      { id: "rest", labels: [] },
-      { id: "prs", labels: [], kind: "pr" as const },
-    ];
-    expect(placeIn(groups, new Set(["bug"]))?.id).toBe("bugs");
-    expect(placeIn(groups, new Set())?.id).toBe("prs");
-    expect(placeIn([groups[0]!, groups[1]!], new Set())?.id).toBe("rest");
-  });
-
-  it("takes the last match when asked, the catch-all still only as a fallback", () => {
-    const groups = [
-      { id: "a", labels: ["x"] },
-      { id: "rest", labels: [] },
-      { id: "b", labels: ["y"] },
-    ];
-    expect(placeIn(groups, new Set(["x", "y"]), "last")?.id).toBe("b");
-    expect(placeIn(groups, new Set(["x"]), "last")?.id).toBe("a");
-    expect(placeIn(groups, new Set(), "last")?.id).toBe("rest");
-  });
-});
-
-describe("placeCard", () => {
-  const prs: Swimlane = {
-    id: "prs",
-    name: "PRs",
-    labels: [],
-    match: "any",
-    kind: "pr",
-    hideBlocked: false,
-  };
-  const dashboard = { ...DASHBOARD, swimlanes: [prs, ...DASHBOARD.swimlanes] };
-
-  it("lets a PR-only lane shadow the labeled lanes after it for PRs only", () => {
-    expect(placeCard(dashboard, "issue", new Set(["prio:high", "phase:doing"]))).toMatchObject({
-      lane: { id: "high" },
-      column: { id: "doing" },
-    });
-    expect(placeCard(dashboard, "pr", new Set(["prio:high"]))).toMatchObject({
-      lane: { id: "prs" },
-      column: { id: "todo" },
-    });
-  });
-
-  it("puts a card carrying two columns' labels in the later column", () => {
-    expect(placeCard(DASHBOARD, "issue", new Set(["phase:done", "phase:doing"]))).toMatchObject({
-      column: { id: "done" },
-    });
-  });
-
-  it("ands the kind with the labels, whatever the match", () => {
-    const lanes = [
-      { ...prs, id: "pr-high", labels: ["prio:high", "prio:low"] },
-      ...DASHBOARD.swimlanes,
-    ];
-    const withLanes = { ...DASHBOARD, swimlanes: lanes };
-    expect(placeCard(withLanes, "pr", new Set(["prio:low"]))?.lane.id).toBe("pr-high");
-    expect(placeCard(withLanes, "pr", new Set())?.lane.id).toBe("rest");
-    expect(placeCard(withLanes, "issue", new Set(["prio:low"]))?.lane.id).toBe("low");
-  });
-
-  it("drops columns of the other kind", () => {
-    const review = {
-      ...DASHBOARD.columns[1]!,
-      id: "review",
-      labels: ["review"],
-      kind: "pr" as const,
-    };
-    const withReview = { ...DASHBOARD, columns: [...DASHBOARD.columns, review] };
-    expect(placeCard(withReview, "pr", new Set(["review"]))?.column.id).toBe("review");
-    expect(placeCard(withReview, "issue", new Set(["review"]))?.column.id).toBe("todo");
-  });
-
-  it("returns null when no column takes the labels", () => {
-    const columns = DASHBOARD.columns.filter((column) => column.labels.length > 0);
-    expect(placeCard({ ...DASHBOARD, columns }, "issue", new Set())).toBeNull();
+  it("returns nothing without a match and without `other`", () => {
+    expect(placeIn(compile([{ id: "a", filter: "label:x" }]), () => false)).toEqual([]);
   });
 });
 
@@ -144,6 +52,8 @@ describe("isBlocked", () => {
   });
 });
 
+const waitsOn = (number: number) => [{ repo: REPO, number, state: "OPEN" as const }];
+
 describe("buildBoard", () => {
   it("places issues by lane and column labels, catch-all otherwise", () => {
     const issues = [
@@ -162,25 +72,13 @@ describe("buildBoard", () => {
     expect(board.unplaced).toBe(0);
   });
 
-  it('places by an "all" column only when the issue carries every label', () => {
+  it("places by a column that asks for every one of its labels", () => {
     const dashboard = {
       ...DASHBOARD,
       columns: [
-        { id: "todo", name: "Todo", labels: [], match: "any" as const, kind: "any" as const },
-        {
-          id: "doing",
-          name: "Doing",
-          labels: ["phase:doing"],
-          match: "any" as const,
-          kind: "any" as const,
-        },
-        {
-          id: "waiting",
-          name: "Waiting",
-          labels: ["phase:doing", "wait"],
-          match: "all" as const,
-          kind: "any" as const,
-        },
+        { id: "todo", name: "Todo", filter: "-label:phase:doing" },
+        { id: "doing", name: "Doing", filter: "label:phase:doing" },
+        { id: "waiting", name: "Waiting", filter: "label:phase:doing label:wait" },
       ],
     };
     const issues = [
@@ -190,7 +88,7 @@ describe("buildBoard", () => {
     ];
     const board = buildBoard(issues, dashboard);
     expect(board.cells[cell("rest", "waiting")]?.map((c) => c.number)).toEqual([1]);
-    expect(board.cells[cell("rest", "doing")]?.map((c) => c.number)).toEqual([2]);
+    expect(board.cells[cell("rest", "doing")]?.map((c) => c.number)).toEqual([2, 1]);
     expect(board.cells[cell("rest", "todo")]?.map((c) => c.number)).toEqual([3]);
     expect(board.labels).toEqual([]);
   });
@@ -237,18 +135,53 @@ describe("buildBoard", () => {
     expect(resolveUsers(["@me", "ann"], null)).toEqual(["ann"]);
   });
 
-  it("puts pull requests in a PR swimlane", () => {
+  it("gives `other` what no earlier lane took", () => {
     const dashboard = {
       ...DASHBOARD,
       swimlanes: [
-        {
-          id: "prs",
-          name: "PRs",
-          labels: [],
-          match: "any" as const,
-          kind: "pr" as const,
-          hideBlocked: false,
-        },
+        { id: "a", name: "A", filter: "label:a", hideBlocked: false },
+        { id: "b", name: "B", filter: "other label:b", hideBlocked: false },
+        { id: "rest", name: "Rest", filter: "other", hideBlocked: false },
+      ],
+    };
+    const issues = [
+      makeIssue({ number: 1, labels: [label("a"), label("b")] }),
+      makeIssue({ number: 2, labels: [label("b")] }),
+      makeIssue({ number: 3 }),
+    ];
+    const board = buildBoard(issues, dashboard);
+    const lane = (id: string) => board.cells[cell(id, "todo")]?.map((c) => c.number);
+    expect(lane("a")).toEqual([1]);
+    expect(lane("b")).toEqual([2]);
+    expect(lane("rest")).toEqual([3]);
+  });
+
+  it("gives a column's `other` what no column to its right took", () => {
+    const dashboard = {
+      ...DASHBOARD,
+      columns: [
+        { id: "rest", name: "Rest", filter: "other" },
+        { id: "b", name: "B", filter: "other label:b" },
+        { id: "a", name: "A", filter: "label:a" },
+      ],
+    };
+    const issues = [
+      makeIssue({ number: 1, labels: [label("a"), label("b")] }),
+      makeIssue({ number: 2, labels: [label("b")] }),
+      makeIssue({ number: 3 }),
+    ];
+    const board = buildBoard(issues, dashboard);
+    const column = (id: string) => board.cells[cell("rest", id)]?.map((c) => c.number);
+    expect(column("a")).toEqual([1]);
+    expect(column("b")).toEqual([2]);
+    expect(column("rest")).toEqual([3]);
+  });
+
+  it("puts pull requests in a PR swimlane and in every other lane they match", () => {
+    const dashboard = {
+      ...DASHBOARD,
+      swimlanes: [
+        { id: "prs", name: "PRs", filter: "is:pr", hideBlocked: false },
         ...DASHBOARD.swimlanes,
       ],
     };
@@ -258,19 +191,34 @@ describe("buildBoard", () => {
     ];
     const board = buildBoard(issues, dashboard);
     expect(board.cells[cell("prs", "todo")]?.map((c) => c.number)).toEqual([1]);
-    expect(board.cells[cell("high", "todo")]?.map((c) => c.number)).toEqual([2]);
+    expect(board.cells[cell("high", "todo")]?.map((c) => c.number)).toEqual([2, 1]);
   });
 
-  it("matches PR status labels like labels, so one lane gathers unfinished PRs", () => {
+  it("shows an issue in every lane and column it matches, counting it once", () => {
+    const issues = [
+      makeIssue({
+        number: 1,
+        labels: [label("prio:high"), label("prio:low"), label("phase:doing"), label("phase:done")],
+      }),
+    ];
+    const board = buildBoard(issues, DASHBOARD);
+    for (const lane of ["high", "low"])
+      for (const column of ["doing", "done"])
+        expect(board.cells[cell(lane, column)]?.map((c) => c.number)).toEqual([1]);
+    expect(board.cells[cell("rest", "todo")]).toEqual([]);
+    expect(board.laneTotals).toEqual({ high: 1, low: 1, rest: 0 });
+    expect(board.columnTotals).toEqual({ todo: 0, doing: 1, done: 1 });
+    expect(board.total).toBe(1);
+  });
+
+  it("matches PR statuses, so one lane gathers unfinished PRs", () => {
     const dashboard = {
       ...DASHBOARD,
       swimlanes: [
         {
           id: "fix",
           name: "To fix",
-          labels: ["is:conflicting", "is:ci:failed", "is:unanswered"],
-          match: "any" as const,
-          kind: "pr" as const,
+          filter: "is:pr is:conflicting|ci:failed|unanswered",
           hideBlocked: false,
         },
         ...DASHBOARD.swimlanes,
@@ -298,14 +246,7 @@ describe("buildBoard", () => {
       ...DASHBOARD,
       users: ["alice"],
       swimlanes: [
-        {
-          id: "review",
-          name: "In review",
-          labels: ["is:has-pr"],
-          match: "any" as const,
-          kind: "issue" as const,
-          hideBlocked: false,
-        },
+        { id: "review", name: "In review", filter: "is:issue is:has-pr", hideBlocked: false },
         ...DASHBOARD.swimlanes,
       ],
     };
@@ -332,15 +273,7 @@ describe("buildBoard", () => {
   it("counts issues that fit no group when an axis has no catch-all", () => {
     const dashboard = {
       ...DASHBOARD,
-      columns: [
-        {
-          id: "doing",
-          name: "Doing",
-          labels: ["phase:doing"],
-          match: "any" as const,
-          kind: "any" as const,
-        },
-      ],
+      columns: [{ id: "doing", name: "Doing", filter: "label:phase:doing" }],
     };
     const board = buildBoard([makeIssue({ number: 1 })], dashboard);
     expect(board.unplaced).toBe(1);
@@ -386,6 +319,41 @@ describe("buildBoard", () => {
     expect(card?.isEpic).toBe(true);
     expect(board.labels).toEqual(["bug"]);
     expect(board.assignees).toEqual(["ann"]);
+  });
+
+  it("matches the epic label and structural labels whatever their case", () => {
+    const issues = [
+      makeIssue({ number: 1, labels: [label("Epic")] }),
+      makeIssue({ number: 2, labels: [label("epic"), label("Prio:High"), label("Bug")] }),
+      makeIssue({ number: 3, labels: [label("bug")] }),
+    ];
+    const board = buildBoard(issues, DASHBOARD);
+    expect(board.epics.map((epic) => epic.number)).toEqual([2, 1]);
+    expect(board.cells[cell("high", "todo")]?.[0]?.labels.map((l) => l.name)).toEqual(["Bug"]);
+    expect(board.labels).toEqual(["Bug"]);
+    expect(numbers(buildBoard(issues, DASHBOARD, { label: "BUG" }))).toEqual([3]);
+  });
+
+  it("matches is:blocking on items an open issue waits on, and @me as the viewer", () => {
+    const dashboard = {
+      ...DASHBOARD,
+      swimlanes: [
+        { id: "blocking", name: "Blocking", filter: "is:blocking", hideBlocked: false },
+        { id: "mine", name: "Mine", filter: "user:@me", hideBlocked: false },
+        ...DASHBOARD.swimlanes,
+      ],
+    };
+    const issues = [
+      makeIssue({ number: 1 }),
+      makeIssue({ number: 2, blockedBy: waitsOn(1), blockedByTotal: 1 }),
+      makeIssue({ number: 3 }),
+      makeIssue({ number: 4, state: "CLOSED", blockedBy: waitsOn(3), blockedByTotal: 1 }),
+      makeIssue({ number: 5, author: "me" }),
+    ];
+    const board = buildBoard(issues, dashboard, {}, [], new Set(), "me");
+    expect(board.cells[cell("blocking", "todo")]?.map((c) => c.number)).toEqual([1]);
+    expect(board.cells[cell("mine", "todo")]?.map((c) => c.number)).toEqual([5]);
+    expect(numbers(board)).toEqual([3, 2]);
   });
 
   it("sorts cells by the dashboard sort, overridable per request", () => {

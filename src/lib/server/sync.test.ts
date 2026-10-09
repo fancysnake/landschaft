@@ -351,10 +351,8 @@ describe("startScheduler", () => {
           users: [],
           sort: { by: "updated", dir: "desc" },
           refreshMinutes: 5,
-          swimlanes: [
-            { id: "a", name: "A", labels: [], match: "any", kind: "any", hideBlocked: false },
-          ],
-          columns: [{ id: "c", name: "C", labels: [], match: "any", kind: "any" }],
+          swimlanes: [{ id: "a", name: "A", filter: "", hideBlocked: false }],
+          columns: [{ id: "c", name: "C", filter: "" }],
         },
       ],
     };

@@ -9,21 +9,34 @@
       "sort": { "by": "updated", "dir": "desc" },
       "refreshMinutes": 5,
       "swimlanes": [
-        { "id": "high", "name": "High priority", "labels": ["prio:high"], "hideBlocked": false },
-        { "id": "normal", "name": "Normal", "labels": ["prio:normal"], "hideBlocked": true },
-        { "id": "rest", "name": "Unprioritised", "labels": [], "hideBlocked": true }
+        {
+          "id": "fix",
+          "name": "PRs to fix",
+          "filter": "is:pr is:conflicting|ci:failed|unanswered"
+        },
+        {
+          "id": "high",
+          "name": "High priority",
+          "filter": "label:prio:high",
+          "hideBlocked": false
+        },
+        { "id": "normal", "name": "Normal", "filter": "label:prio:normal", "hideBlocked": true },
+        { "id": "rest", "name": "Unprioritised", "filter": "other", "hideBlocked": true }
       ],
       "columns": [
-        { "id": "backlog", "name": "Backlog", "labels": ["backlog"] },
-        { "id": "ready", "name": "Ready", "labels": [] },
-        { "id": "doing", "name": "In progress", "labels": ["phase:doing"] },
-        { "id": "review", "name": "In review", "labels": ["phase:review"] },
+        { "id": "backlog", "name": "Backlog", "filter": "label:backlog" },
         {
-          "id": "stuck",
-          "name": "Review blocked",
-          "labels": ["phase:review", "wait"],
-          "match": "all"
-        }
+          "id": "ready",
+          "name": "Ready",
+          "filter": "other -label:backlog"
+        },
+        { "id": "doing", "name": "In progress", "filter": "label:phase:doing" },
+        {
+          "id": "review",
+          "name": "In review",
+          "filter": "label:phase:review|\"needs review\" -label:wait"
+        },
+        { "id": "stuck", "name": "Review blocked", "filter": "label:phase:review label:wait" }
       ]
     }
   ]

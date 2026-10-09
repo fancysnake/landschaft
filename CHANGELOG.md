@@ -7,6 +7,26 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-09
+
+### Added
+
+- Swimlanes and columns pick items with a filter in GitHub search syntax (`label:a|b -is:pr`,
+  `OR`, parens), with terms for blockers, parents, sub-issues, repos and people. Settings
+  checks each filter as you type and suggests terms and label names.
+
+### Changed
+
+- An item shows in every swimlane and column whose filter it matches, not only the first lane
+  and last column.
+- An empty filter matches every item. The term `other` holds for items no swimlane above, or
+  no column to the right, matched: `other` alone makes the bottom swimlane or the leftmost
+  column a catch-all, and `other label:b` below a `label:a` lane takes the `b` items that lane
+  did not.
+- Labels, the epic label among them, match by name, ignoring case.
+- `labels`, `match` and `kind` on swimlanes and columns become `filter`; old configs convert
+  on load, a catch-all to `other` minus the entries `other` does not look at.
+
 ### Removed
 
 - Drag and drop on the board, with `POST /api/move` and every GitHub label write. The board is
@@ -146,7 +166,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v0.10.1...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/fancysnake/landschaft/compare/v0.10.1...v1.0.0
 [0.10.1]: https://github.com/fancysnake/landschaft/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/fancysnake/landschaft/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/fancysnake/landschaft/compare/v0.9.0...v0.9.1

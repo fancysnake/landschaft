@@ -17,6 +17,7 @@ export const GET = route(async ({ params, url }) => {
     filters,
     users,
     db.starredEpics(dashboard.id),
+    viewer,
   );
   return json({ dashboard, users, board, status: syncer.status() });
 });

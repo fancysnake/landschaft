@@ -27,16 +27,6 @@ export default function Board({ dashboardId }: Props) {
   }
   const { dashboard, users, board, status } = data;
   const showRepo = dashboard.repos.length > 1;
-  const columnTotals = Object.fromEntries(
-    dashboard.columns.map((column) => [
-      column.id,
-      dashboard.swimlanes.reduce(
-        (sum, lane) => sum + (board.cells[cellKey(lane.id, column.id)]?.length ?? 0),
-        0,
-      ),
-    ]),
-  );
-  const total = Object.values(board.laneTotals).reduce((sum, n) => sum + n, 0);
 
   return (
     <div className="flex h-full flex-col gap-3 p-4">
@@ -44,7 +34,7 @@ export default function Board({ dashboardId }: Props) {
         <h1 className="text-lg font-semibold">
           {dashboard.name}
           <span className="ml-2 text-sm font-normal text-neutral-500">
-            {total} issues
+            {board.total} issues
             {dashboard.users.length > 0 && (
               <span title="Created by or assigned to"> · {users.join(", ") || "nobody"}</span>
             )}
@@ -64,7 +54,7 @@ export default function Board({ dashboardId }: Props) {
       {board.unplaced > 0 && (
         <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
           {board.unplaced} issue{board.unplaced === 1 ? "" : "s"} match no swimlane or column. Add a
-          catch-all (a lane or column without labels) in{" "}
+          lane or column with the filter <code>other</code> in{" "}
           <a href="/settings" className="underline">
             settings
           </a>
@@ -104,7 +94,7 @@ export default function Board({ dashboardId }: Props) {
               className="sticky top-0 z-10 rounded-md bg-neutral-200/90 px-2 py-1 text-sm font-medium backdrop-blur"
             >
               {column.name}
-              <span className="ml-2 text-neutral-500">{columnTotals[column.id]}</span>
+              <span className="ml-2 text-neutral-500">{board.columnTotals[column.id] ?? 0}</span>
             </div>
           ))}
           {dashboard.swimlanes.map((lane) => (

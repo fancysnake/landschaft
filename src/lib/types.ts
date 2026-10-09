@@ -1,4 +1,5 @@
-import type { PullStatusLabel, SortBy, SortDir, StatusLabel } from "./schema";
+import type { SortBy, SortDir } from "./schema";
+import type { PullStatusLabel, StatusLabel } from "./status";
 
 export type IssueState = "OPEN" | "CLOSED";
 export type IssueKind = "issue" | "pr";
@@ -113,9 +114,13 @@ export interface Epic {
 export interface Board {
   cells: Record<string, Card[]>;
   laneTotals: Record<string, number>;
+  /** Issues shown in each column; one in several lanes counts once. */
+  columnTotals: Record<string, number>;
   hiddenBlocked: Record<string, number>;
   epics: Epic[];
   unplaced: number;
+  /** Issues shown in at least one cell; one in several cells counts once. */
+  total: number;
   assignees: string[];
   labels: string[];
   sort: { by: SortBy; dir: SortDir };

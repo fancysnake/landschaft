@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { PullStatusLabel } from "../schema";
+import type { PullStatusLabel } from "../status";
 
 import {
   type CheckContext,

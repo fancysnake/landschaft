@@ -20,7 +20,7 @@ The remaining rate-limit budget is shown next to the sync status. The board poll
 
 ## Epics
 
-Issues carrying the dashboard's `epicLabel` are lifted out of the grid into a strip above it,
+Issues carrying the dashboard's `epicLabel` (in any case) are lifted out of the grid into a strip above it,
 each with its sub-issue progress from GitHub. Clicking an epic filters the board to its
 sub-issues and to issues it blocks or is blocked by; clicking again clears the filter. The ↗ on a tile opens the epic on GitHub.
 Pull requests that close the epic or any of those issues (GitHub's "linked pull requests")
@@ -32,12 +32,11 @@ the local database, never on GitHub, so a closed epic that is reopened keeps its
 
 ## Pull requests
 
-Open pull requests are synced alongside issues and placed by the same label rules. They carry a `PR` badge and a sky-blue tint (issues green, epics violet, blocked red). Set a swimlane or column to
-PRs only (or issues only) to split them, with an `is:pr` (or `is:issue`) chip in its label picker.
+Open pull requests are synced alongside issues and placed by the same filters. They carry a `PR` badge and a sky-blue tint (issues green, epics violet, blocked red). Put `is:pr` (or `is:issue`) in a swimlane's or column's filter to split them.
 
-Add `is:conflicting`, `is:ci:failed`, `is:ci:running` or `is:unanswered` to an entry's labels to
-pick PRs by merge conflicts, a failed check (GitHub's red ✗ on the last commit), any check still
-running, or review threads awaiting the author; each sync refreshes them for every open PR.
+`is:conflicting`, `is:ci:failed`, `is:ci:running` and `is:unanswered` pick PRs by merge
+conflicts, a failed check (GitHub's red ✗ on the last commit), any check still running, or review
+threads awaiting the author; each sync refreshes them for every open PR.
 
 A PR card shows a pill for each status that holds, whatever lane it is in: `conflict`, `CI ✗`,
 `CI …` or `comments`.
