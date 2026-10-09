@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { act, createElement } from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot, type Root } from "react-dom/client";
 
 import type { Filters } from "../schema";
 
@@ -14,14 +14,13 @@ vi.mock("./api", async (importOriginal) => {
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-/** A board response tagged with the query it answers. */
-const response = (filters: Filters) =>
-  ({ tag: filtersToQuery(filters), status: { version: 1 } }) as unknown as BoardResponse;
-const tagOf = (data: BoardResponse | null) => (data as { tag?: string } | null)?.tag;
+const response = () => ({ status: { version: 1 } }) as BoardResponse;
 
-function renderBoard(initial: Filters) {
-  const container = document.createElement("div");
-  const root = createRoot(container);
+const roots: Root[] = [];
+
+async function renderBoard(initial: Filters) {
+  const root = createRoot(document.createElement("div"));
+  roots.push(root);
   const result: { current: BoardController | null } = { current: null };
   const report = (board: BoardController) => {
     result.current = board;
@@ -32,17 +31,25 @@ function renderBoard(initial: Filters) {
   }
   const render = (filters: Filters) =>
     act(async () => root.render(createElement(Probe, { filters })));
-  return { result, render, ready: render(initial), unmount: () => act(async () => root.unmount()) };
+  await render(initial);
+  return { result, render };
 }
 
-afterEach(() => vi.resetAllMocks());
+afterEach(async () => {
+  for (const root of roots.splice(0)) await act(async () => root.unmount());
+  vi.resetAllMocks();
+});
 
 test("a reload after sync uses the filters current when the sync finishes", async () => {
-  vi.mocked(api.board).mockImplementation((_, filters) => Promise.resolve(response(filters)));
+  const responses = new Map<string, BoardResponse>();
+  vi.mocked(api.board).mockImplementation((_, filters) => {
+    const board = response();
+    responses.set(filtersToQuery(filters), board);
+    return Promise.resolve(board);
+  });
   const sync = Promise.withResolvers<SyncResponse>();
   vi.mocked(api.sync).mockReturnValue(sync.promise);
-  const { result, render, ready, unmount } = renderBoard({ repo: ["a", "b"] });
-  await ready;
+  const { result, render } = await renderBoard({ repo: ["a", "b"] });
 
   let syncing!: Promise<void>;
   await act(async () => {
@@ -55,25 +62,23 @@ test("a reload after sync uses the filters current when the sync finishes", asyn
   });
 
   expect(vi.mocked(api.board).mock.lastCall?.[1]).toEqual({ repo: ["a"] });
-  expect(tagOf(result.current!.data)).toBe("repo=a");
-  await unmount();
+  expect(result.current!.data).toBe(responses.get("repo=a"));
 });
 
 test("a stale board response does not replace a newer one", async () => {
-  const pending: { filters: Filters; resolve: (value: BoardResponse) => void }[] = [];
-  vi.mocked(api.board).mockImplementation((_, filters) => {
+  const pending: { board: BoardResponse; resolve: () => void }[] = [];
+  vi.mocked(api.board).mockImplementation(() => {
+    const board = response();
     const { promise, resolve } = Promise.withResolvers<BoardResponse>();
-    pending.push({ filters, resolve });
+    pending.push({ board, resolve: () => resolve(board) });
     return promise;
   });
-  const { result, render, ready, unmount } = renderBoard({ repo: ["a", "b"] });
-  await ready;
+  const { result, render } = await renderBoard({ repo: ["a", "b"] });
   await render({ repo: ["a"] });
 
   const [older, newer] = pending;
-  await act(async () => newer.resolve(response(newer.filters)));
-  await act(async () => older.resolve(response(older.filters)));
+  await act(async () => newer.resolve());
+  await act(async () => older.resolve());
 
-  expect(tagOf(result.current!.data)).toBe("repo=a");
-  await unmount();
+  expect(result.current!.data).toBe(newer.board);
 });
