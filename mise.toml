@@ -4,7 +4,9 @@ node = "26.10.0"
 hk = "2.4.0"
 pkl = "0.32.1"
 pipx = "1.17.10"
-python = "3.14.8"
+# vekna supports Python <= 3.14; tasks.update excludes python so --bump skips 3.15. Drop both once
+# vekna supports 3.15.
+python = "3.14"
 "pipx:vekna" = { version = "0.11.0", pipx_args = "--preinstall git+https://github.com/fancysnake/cabinet.git@v2.0.0" }
 # --include-deps: the mkdocs binary belongs to a dependency of mkdocs-material; uvx = false
 # because mise prefers uvx where uv is installed, and there --include-deps is not accepted.
