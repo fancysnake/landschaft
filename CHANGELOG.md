@@ -7,37 +7,29 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-10
+
 ### Added
 
+- Settings suggest repos after `repo:` and users after `user:`, `author:` and `assignee:`.
 - Dashboards with no items in the repos switched on are dimmed in the top bar.
 - `GET /api/dashboards` lists the repos among each dashboard's items.
 
 ### Changed
 
-- Repo chips sit in the top bar and list the global repos. Settings show repositories, users and
-  the refresh interval above the dashboards.
+- Global `repos`, `users` and `refreshMinutes` replace the per-dashboard ones; each dashboard
+  narrows them with an optional `filter`, such as `repo:acme/app user:@me`, that may not use
+  `other`. Settings show the global fields above the dashboards. Old configs migrate on load.
+- Repo chips sit in the top bar, list the global repos and switch each off on every board in
+  this browser.
 
 ### Removed
 
 - The `repo=` board URL parameter; the top bar's repo chips choose the repos.
 
-## [1.1.0] - 2026-10-10
-
-### Added
-
-- Settings suggest repos after `repo:` and users after `user:`, `author:` and `assignee:`.
-
-### Changed
-
-- Global `repos`, `users` and `refreshMinutes` replace the per-dashboard ones; each dashboard
-  narrows them with an optional `filter`, such as `repo:acme/app user:@me`, that may not use
-  `other`. Old configs migrate on load.
-- A board's repo chips list the repositories among its items. A repo switched off stays off on
-  every board in this browser; a `repo=` in the URL still wins.
-
 ### Fixed
 
-- A sync or a star keeps items from a deselected repo off the board.
+- A sync or a star keeps items from a switched-off repo off the board.
 
 ## [1.0.0] - 2026-10-09
 
@@ -198,8 +190,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v1.1.0...HEAD
-[1.1.0]: https://github.com/fancysnake/landschaft/compare/v1.0.0...v1.1.0
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/fancysnake/landschaft/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/fancysnake/landschaft/compare/v0.10.1...v1.0.0
 [0.10.1]: https://github.com/fancysnake/landschaft/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/fancysnake/landschaft/compare/v0.9.1...v0.10.0
