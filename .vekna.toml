@@ -8,10 +8,4 @@ remote = "https-origin"
 gate = "mise run fullcheck"
 
 [cabinet.agent]
-may_run = [
-  "mise run fullcheck",
-  "mise run test",
-  "mise run check",
-  "mise run lint",
-  "mise run format",
-]
+may_not_run = ["mise run fullcheck"]
