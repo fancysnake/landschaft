@@ -1,9 +1,7 @@
-import { useId } from "react";
-
 import type { Axis } from "../../lib/schema";
-import type { LabelDef } from "../../lib/types";
 
-import { filterError, suggestFilter } from "../../lib/filter";
+import { filterError, type Offer } from "../../lib/filter";
+import { FilterInput } from "./FilterInput";
 
 interface Group {
   id: string;
@@ -17,8 +15,8 @@ interface Props<T extends Group> {
   items: T[];
   onChange(items: T[]): void;
   create(id: string): T;
-  /** Suggested after `label:`. */
-  labels: LabelDef[];
+  /** Completed in filters. */
+  offer: Offer;
   /** Swimlanes get the "hide blocked" toggle. */
   axis: Axis;
 }
@@ -42,7 +40,7 @@ export function LaneColumnEditor<T extends Group>({
   items,
   onChange,
   create,
-  labels,
+  offer,
   axis,
 }: Props<T>) {
   const replace = (index: number, item: T) =>
@@ -53,7 +51,6 @@ export function LaneColumnEditor<T extends Group>({
     next.splice(b, 0, item!);
     onChange(next);
   };
-  const labelNames = [...new Set(labels.map((label) => label.name))];
 
   return (
     <section>
@@ -91,7 +88,9 @@ export function LaneColumnEditor<T extends Group>({
             <FilterInput
               value={item.filter}
               onChange={(filter) => replace(index, { ...item, filter })}
-              labels={labelNames}
+              offer={offer}
+              validate={filterError}
+              placeholder="empty = all, e.g. label:bug -is:pr, other label:bug"
             />
             <div className="flex gap-1">
               <button
@@ -130,46 +129,5 @@ export function LaneColumnEditor<T extends Group>({
         + add
       </button>
     </section>
-  );
-}
-
-/** A filter expression with completions for its last term and the parse error below it. */
-function FilterInput({
-  value,
-  onChange,
-  labels,
-}: {
-  value: string;
-  onChange(value: string): void;
-  labels: string[];
-}) {
-  const listId = useId();
-  const errorId = useId();
-  const error = filterError(value);
-  return (
-    <div>
-      <input
-        list={listId}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder="empty = all, e.g. label:bug -is:pr, other label:bug"
-        aria-invalid={error !== null}
-        aria-describedby={error ? errorId : undefined}
-        spellCheck={false}
-        className={`w-full rounded-md border px-2 py-1 font-mono text-sm ${
-          error ? "border-red-400" : "border-neutral-300"
-        }`}
-      />
-      <datalist id={listId}>
-        {suggestFilter(value, labels).map((option) => (
-          <option key={option} value={option} />
-        ))}
-      </datalist>
-      {error && (
-        <p id={errorId} className="mt-0.5 text-xs text-red-700">
-          {error}
-        </p>
-      )}
-    </div>
   );
 }

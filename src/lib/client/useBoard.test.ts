@@ -2,7 +2,7 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
-import type { Filters } from "../schema";
+import type { BoardQuery } from "../schema";
 
 import { api, type BoardResponse, filtersToQuery, type SyncResponse } from "./api";
 import { type BoardController, useBoard } from "./useBoard";
@@ -18,18 +18,18 @@ const response = () => ({ status: { version: 1 } }) as BoardResponse;
 
 const roots: Root[] = [];
 
-async function renderBoard(initial: Filters) {
+async function renderBoard(initial: BoardQuery) {
   const root = createRoot(document.createElement("div"));
   roots.push(root);
   const result: { current: BoardController | null } = { current: null };
   const report = (board: BoardController) => {
     result.current = board;
   };
-  function Probe({ filters }: { filters: Filters }) {
+  function Probe({ filters }: { filters: BoardQuery }) {
     report(useBoard("main", filters));
     return null;
   }
-  const render = (filters: Filters) =>
+  const render = (filters: BoardQuery) =>
     act(async () => root.render(createElement(Probe, { filters })));
   await render(initial);
   return { result, render };
@@ -49,20 +49,20 @@ test("a reload after sync uses the filters current when the sync finishes", asyn
   });
   const sync = Promise.withResolvers<SyncResponse>();
   vi.mocked(api.sync).mockReturnValue(sync.promise);
-  const { result, render } = await renderBoard({ repo: ["a", "b"] });
+  const { result, render } = await renderBoard({ hide: ["a", "b"] });
 
   let syncing!: Promise<void>;
   await act(async () => {
     syncing = result.current!.sync(true);
   });
-  await render({ repo: ["a"] });
+  await render({ hide: ["a"] });
   await act(async () => {
     sync.resolve({ status: {} } as SyncResponse);
     await syncing;
   });
 
-  expect(vi.mocked(api.board).mock.lastCall?.[1]).toEqual({ repo: ["a"] });
-  expect(result.current!.data).toBe(responses.get("repo=a"));
+  expect(vi.mocked(api.board).mock.lastCall?.[1]).toEqual({ hide: ["a"] });
+  expect(result.current!.data).toBe(responses.get("hide=a"));
 });
 
 test("a stale board response does not replace a newer one", async () => {
@@ -73,8 +73,8 @@ test("a stale board response does not replace a newer one", async () => {
     pending.push({ board, resolve: () => resolve(board) });
     return promise;
   });
-  const { result, render } = await renderBoard({ repo: ["a", "b"] });
-  await render({ repo: ["a"] });
+  const { result, render } = await renderBoard({ hide: ["a", "b"] });
+  await render({ hide: ["a"] });
 
   const [older, newer] = pending;
   await act(async () => newer.resolve());

@@ -12,7 +12,7 @@ Sync is sequential per repository, on purpose: GitHub's GraphQL rate limit is sh
 everything the token does. Two kinds of pass:
 
 - **Incremental** — issues updated since the last run, every `refreshMinutes`.
-- **Full** — every open issue, once a day, for repositories just added to a dashboard, and on
+- **Full** — every open issue, once a day, for repositories just added in settings, and on
   demand from the sync button on the board.
 
 The remaining rate-limit budget is shown next to the sync status. The board polls
@@ -42,13 +42,15 @@ A PR card shows a pill for each status that holds, whatever lane it is in: `conf
 `CI …` or `comments`.
 
 `is:has-pr` picks issues that an open PR closes (GitHub's "linked pull requests"), whoever
-opened the PR, as long as the PR is in one of the dashboard's repos; such an issue card shows a
+opened the PR, as long as the PR is in one of the global repos; such an issue card shows a
 `PR open` pill. It drops once the PR is merged or closed.
 
 ## Filters
 
-On multi-repo boards, chips above the board switch each repository on or off
-(`repo=owner/a,owner/b`); `all` turns every chip on and, once all are on, `none` turns them off.
+With more than one global repository, chips in the top bar switch each on or off; `all` turns
+every chip on and, once all are on, `none` turns them off. The choice holds on every board, in
+this browser, and after a reload. A dashboard with no items in the repositories switched on is
+dimmed in the top bar.
 
-Text, repos, assignee, label, epic and sort live in the query string, so a filtered view is a link
-you can bookmark or send. Empty values count as unset, except `repo=`, which shows no repository.
+Text, assignee, label, epic and sort live in the query string, so a filtered view is a link you
+can bookmark or send. Empty values count as unset.

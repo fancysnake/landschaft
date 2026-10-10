@@ -3,10 +3,9 @@ import { describe, expect, it } from "vitest";
 import { askedLabels, type FilterNode } from "../filter";
 import { cellKey } from "../types";
 import { DASHBOARD, label, makeIssue, REPO } from "./__fixtures__/issues";
-import { buildBoard, compile, isBlocked, placeIn, resolveUsers } from "./board";
+import { buildBoard, compile, isBlocked, placeIn } from "./board";
 
 const cell = (laneId: string, colId: string) => cellKey(laneId, colId);
-const TWO_REPOS = { ...DASHBOARD, repos: [REPO, "acme/other"] };
 const numbers = (board: ReturnType<typeof buildBoard>) =>
   board.cells[cell("rest", "todo")]?.map((c) => c.number);
 
@@ -98,18 +97,20 @@ describe("buildBoard", () => {
       makeIssue({ number: 1, author: "Ann" }),
       makeIssue({ number: 2, author: "bob", assignees: [{ login: "cid", avatarUrl: "" }] }),
       makeIssue({ number: 3, author: "dan" }),
+      makeIssue({ number: 4, author: "renovate" }),
     ];
     const users = (list: string[], viewer: string | null = null) =>
-      numbers(buildBoard(issues, { ...DASHBOARD, users: list }, {}, resolveUsers(list, viewer)));
+      numbers(buildBoard(issues, DASHBOARD, {}, list, new Set(), viewer));
     expect(users(["ann", "cid"])).toEqual([2, 1]);
-    expect(users(["@me", "ann"], "dan")).toEqual([3, 1]);
+    expect(users(["@ME", "ann"], "dan")).toEqual([3, 1]);
     expect(users(["@me", "ann"])).toEqual([1]);
     expect(users(["@me"])).toEqual([]);
-    expect(users([])).toEqual([3, 2, 1]);
+    expect(users(["renovate[bot]"])).toEqual([4]);
+    expect(users([])).toEqual([4, 3, 2, 1]);
   });
 
   it("keeps only the viewer's authored or assigned issues under @me", () => {
-    const dashboard = { ...DASHBOARD, users: ["@me"] };
+    const dashboard = DASHBOARD;
     const me = { login: "me", avatarUrl: "" };
     const issues = [
       makeIssue({ number: 1, author: "me" }),
@@ -117,22 +118,10 @@ describe("buildBoard", () => {
       makeIssue({ number: 3, author: "ann", labels: [label("epic")] }),
       makeIssue({ number: 4, author: null }),
     ];
-    const mine = buildBoard(issues, dashboard, {}, ["me"]);
+    const mine = buildBoard(issues, dashboard, {}, ["@me"], new Set(), "me");
     expect(numbers(mine)).toEqual([2, 1]);
     expect(mine.epics).toEqual([]);
     expect(mine.assignees).toEqual(["me"]);
-    expect(numbers(buildBoard(issues, dashboard, {}, []))).toEqual([]);
-    expect(numbers(buildBoard(issues, DASHBOARD, {}, ["me"]))).toEqual([4, 3, 2, 1]);
-  });
-
-  it("resolves @me to the viewer and drops the [bot] suffix", () => {
-    expect(resolveUsers(["@me", "@ME", "Ann", "renovate[bot]"], "dan")).toEqual([
-      "dan",
-      "dan",
-      "Ann",
-      "renovate",
-    ]);
-    expect(resolveUsers(["@me", "ann"], null)).toEqual(["ann"]);
   });
 
   it("gives `other` what no earlier lane took", () => {
@@ -244,7 +233,6 @@ describe("buildBoard", () => {
   it("matches is:has-pr on issues an open PR closes, whoever's the PR", () => {
     const dashboard = {
       ...DASHBOARD,
-      users: ["alice"],
       swimlanes: [
         { id: "review", name: "In review", filter: "is:issue is:has-pr", hideBlocked: false },
         ...DASHBOARD.swimlanes,
@@ -385,22 +373,6 @@ describe("buildBoard", () => {
     expect(numbers(buildBoard(issues, DASHBOARD, { q: "login", assignee: "ann" }))).toEqual([1]);
   });
 
-  it("repo filter keeps only that repo's issues", () => {
-    const issues = [makeIssue({ number: 1 }), makeIssue({ number: 2, repo: "acme/other" })];
-    expect(numbers(buildBoard(issues, TWO_REPOS, { repo: ["acme/other"] }))).toEqual([2]);
-  });
-
-  it("repo filter takes a list and skips repos not on the dashboard", () => {
-    const three = { ...DASHBOARD, repos: [REPO, "acme/other", "acme/third"] };
-    const issues = [
-      makeIssue({ number: 1 }),
-      makeIssue({ number: 2, repo: "acme/other" }),
-      makeIssue({ number: 3, repo: "acme/third" }),
-    ];
-    const repo = ["acme/third", "acme/gone", "acme/app"];
-    expect(numbers(buildBoard(issues, three, { repo }))).toEqual([3, 1]);
-  });
-
   it("places pull requests next to issues and never lists them as epics", () => {
     const issues = [makeIssue({ number: 1 }), makeIssue({ number: 2, kind: "pr" })];
     const board = buildBoard(issues, DASHBOARD);
@@ -472,23 +444,55 @@ describe("buildBoard", () => {
     ]);
   });
 
-  it("hides epics from other repos under the repo filter", () => {
+  it("hides epics from hidden repos", () => {
     const issues = [
       makeIssue({ number: 10, labels: [label("epic")] }),
       makeIssue({ number: 11, repo: "acme/other", labels: [label("epic")] }),
     ];
-    const board = buildBoard(issues, TWO_REPOS, { repo: ["acme/other"] });
+    const board = buildBoard(issues, DASHBOARD, { hide: [REPO] });
     expect(board.epics.map((epic) => epic.key)).toEqual(["acme/other#11"]);
   });
 
-  it("ignores a repo filter for a repo not on the dashboard", () => {
+  it("ignores hidden repos not on the dashboard", () => {
     const issues = [
       makeIssue({ number: 1 }),
       makeIssue({ number: 10, repo: "acme/other", labels: [label("epic")] }),
     ];
-    const board = buildBoard(issues, TWO_REPOS, { repo: ["acme/gone"] });
+    const board = buildBoard(issues, DASHBOARD, { hide: ["acme/gone"] });
     expect(numbers(board)).toEqual([10, 1]);
     expect(board.epics.map((epic) => epic.key)).toEqual(["acme/other#10"]);
+  });
+
+  it("narrows to the dashboard filter, epics included, hiding the labels it asks for", () => {
+    const dashboard = { ...DASHBOARD, filter: "repo:acme/other OR user:@me label:team" };
+    const issues = [
+      makeIssue({ number: 1, labels: [label("team")] }),
+      makeIssue({ number: 2, author: "me", labels: [label("team")] }),
+      makeIssue({ number: 3, repo: "acme/other", labels: [label("epic")] }),
+      makeIssue({ number: 4, author: "me" }),
+      makeIssue({ number: 10, labels: [label("epic")] }),
+    ];
+    const board = buildBoard(issues, dashboard, {}, [], new Set(), "me");
+    expect(numbers(board)).toEqual([3, 2]);
+    expect(board.epics.map((epic) => epic.key)).toEqual(["acme/other#3"]);
+    expect(board.cells[cell("rest", "todo")]?.[1]?.labels).toEqual([]);
+    expect(board.repos).toEqual(["acme/app", "acme/other"]);
+  });
+
+  it("lists the repos among the dashboard's items, shown or not", () => {
+    const issues = [
+      makeIssue({ number: 1, repo: "acme/b" }),
+      makeIssue({ number: 2, repo: "acme/a" }),
+      makeIssue({ number: 3, repo: "acme/c", state: "CLOSED" }),
+    ];
+    expect(buildBoard(issues, DASHBOARD, { hide: ["acme/b"] }).repos).toEqual(["acme/a", "acme/b"]);
+  });
+
+  it("hides repos switched off in the nav", () => {
+    const issues = [makeIssue({ number: 1 }), makeIssue({ number: 2, repo: "acme/other" })];
+    const hide = ["acme/other", "acme/gone"];
+    expect(numbers(buildBoard(issues, DASHBOARD, { hide }))).toEqual([1]);
+    expect(numbers(buildBoard(issues, DASHBOARD, { hide: [REPO, "acme/other"] }))).toEqual([]);
   });
 
   it("skips epics when no epic label is configured", () => {

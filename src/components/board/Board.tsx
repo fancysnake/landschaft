@@ -1,15 +1,13 @@
-import { Fragment } from "react";
+import { Fragment, useMemo } from "react";
 
-import { repoShortName } from "../../lib/client/labels";
 import { useBoard } from "../../lib/client/useBoard";
+import { useHiddenRepos } from "../../lib/client/useHiddenRepos";
 import { useUrlFilters } from "../../lib/client/useUrlFilters";
-import { repoFilter, selectedRepos } from "../../lib/schema";
 import { cellKey } from "../../lib/types";
 import { EpicStrip } from "./EpicStrip";
 import { FilterBar } from "./FilterBar";
 import { IssueCard } from "./IssueCard";
 import { SyncStatus } from "./SyncStatus";
-import { Toggles } from "./Toggles";
 
 interface Props {
   dashboardId: string;
@@ -17,16 +15,18 @@ interface Props {
 
 export default function Board({ dashboardId }: Props) {
   const [filters, updateFilters] = useUrlFilters();
+  const [hidden] = useHiddenRepos();
+  const request = useMemo(() => ({ ...filters, hide: hidden }), [filters, hidden]);
   const { data, error, loading, syncing, sync, setEpicStarred, dismissError } = useBoard(
     dashboardId,
-    filters,
+    request,
   );
 
   if (!data) {
     return <p className="p-6 text-sm text-neutral-500">{loading ? "Loading board…" : error}</p>;
   }
-  const { dashboard, users, board, status } = data;
-  const showRepo = dashboard.repos.length > 1;
+  const { dashboard, board, status } = data;
+  const showRepo = board.repos.length > 1;
 
   return (
     <div className="flex h-full flex-col gap-3 p-4">
@@ -35,8 +35,10 @@ export default function Board({ dashboardId }: Props) {
           {dashboard.name}
           <span className="ml-2 text-sm font-normal text-neutral-500">
             {board.total} issues
-            {dashboard.users.length > 0 && (
-              <span title="Created by or assigned to"> · {users.join(", ") || "nobody"}</span>
+            {dashboard.filter && (
+              <code title="Dashboard filter" className="ml-2 text-xs">
+                {dashboard.filter}
+              </code>
             )}
           </span>
         </h1>
@@ -61,15 +63,12 @@ export default function Board({ dashboardId }: Props) {
           .
         </p>
       )}
-
-      {showRepo && (
-        <Toggles
-          label="Repositories"
-          options={dashboard.repos.map((repo) => ({ value: repo, label: repoShortName(repo) }))}
-          selected={selectedRepos(filters.repo, dashboard.repos)}
-          onChange={(next) => updateFilters({ repo: repoFilter(next, dashboard.repos) })}
-        />
+      {board.repos.length > 0 && board.repos.every((repo) => hidden.includes(repo)) && (
+        <p className="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600">
+          Every repository with items on this board is switched off in the bar above.
+        </p>
       )}
+
       {dashboard.epicLabel && (
         <EpicStrip
           epics={board.epics}

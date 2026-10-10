@@ -121,6 +121,8 @@ export interface Board {
   unplaced: number;
   /** Issues shown in at least one cell; one in several cells counts once. */
   total: number;
+  /** Repos among the dashboard's items, whether shown or not; the board's repo chips. */
+  repos: string[];
   assignees: string[];
   labels: string[];
   sort: { by: SortBy; dir: SortDir };

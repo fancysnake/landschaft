@@ -1,92 +1,44 @@
-import { type ReactNode, useEffect, useState } from "react";
-
+import type { Offer } from "../../lib/filter";
 import type { LabelDef } from "../../lib/types";
 
-import { api } from "../../lib/client/api";
-import { type Dashboard, repoName, type SortBy, type SortDir, userName } from "../../lib/schema";
-import { ChipList } from "./ChipList";
+import { type Dashboard, dashboardFilterError, type SortBy, type SortDir } from "../../lib/schema";
+import { Field, input } from "./Field";
+import { FilterInput } from "./FilterInput";
 import { LabelPicker } from "./LabelPicker";
 import { LaneColumnEditor } from "./LaneColumnEditor";
 
 interface Props {
   dashboard: Dashboard;
   onChange(dashboard: Dashboard): void;
+  /** Labels of the global repos, for the epic label picker. */
+  catalog: LabelDef[];
+  /** Completed in filters. */
+  offer: Offer;
 }
 
-const input = "rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm";
-
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-sm font-medium">{label}</span>
-      {children}
-      {hint && <span className="mt-1 block text-xs text-neutral-500">{hint}</span>}
-    </label>
-  );
-}
-
-export function DashboardEditor({ dashboard, onChange }: Props) {
-  const [catalog, setCatalog] = useState<LabelDef[]>([]);
-  const reposKey = dashboard.repos.join(",");
-
-  useEffect(() => {
-    let cancelled = false;
-    const request = reposKey ? api.labels(reposKey.split(",")) : Promise.resolve([]);
-    request
-      .then((labels) => {
-        if (!cancelled) setCatalog(labels);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [reposKey]);
-
+export function DashboardEditor({ dashboard, onChange, catalog, offer }: Props) {
   const patch = (changes: Partial<Dashboard>) => onChange({ ...dashboard, ...changes });
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-[1fr_8rem]">
-        <Field label="Name">
-          <input
-            value={dashboard.name}
-            onChange={(event) => patch({ name: event.target.value })}
-            className={`${input} w-full`}
-          />
-        </Field>
-        <Field label="Refresh (min)">
-          <input
-            type="number"
-            min={1}
-            max={1440}
-            value={dashboard.refreshMinutes}
-            onChange={(event) => patch({ refreshMinutes: Number(event.target.value) || 1 })}
-            className={`${input} w-full`}
-          />
-        </Field>
-      </div>
-
-      <Field
-        label="Repositories"
-        hint="Labels below are suggested from these repos once they have synced (saving triggers the first sync)."
-      >
-        <ChipList
-          items={dashboard.repos}
-          onChange={(repos) => patch({ repos })}
-          schema={repoName}
-          placeholder="owner/repo"
+      <Field label="Name">
+        <input
+          value={dashboard.name}
+          onChange={(event) => patch({ name: event.target.value })}
+          className={`${input} w-full`}
         />
       </Field>
 
       <Field
-        label="Users"
-        hint="Only issues and pull requests these users created or are assigned to; @me is you (the token's account). Empty shows everyone's."
+        label="Filter"
+        hint="Narrows the global repositories and users to what this dashboard shows, e.g. repo:acme/app|acme/lib user:@me. Empty shows all of them."
       >
-        <ChipList
-          items={dashboard.users}
-          onChange={(users) => patch({ users })}
-          schema={userName}
-          placeholder="login or @me"
+        <FilterInput
+          value={dashboard.filter}
+          onChange={(filter) => patch({ filter })}
+          offer={offer}
+          validate={dashboardFilterError}
+          placeholder="empty = all, e.g. repo:acme/app label:team-a"
         />
       </Field>
 
@@ -134,7 +86,7 @@ export function DashboardEditor({ dashboard, onChange }: Props) {
         items={dashboard.swimlanes}
         onChange={(swimlanes) => patch({ swimlanes })}
         create={(id) => ({ id, name: "New lane", filter: "", hideBlocked: false })}
-        labels={catalog}
+        offer={offer}
         axis="swimlanes"
       />
       <LaneColumnEditor
@@ -142,7 +94,7 @@ export function DashboardEditor({ dashboard, onChange }: Props) {
         items={dashboard.columns}
         onChange={(columns) => patch({ columns })}
         create={(id) => ({ id, name: "New column", filter: "" })}
-        labels={catalog}
+        offer={offer}
         axis="columns"
       />
     </div>

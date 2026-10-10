@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { Filters } from "../schema";
+import type { BoardQuery } from "../schema";
 
 import { api, type BoardResponse, errorMessage } from "./api";
 
@@ -16,8 +16,8 @@ export interface BoardController {
   dismissError(): void;
 }
 
-/** Loads the board for the current filters, polls the sync version. */
-export function useBoard(dashboardId: string, filters: Filters): BoardController {
+/** Loads the board for the current query, polls the sync version. */
+export function useBoard(dashboardId: string, filters: BoardQuery): BoardController {
   const [data, setData] = useState<BoardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);

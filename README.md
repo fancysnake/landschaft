@@ -83,16 +83,18 @@ mise run dev        # http://localhost:4321
 
 For a production build: `mise run build` then `mise run preview`.
 
-Open **Settings**, create a dashboard, add repositories and define swimlanes and columns.
-Saving triggers the first sync; once labels are cached the filter inputs suggest them.
+Open **Settings**, add repositories, then create a dashboard and define swimlanes and columns.
+Saving triggers the first sync; once labels are cached the filter inputs suggest them, along with
+repos after `repo:` and users after `user:`, `author:` and `assignee:`.
 
 ## How placement works
 
 <!-- --8<-- [start:placement] -->
 
-- A dashboard shows only open issues **its users created or are assigned to**. The default is
-  `@me`, the account behind the token; list other GitHub logins in settings to follow them too,
-  or remove every user to see everyone's.
+- Every dashboard starts from the open issues in the **global repositories** that the
+  **global users** created or are assigned to (no users: everyone's). A dashboard's own
+  **filter** narrows that, e.g. `repo:acme/app user:@me`; `@me` is the account behind the
+  token.
 - Each swimlane and column has a **filter**. An issue shows up in **every** swimlane and
   column whose filter it satisfies: with lanes `label:a` and `label:b`, an issue carrying
   both appears in both. An empty filter matches everything.
@@ -111,8 +113,8 @@ Saving triggers the first sync; once labels are cached the filter inputs suggest
     `is:unanswered` (an unresolved review thread whose last comment is not the PR author's).
     `is:pr is:conflicting|ci:failed|unanswered` gathers the PRs waiting on their author.
   - `is:has-pr` picks issues an open PR closes (GitHub's "linked pull requests"), whoever
-    opened the PR, as long as the PR is in one of the dashboard's repos.
-- Labels a filter asks for (outside a `-`) are hidden on cards.
+    opened the PR, as long as the PR is in one of the global repos.
+- Labels a filter asks for (outside a `-`), the dashboard's included, are hidden on cards.
 - The term **`other`** holds for issues no swimlane above, or no column to the right,
   matched, so order matters. Alone it makes the bottom swimlane or the leftmost column the
   catch-all; `other label:b` below a `label:a` lane takes the `b` issues the `a` lane did
@@ -123,9 +125,10 @@ Saving triggers the first sync; once labels are cached the filter inputs suggest
   progress; clicking one filters the board to its sub-issues and to issues it blocks or is
   blocked by; ↗ opens it on GitHub. Pull requests linked to any of those issues (or to the
   epic) show up too.
-- Open **pull requests** are cards like issues. On multi-repo boards, chips above the board
-  switch each repository on or off.
-- Filters (text, repos, assignee, label, epic, sort) live in the URL, so a view is a link.
+- Open **pull requests** are cards like issues.
+- Repo chips in the top bar switch each global repository on or off for every board, in this
+  browser; a dashboard with no items in the repos switched on is dimmed.
+- Filters (text, assignee, label, epic, sort) live in the URL, so a view is a link.
 
 <!-- --8<-- [end:placement] -->
 

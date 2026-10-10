@@ -1,12 +1,15 @@
-import type { Config, Dashboard, Filters, StarEpicRequest, SyncRequest } from "../schema";
+import type { BoardQuery, Config, Dashboard, StarEpicRequest, SyncRequest } from "../schema";
 import type { Board, LabelDef, SyncStatus } from "../types";
 
 export interface BoardResponse {
   dashboard: Dashboard;
-  /** The dashboard's users with `@me` resolved; see `resolveUsers`. */
-  users: string[];
   board: Board;
   status: SyncStatus;
+}
+
+export interface DashboardsResponse {
+  /** The repos among each dashboard's items. */
+  dashboards: { id: string; repos: string[] }[];
 }
 
 export interface SyncResponse {
@@ -52,9 +55,9 @@ async function request<T>(input: string, init: RequestInit = {}): Promise<T> {
   return payload as T;
 }
 
-export function filtersToQuery(filters: Filters): string {
+export function filtersToQuery(query: BoardQuery): string {
   const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(filters)) {
+  for (const [key, value] of Object.entries(query)) {
     if (Array.isArray(value)) params.set(key, value.join(","));
     else if (value) params.set(key, value);
   }
@@ -62,9 +65,10 @@ export function filtersToQuery(filters: Filters): string {
 }
 
 export const api = {
-  board: (dashboardId: string, filters: Filters) =>
+  dashboards: () => request<DashboardsResponse>("/api/dashboards"),
+  board: (dashboardId: string, query: BoardQuery) =>
     request<BoardResponse>(
-      `/api/dashboards/${encodeURIComponent(dashboardId)}/board?${filtersToQuery(filters)}`,
+      `/api/dashboards/${encodeURIComponent(dashboardId)}/board?${filtersToQuery(query)}`,
     ),
   version: () => request<SyncStatus>("/api/version"),
   sync: (body: Partial<SyncRequest>) =>

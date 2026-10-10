@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ConfigSchema } from "../schema";
-import { allRepos, findDashboard, loadConfig, refreshMinutesByRepo, saveConfig } from "./config";
+import { findDashboard, loadConfig, saveConfig } from "./config";
 
 const minimal = {
   dashboards: [
@@ -44,15 +44,14 @@ describe("config file", () => {
   });
 
   it("returns an empty config when the file is missing", () => {
-    expect(loadConfig(file)).toEqual({ dashboards: [] });
+    expect(loadConfig(file)).toEqual({ repos: [], users: [], refreshMinutes: 5, dashboards: [] });
   });
 
   it("round-trips through save and load with defaults filled in", () => {
     const saved = saveConfig(minimal, file);
     expect(saved.dashboards[0]).toMatchObject({
       sort: { by: "updated", dir: "desc" },
-      refreshMinutes: 5,
-      users: ["@me"],
+      filter: "",
       swimlanes: [{ id: "all", filter: "other", hideBlocked: false }],
       columns: [{ id: "todo", filter: "other" }],
     });
@@ -76,6 +75,11 @@ const parseDashboard = (extra: object) =>
 
 const lane = (group: object) =>
   parseDashboard({ swimlanes: [{ id: "a", name: "A", ...group }] }).swimlanes[0];
+
+const usersOf = (extra: object) =>
+  ConfigSchema.parse({ dashboards: [{ ...minimal.dashboards[0]!, ...extra }] }).users;
+
+const dashboard = (id: string, extra: object) => ({ ...minimal.dashboards[0]!, id, ...extra });
 
 describe("config schema rules", () => {
   const base = minimal.dashboards[0]!;
@@ -165,10 +169,22 @@ describe("config schema rules", () => {
   });
 
   it("reads the legacy scope as users", () => {
-    expect(parseDashboard({ scope: "mine" })).toMatchObject({ users: ["@me"] });
-    expect(parseDashboard({ scope: "all" })).toMatchObject({ users: [] });
-    expect(parseDashboard({ scope: "all", users: ["ann"] })).toMatchObject({ users: ["ann"] });
+    expect(usersOf({ scope: "mine" })).toEqual(["@me"]);
+    expect(usersOf({ scope: "all" })).toEqual([]);
+    expect(usersOf({ scope: "all", users: ["ann"] })).toEqual(["ann"]);
     expect(parseDashboard({ scope: "all" })).not.toHaveProperty("scope");
+  });
+
+  it("rejects `other` in a dashboard filter", () => {
+    expect(() =>
+      saveConfig(
+        { repos: [], dashboards: [{ ...base, filter: "label:a -other" }] },
+        "/dev/null/never",
+      ),
+    ).toThrow(/only works in swimlanes/);
+    expect(parseDashboard({ filter: "repo:acme/app user:@me" }).filter).toBe(
+      "repo:acme/app user:@me",
+    );
   });
 
   it("takes GitHub logins and @me as users", () => {
@@ -185,19 +201,61 @@ describe("config schema rules", () => {
   });
 });
 
+describe("global scope migration", () => {
+  it("takes the unions and the shortest interval, narrowing dashboards that differ", () => {
+    const config = ConfigSchema.parse(minimal);
+    expect(config).toMatchObject({
+      repos: ["acme/app", "acme/lib"],
+      users: ["@me"],
+      refreshMinutes: 1,
+    });
+    expect(config.dashboards.map((d) => d.filter)).toEqual(["", "repo:acme/lib"]);
+    expect(config.dashboards[1]).not.toHaveProperty("repos");
+    expect(config.dashboards[1]).not.toHaveProperty("refreshMinutes");
+    const epic = ConfigSchema.parse({
+      dashboards: [{ ...minimal.dashboards[1], epicLabel: "epic" }],
+    });
+    expect(epic.dashboards[0]?.epicLabel).toBe("epic");
+    const slow = minimal.dashboards.map((d) => ({ ...d, refreshMinutes: 10 }));
+    expect(ConfigSchema.parse({ dashboards: slow }).refreshMinutes).toBe(10);
+  });
+
+  it("narrows users, and keeps users empty when any dashboard took everyone's", () => {
+    const mixed = ConfigSchema.parse({
+      dashboards: [dashboard("a", { users: ["ann"] }), dashboard("b", { users: ["ann", "bob"] })],
+    });
+    expect(mixed.users).toEqual(["ann", "bob"]);
+    expect(mixed.dashboards.map((d) => d.filter)).toEqual(["user:ann", ""]);
+    const everyone = ConfigSchema.parse({
+      dashboards: [dashboard("a", { users: ["ann"] }), dashboard("b", { scope: "all" })],
+    });
+    expect(everyone.users).toEqual([]);
+    expect(everyone.dashboards.map((d) => d.filter)).toEqual(["user:ann", ""]);
+  });
+
+  it("puts a filter already there in parens before the narrowing", () => {
+    const config = ConfigSchema.parse({
+      dashboards: [
+        dashboard("a", { repos: ["acme/app"], filter: "label:a OR label:b" }),
+        dashboard("b", { repos: ["acme/lib"] }),
+      ],
+    });
+    expect(config.dashboards[0]?.filter).toBe("(label:a OR label:b) repo:acme/app");
+  });
+
+  it("leaves a config with global repos alone, dropping dashboard leftovers", () => {
+    const config = ConfigSchema.parse({ ...minimal, repos: ["acme/app"] });
+    expect(config).toMatchObject({ repos: ["acme/app"], users: [], refreshMinutes: 5 });
+    expect(config.dashboards.map((d) => d.filter)).toEqual(["", ""]);
+    expect(config.dashboards[0]).not.toHaveProperty("users");
+  });
+});
+
 describe("config helpers", () => {
   const config = saveConfig(minimal, join(mkdtempSync(join(tmpdir(), "landschaft-")), "c.json"));
 
-  it("finds dashboards and unique repos", () => {
+  it("finds dashboards", () => {
     expect(findDashboard(config, "fast")?.name).toBe("Fast");
     expect(findDashboard(config, "nope")).toBeUndefined();
-    expect(allRepos(config)).toEqual(["acme/app", "acme/lib"]);
-  });
-
-  it("uses the smallest refresh interval per repo", () => {
-    expect([...refreshMinutesByRepo(config)]).toEqual([
-      ["acme/app", 5],
-      ["acme/lib", 1],
-    ]);
   });
 });
