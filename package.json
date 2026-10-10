@@ -24,10 +24,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@astrojs/node": "^11.1.6",
-    "@astrojs/react": "^7.0.0",
+    "@astrojs/node": "^11.1.7",
+    "@astrojs/react": "^7.0.1",
     "@tailwindcss/vite": "^4.3.3",
-    "astro": "^7.3.5",
+    "astro": "^7.3.8",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "tailwindcss": "^4.3.3",
@@ -35,13 +35,13 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "happy-dom": "^20.14.5",
-    "oxfmt": "^0.70.0",
-    "oxlint": "^1.86.0",
-    "typescript": "6",
+    "happy-dom": "^20.14.6",
+    "oxfmt": "^0.72.0",
+    "oxlint": "^1.87.0",
+    "typescript": "^7.0.2",
     "vitest": "^5.0.3"
   },
   "engines": {
