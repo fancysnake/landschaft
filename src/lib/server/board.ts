@@ -7,9 +7,9 @@ import {
   parseFilter,
 } from "../filter";
 import {
+  type BoardQuery,
   type Dashboard,
   type Filters,
-  ME,
   OTHER_LOOKS_AT,
   shownRepos,
   type SortBy,
@@ -127,47 +127,31 @@ function compareBy(by: SortBy, dir: SortDir) {
 }
 
 /**
- * The global users as plain logins: `@me` becomes `viewer`, or drops out while that is
- * unknown, and a `[bot]` suffix comes off, since synced bot logins lack it.
- */
-export function resolveUsers(users: string[], viewer: string | null): string[] {
-  return users.flatMap((user) => {
-    const login = user.toLowerCase() === ME ? viewer : user.replace(/\[bot\]$/i, "");
-    return login === null ? [] : [login];
-  });
-}
-
-function byUsers(users: string[] | null): (issue: Issue) => boolean {
-  if (users === null) return () => true;
-  const logins = new Set(users.map((user) => user.toLowerCase()));
-  const listed = (login: string | null) => login !== null && logins.has(login.toLowerCase());
-  return (issue) => listed(issue.author) || issue.assignees.some(({ login }) => listed(login));
-}
-
-/**
  * Lays the open issues out on the dashboard's grid. `issues` are the global repos'; of them,
- * only those one of `users` (the global users through `resolveUsers`, null for everyone)
- * authored or is assigned to and that pass the dashboard's filter take part. `starred` epic
- * keys lead the epic strip. `viewer` is what `@me` in a filter stands for.
+ * only those one of the global `users` (empty for everyone) authored or is assigned to and that
+ * pass the dashboard's filter take part. `starred` epic keys lead the epic strip. `viewer` is
+ * what `@me` stands for.
  */
 export function buildBoard(
   issues: Issue[],
   dashboard: Dashboard,
-  filters: Filters = {},
-  users: string[] | null = null,
+  filters: BoardQuery = {},
+  users: string[] = [],
   starred: ReadonlySet<string> = new Set(),
   viewer: string | null = null,
 ): Board {
   const byKey = new Map(issues.map((issue) => [issueKey(issue.repo, issue.number), issue]));
-  const listed = byUsers(users);
   const wanted = issueFilter(filters, byKey);
   // From all of `issues`, not just `open`.
   const itemOf = itemsOf(issues, byKey);
   const scope = parseFilter(dashboard.filter);
-  const open = issues.filter(
-    (issue) =>
-      issue.state === "OPEN" && listed(issue) && matchesFilter(scope, itemOf(issue), { viewer }),
-  );
+  const base: FilterNode | null =
+    users.length > 0 ? { type: "term", key: "user", values: users } : null;
+  const open = issues.filter((issue) => {
+    if (issue.state !== "OPEN") return false;
+    const item = itemOf(issue);
+    return matchesFilter(base, item, { viewer }) && matchesFilter(scope, item, { viewer });
+  });
   const present = [...new Set(open.map((issue) => issue.repo))].toSorted();
   const repos = new Set(shownRepos(filters, present));
   const axes = { swimlanes: compile(dashboard.swimlanes), columns: compile(dashboard.columns) };

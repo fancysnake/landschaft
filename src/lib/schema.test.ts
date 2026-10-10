@@ -2,15 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import { filtersToQuery } from "./client/api";
 import { readFilters } from "./client/useUrlFilters";
-import { FiltersSchema, hiddenRepos, repoFilter, selectedRepos, shownRepos } from "./schema";
+import { BoardQuerySchema, hiddenRepos, repoFilter, selectedRepos, shownRepos } from "./schema";
 
 describe("repo filter", () => {
   const repos = ["acme/a", "acme/b", "acme/c"];
 
   it("parses the query value into a list, absent meaning unset and empty meaning none", () => {
-    expect(FiltersSchema.parse({ repo: "acme/a,acme/b" }).repo).toEqual(["acme/a", "acme/b"]);
-    expect(FiltersSchema.parse({}).repo).toBeUndefined();
-    expect(FiltersSchema.parse({ repo: "" }).repo).toEqual([]);
+    expect(BoardQuerySchema.parse({ repo: "acme/a,acme/b" }).repo).toEqual(["acme/a", "acme/b"]);
+    expect(BoardQuerySchema.parse({}).repo).toBeUndefined();
+    expect(BoardQuerySchema.parse({ repo: "" }).repo).toEqual([]);
   });
 
   it("encodes an empty selection as repo= and reads it back", () => {

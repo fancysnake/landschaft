@@ -212,6 +212,10 @@ describe("global scope migration", () => {
     expect(config.dashboards.map((d) => d.filter)).toEqual(["", "repo:acme/lib"]);
     expect(config.dashboards[1]).not.toHaveProperty("repos");
     expect(config.dashboards[1]).not.toHaveProperty("refreshMinutes");
+    const epic = ConfigSchema.parse({
+      dashboards: [{ ...minimal.dashboards[1], epicLabel: "epic" }],
+    });
+    expect(epic.dashboards[0]?.epicLabel).toBe("epic");
     const slow = minimal.dashboards.map((d) => ({ ...d, refreshMinutes: 10 }));
     expect(ConfigSchema.parse({ dashboards: slow }).refreshMinutes).toBe(10);
   });

@@ -1,11 +1,11 @@
-import type { ReactNode } from "react";
-
 import type { Offer } from "../../lib/filter";
 import type { LabelDef } from "../../lib/types";
 
 import { type Dashboard, dashboardFilterError, type SortBy, type SortDir } from "../../lib/schema";
+import { Field, input } from "./Field";
+import { FilterInput } from "./FilterInput";
 import { LabelPicker } from "./LabelPicker";
-import { FilterInput, LaneColumnEditor } from "./LaneColumnEditor";
+import { LaneColumnEditor } from "./LaneColumnEditor";
 
 interface Props {
   dashboard: Dashboard;
@@ -14,26 +14,6 @@ interface Props {
   catalog: LabelDef[];
   /** Completed in filters. */
   offer: Offer;
-}
-
-export const input = "rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm";
-
-export function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: ReactNode;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-sm font-medium">{label}</span>
-      {children}
-      {hint && <span className="mt-1 block text-xs text-neutral-500">{hint}</span>}
-    </label>
-  );
 }
 
 export function DashboardEditor({ dashboard, onChange, catalog, offer }: Props) {

@@ -1,6 +1,6 @@
 import { type Config, repoName, userName } from "../../lib/schema";
 import { ChipList } from "./ChipList";
-import { Field, input } from "./DashboardEditor";
+import { Field, input } from "./Field";
 
 type Scope = Pick<Config, "repos" | "users" | "refreshMinutes">;
 

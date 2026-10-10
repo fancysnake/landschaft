@@ -133,12 +133,6 @@ export const DashboardSchema = z
     sort: SortSchema.default({ by: "updated", dir: "desc" }),
     swimlanes: z.array(SwimlaneSchema).min(1).transform(migrateAxis("swimlanes")),
     columns: z.array(ColumnSchema).min(1).transform(migrateAxis("columns")),
-    /** Legacy, folded into the global scope by `migrateScope`. */
-    repos: z.array(repoName).optional(),
-    users: z.array(userName).optional(),
-    /** Legacy: "mine" reads as `users: ["@me"]`, "all" as `users: []`. */
-    scope: z.enum(["mine", "all"]).optional(),
-    refreshMinutes: refreshMinutes.optional(),
   })
   .superRefine((dashboard, ctx) => {
     for (const axis of ["swimlanes", "columns"] as const) {
@@ -147,68 +141,81 @@ export const DashboardSchema = z
       }
     }
   });
-type LegacyDashboard = z.infer<typeof DashboardSchema>;
 
-const ConfigShape = z.object({
-  /** Every board starts from the open items in these repos… */
-  repos: z.array(repoName).optional(),
-  /** …that these users authored or are assigned to; empty takes everyone's. */
-  users: z.array(userName).optional(),
-  refreshMinutes: refreshMinutes.optional(),
-  dashboards: z.array(DashboardSchema).default([]),
-});
-
-const union = (lists: string[][]) => [...new Set(lists.flat())];
-const sameSet = (a: string[], b: string[]) =>
+/** A config object as read from JSON, before validation. */
+type Raw = Record<string, unknown>;
+const isRaw = (value: unknown): value is Raw =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+/** A legacy list field as a list; malformed values stay in for validation to report. */
+const list = (value: unknown): unknown[] => (value === undefined ? [] : [value].flat());
+const union = (lists: unknown[][]) => [...new Set(lists.flat())];
+const sameSet = (a: unknown[], b: unknown[]) =>
   a.length === b.length && a.every((value) => b.includes(value));
-const legacyUsers = (dashboard: LegacyDashboard) =>
-  dashboard.users ?? (dashboard.scope === "all" ? [] : [ME]);
+/** Legacy `scope`: "mine" reads as `users: ["@me"]`, "all" as `users: []`. */
+const legacyUsers = (dashboard: Raw) =>
+  dashboard.users === undefined ? (dashboard.scope === "all" ? [] : [ME]) : list(dashboard.users);
 
 /**
- * Fills in the global scope. A config without global `repos` predates it: its repos and users
- * are the unions of the dashboards' (users empty when any dashboard took everyone's), its
- * refresh interval the shortest any had, and a dashboard narrower than the union gets a
- * `repo:`/`user:` filter.
+ * Lifts a config without global `repos`, which predates the global scope, into one with it: its
+ * repos and users are the unions of the dashboards' (users empty when any dashboard took
+ * everyone's), its refresh interval the shortest any had, and a dashboard narrower than the union
+ * gets a `repo:`/`user:` filter. Runs before validation, which strips the leftover fields.
  */
-function migrateScope(config: z.infer<typeof ConfigShape>) {
-  const { repos, users, dashboards } = config;
-  const legacy = repos === undefined;
-  const intervals = legacy ? dashboards.map((dashboard) => dashboard.refreshMinutes ?? 5) : [];
+function migrateScope(config: unknown): unknown {
+  if (!isRaw(config) || config.repos !== undefined || !Array.isArray(config.dashboards)) {
+    return config;
+  }
+  const dashboards: unknown[] = config.dashboards;
+  if (!dashboards.every(isRaw)) return config;
   const global = {
-    repos: repos ?? union(dashboards.map((dashboard) => dashboard.repos ?? [])),
+    repos: union(dashboards.map((dashboard) => list(dashboard.repos))),
     users:
-      users ??
-      (legacy && dashboards.every((dashboard) => legacyUsers(dashboard).length > 0)
+      config.users ??
+      (dashboards.every((dashboard) => legacyUsers(dashboard).length > 0)
         ? union(dashboards.map(legacyUsers))
         : []),
-    refreshMinutes: config.refreshMinutes ?? (intervals.length > 0 ? Math.min(...intervals) : 5),
+    refreshMinutes:
+      config.refreshMinutes ??
+      (dashboards.length > 0
+        ? Math.min(...dashboards.map((dashboard) => Number(dashboard.refreshMinutes ?? 5)))
+        : undefined),
   };
-  const narrowing = (dashboard: LegacyDashboard) => {
-    if (!legacy) return [];
-    const own = { repos: dashboard.repos ?? [], users: legacyUsers(dashboard) };
-    return (["repos", "users"] as const).flatMap((key) =>
-      own[key].length === 0 || sameSet(own[key], global[key])
-        ? []
-        : [`${key.slice(0, -1)}:${own[key].join("|")}`],
+  const narrow = (dashboard: Raw): Raw => {
+    const scopes = [
+      ["repo", list(dashboard.repos), global.repos],
+      ["user", legacyUsers(dashboard), list(global.users)],
+    ] as const;
+    const parts = scopes.flatMap(([key, own, all]) =>
+      own.length === 0 || sameSet(own, all) ? [] : [`${key}:${own.join("|")}`],
     );
+    if (parts.length === 0) return dashboard;
+    const filter = dashboard.filter ? [`(${String(dashboard.filter)})`] : [];
+    return { ...dashboard, filter: [...filter, ...parts].join(" ") };
   };
   return {
+    ...config,
     ...global,
-    dashboards: dashboards.map((dashboard) => {
-      const { name, filter, epicLabel, sort, swimlanes, columns } = dashboard;
-      const parts = narrowing(dashboard);
-      const own = filter && parts.length > 0 ? `(${filter})` : filter;
-      const narrowed = [own, ...parts].filter(Boolean).join(" ");
-      return { id: dashboard.id, name, filter: narrowed, epicLabel, sort, swimlanes, columns };
-    }),
+    dashboards: dashboards.map(narrow),
   };
 }
 
-export const ConfigSchema = ConfigShape.superRefine((config, ctx) => {
-  if (!hasUniqueIds(config.dashboards)) {
-    ctx.addIssue({ code: "custom", path: ["dashboards"], message: "ids must be unique" });
-  }
-}).transform(migrateScope);
+export const ConfigSchema = z.preprocess(
+  migrateScope,
+  z
+    .object({
+      /** Every board starts from the open items in these repos… */
+      repos: z.array(repoName).default([]),
+      /** …that these users authored or are assigned to; empty takes everyone's. */
+      users: z.array(userName).default([]),
+      refreshMinutes: refreshMinutes.default(5),
+      dashboards: z.array(DashboardSchema).default([]),
+    })
+    .superRefine((config, ctx) => {
+      if (!hasUniqueIds(config.dashboards)) {
+        ctx.addIssue({ code: "custom", path: ["dashboards"], message: "ids must be unique" });
+      }
+    }),
+);
 
 export type Swimlane = Dashboard["swimlanes"][number];
 export type Column = Dashboard["columns"][number];
@@ -234,10 +241,14 @@ export type TextFilterKey = (typeof TEXT_FILTER_KEYS)[number];
 export type Filters = { [K in TextFilterKey]?: string } & {
   /** Repos to show, set by the repo chips; unset shows all, empty shows none. */
   repo?: string[];
-  /** Repos turned off on any board, kept per browser; only read while `repo` is unset. */
-  hide?: string[];
   sort?: SortBy;
   dir?: SortDir;
+};
+
+/** What the board endpoint takes: the URL filters plus the repos hidden in this browser. */
+export type BoardQuery = Filters & {
+  /** Repos turned off on any board, kept per browser; only read while `repo` is unset. */
+  hide?: string[];
 };
 
 /** The `repo` query value (`owner/a,owner/b`) as a list; absent is unset, `repo=` is empty. */
@@ -248,8 +259,8 @@ export function parseRepoFilter(value: string | null | undefined): string[] | un
 /**
  * The board repos shown: those the URL's `repo` selects when set, else all but the hidden.
  */
-export function shownRepos(filters: Filters, boardRepos: string[]): string[] {
-  const listed = filters.repo ?? boardRepos.filter((repo) => !filters.hide?.includes(repo));
+export function shownRepos(query: BoardQuery, boardRepos: string[]): string[] {
+  const listed = query.repo ?? boardRepos.filter((repo) => !query.hide?.includes(repo));
   return selectedRepos(listed, boardRepos);
 }
 
@@ -282,8 +293,8 @@ const optionalText = z
   .optional()
   .transform((value) => (value === "" ? undefined : value));
 
-/** Query-string filters; empty strings count as "not set". */
-export const FiltersSchema: z.ZodType<Filters, Record<string, unknown>> = z.object({
+/** The board query string; empty strings count as "not set". */
+export const BoardQuerySchema: z.ZodType<BoardQuery, Record<string, unknown>> = z.object({
   ...(Object.fromEntries(TEXT_FILTER_KEYS.map((key) => [key, optionalText])) as Record<
     TextFilterKey,
     typeof optionalText

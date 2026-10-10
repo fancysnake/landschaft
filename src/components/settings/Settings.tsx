@@ -16,15 +16,11 @@ function newDashboard(): Dashboard {
     id: newId(),
     name: "New dashboard",
     filter: "",
-    epicLabel: undefined,
     sort: { by: "updated", dir: "desc" },
     swimlanes: [{ id: "all", name: "Everything", filter: "", hideBlocked: false }],
     columns: [{ id: "todo", name: "Todo", filter: "" }],
   };
 }
-
-/** Selects the global panel; no dashboard id is empty. */
-const SCOPE = "";
 
 type Notice = { kind: "ok" | "error"; text: string } | null;
 
@@ -37,6 +33,7 @@ const entry = (active: boolean) =>
 
 export default function Settings() {
   const [config, setConfig] = useState<Config | null>(null);
+  /** The dashboard being edited; null for the global panel. */
   const [selected, setSelected] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -50,7 +47,7 @@ export default function Settings() {
       .config()
       .then((loaded) => {
         setConfig(loaded);
-        setSelected(loaded.repos.length > 0 ? (loaded.dashboards[0]?.id ?? SCOPE) : SCOPE);
+        setSelected(loaded.repos.length > 0 ? (loaded.dashboards[0]?.id ?? null) : null);
       })
       .catch((cause: unknown) => setNotice({ kind: "error", text: errorMessage(cause) }));
   }, []);
@@ -92,7 +89,7 @@ export default function Settings() {
   const removeDashboard = (id: string) => {
     const dashboards = config.dashboards.filter((d) => d.id !== id);
     update({ ...config, dashboards });
-    if (selected === id) setSelected(dashboards[0]?.id ?? SCOPE);
+    if (selected === id) setSelected(dashboards[0]?.id ?? null);
   };
 
   const save = async () => {
@@ -106,8 +103,8 @@ export default function Settings() {
       setConfig(saved);
       setJsonText(null);
       setDirty(false);
-      if (selected !== SCOPE && !saved.dashboards.some((d) => d.id === selected))
-        setSelected(saved.dashboards[0]?.id ?? SCOPE);
+      if (selected !== null && !saved.dashboards.some((d) => d.id === selected))
+        setSelected(saved.dashboards[0]?.id ?? null);
       setNotice({
         kind: "ok",
         text: "Saved. Newly added repositories are syncing in the background.",
@@ -169,8 +166,8 @@ export default function Settings() {
           <aside className="space-y-1">
             <button
               type="button"
-              onClick={() => setSelected(SCOPE)}
-              className={`${entry(selected === SCOPE)} mb-3`}
+              onClick={() => setSelected(null)}
+              className={`${entry(current === null)} mb-3`}
             >
               Repositories &amp; users
             </button>
@@ -193,9 +190,7 @@ export default function Settings() {
             </button>
           </aside>
           <div className="min-h-0 overflow-auto rounded-md border border-neutral-200 bg-white p-4">
-            {selected === SCOPE ? (
-              <ScopeEditor scope={config} onChange={(scope) => update({ ...config, ...scope })} />
-            ) : current ? (
+            {current ? (
               <>
                 <div className="mb-4 flex justify-end gap-2">
                   <button
@@ -222,7 +217,7 @@ export default function Settings() {
                 />
               </>
             ) : (
-              <p className="text-sm text-neutral-500">Create a dashboard to get started.</p>
+              <ScopeEditor scope={config} onChange={(scope) => update({ ...config, ...scope })} />
             )}
           </div>
         </div>

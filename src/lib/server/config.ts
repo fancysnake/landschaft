@@ -8,7 +8,7 @@ export function configPath(): string {
 }
 
 export function loadConfig(file = configPath()): Config {
-  if (!existsSync(file)) return ConfigSchema.parse({ repos: [] });
+  if (!existsSync(file)) return ConfigSchema.parse({});
   return ConfigSchema.parse(JSON.parse(readFileSync(file, "utf8")));
 }
 

@@ -2,7 +2,8 @@ import { Fragment, useMemo } from "react";
 
 import { repoShortName } from "../../lib/client/labels";
 import { useBoard } from "../../lib/client/useBoard";
-import { useHiddenRepos, useUrlFilters } from "../../lib/client/useUrlFilters";
+import { useHiddenRepos } from "../../lib/client/useHiddenRepos";
+import { useUrlFilters } from "../../lib/client/useUrlFilters";
 import { hiddenRepos, repoFilter, shownRepos } from "../../lib/schema";
 import { cellKey } from "../../lib/types";
 import { EpicStrip } from "./EpicStrip";
