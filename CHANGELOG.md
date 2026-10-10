@@ -7,22 +7,23 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-10
+
 ### Added
 
 - Settings suggest repos after `repo:` and users after `user:`, `author:` and `assignee:`.
 
 ### Changed
 
-- Repositories, users and the refresh interval are global, set in a new settings panel. Each
-  dashboard narrows them with an optional filter, such as `repo:acme/app user:@me`, which may
-  not use `other`. Old configs migrate on load.
+- Global `repos`, `users` and `refreshMinutes` replace the per-dashboard ones; each dashboard
+  narrows them with an optional `filter`, such as `repo:acme/app user:@me`, that may not use
+  `other`. Old configs migrate on load.
 - A board's repo chips list the repositories among its items. A repo switched off stays off on
   every board in this browser; a `repo=` in the URL still wins.
 
 ### Fixed
 
-- The board no longer shows items from a deselected repo after a sync. A reload after sync or
-  starring uses the current filters, and a slow response for older filters is dropped.
+- A sync or a star keeps items from a deselected repo off the board.
 
 ## [1.0.0] - 2026-10-09
 
@@ -183,7 +184,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v1.0.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/fancysnake/landschaft/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/fancysnake/landschaft/compare/v0.10.1...v1.0.0
 [0.10.1]: https://github.com/fancysnake/landschaft/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/fancysnake/landschaft/compare/v0.9.1...v0.10.0

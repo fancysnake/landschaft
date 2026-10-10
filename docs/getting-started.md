@@ -44,7 +44,8 @@ mise run dev      # http://localhost:4321
 
 Open **Settings**, add repositories, then create a dashboard and define swimlanes and columns.
 Saving writes `landschaft.config.json` next to `package.json` and triggers the first sync; once
-labels are cached the filter inputs suggest them. Commit the config; the cache is disposable.
+labels are cached the filter inputs suggest them, along with repos after `repo:` and users after
+`user:`, `author:` and `assignee:`. Commit the config; the cache is disposable.
 
 The CLI:
 

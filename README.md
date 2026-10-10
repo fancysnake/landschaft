@@ -84,7 +84,8 @@ mise run dev        # http://localhost:4321
 For a production build: `mise run build` then `mise run preview`.
 
 Open **Settings**, add repositories, then create a dashboard and define swimlanes and columns.
-Saving triggers the first sync; once labels are cached the filter inputs suggest them.
+Saving triggers the first sync; once labels are cached the filter inputs suggest them, along with
+repos after `repo:` and users after `user:`, `author:` and `assignee:`.
 
 ## How placement works
 
