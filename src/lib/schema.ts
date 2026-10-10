@@ -239,54 +239,15 @@ export const TEXT_FILTER_KEYS = ["q", "assignee", "label", "epic"] as const;
 export type TextFilterKey = (typeof TEXT_FILTER_KEYS)[number];
 
 export type Filters = { [K in TextFilterKey]?: string } & {
-  /** Repos to show, set by the repo chips; unset shows all, empty shows none. */
-  repo?: string[];
   sort?: SortBy;
   dir?: SortDir;
 };
 
 /** What the board endpoint takes: the URL filters plus the repos hidden in this browser. */
 export type BoardQuery = Filters & {
-  /** Repos turned off on any board, kept per browser; only read while `repo` is unset. */
+  /** Repos switched off in the nav, kept per browser. */
   hide?: string[];
 };
-
-/** The `repo` query value (`owner/a,owner/b`) as a list; absent is unset, `repo=` is empty. */
-export function parseRepoFilter(value: string | null | undefined): string[] | undefined {
-  return value?.split(",").filter(Boolean);
-}
-
-/**
- * The board repos shown: those the URL's `repo` selects when set, else all but the hidden.
- */
-export function shownRepos(query: BoardQuery, boardRepos: string[]): string[] {
-  const listed = query.repo ?? boardRepos.filter((repo) => !query.hide?.includes(repo));
-  return selectedRepos(listed, boardRepos);
-}
-
-/** The hidden repos once `selected` is chosen on a board of `boardRepos`; others keep theirs. */
-export function hiddenRepos(selected: string[], boardRepos: string[], hidden: string[]): string[] {
-  return [
-    ...hidden.filter((repo) => !boardRepos.includes(repo)),
-    ...boardRepos.filter((repo) => !selected.includes(repo)),
-  ];
-}
-
-/**
- * The dashboard repos a repo filter selects: those it lists, or all of them when it lists
- * none on the dashboard (a stale URL would otherwise filter with no control to clear it).
- * An empty filter selects none, unless a single-repo dashboard hides the chips.
- */
-export function selectedRepos(filter: string[] | undefined, dashboardRepos: string[]): string[] {
-  if (filter?.length === 0 && dashboardRepos.length > 1) return [];
-  const listed = dashboardRepos.filter((repo) => filter?.includes(repo));
-  return listed.length > 0 ? listed : dashboardRepos;
-}
-
-/** Inverse of `selectedRepos`: every dashboard repo selected is no filter. */
-export function repoFilter(selected: string[], dashboardRepos: string[]): string[] | undefined {
-  return dashboardRepos.every((repo) => selected.includes(repo)) ? undefined : selected;
-}
 
 const optionalText = z
   .string()
@@ -299,8 +260,10 @@ export const BoardQuerySchema: z.ZodType<BoardQuery, Record<string, unknown>> = 
     TextFilterKey,
     typeof optionalText
   >),
-  repo: z.string().optional().transform(parseRepoFilter),
-  hide: z.string().optional().transform(parseRepoFilter),
+  hide: z
+    .string()
+    .optional()
+    .transform((value) => value?.split(",").filter(Boolean)),
   sort: SortBySchema.optional(),
   dir: SortDirSchema.optional(),
 });

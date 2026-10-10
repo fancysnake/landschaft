@@ -7,6 +7,11 @@ export interface BoardResponse {
   status: SyncStatus;
 }
 
+export interface DashboardsResponse {
+  /** The repos among each dashboard's items. */
+  dashboards: { id: string; repos: string[] }[];
+}
+
 export interface SyncResponse {
   results: { repo: string; full: boolean; upserted: number; closed: number }[];
   status: SyncStatus;
@@ -60,6 +65,7 @@ export function filtersToQuery(query: BoardQuery): string {
 }
 
 export const api = {
+  dashboards: () => request<DashboardsResponse>("/api/dashboards"),
   board: (dashboardId: string, query: BoardQuery) =>
     request<BoardResponse>(
       `/api/dashboards/${encodeURIComponent(dashboardId)}/board?${filtersToQuery(query)}`,

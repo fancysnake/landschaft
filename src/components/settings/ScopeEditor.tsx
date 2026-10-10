@@ -14,7 +14,7 @@ export function ScopeEditor({ scope, onChange }: Props) {
   const patch = (changes: Partial<Scope>) => onChange({ ...scope, ...changes });
 
   return (
-    <div className="space-y-6">
+    <div className="grid gap-4 lg:grid-cols-[1fr_1fr_10rem]">
       <Field
         label="Repositories"
         hint="Every dashboard starts from these. Labels are suggested from them once they have synced (saving triggers the first sync)."

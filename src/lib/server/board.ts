@@ -11,7 +11,6 @@ import {
   type Dashboard,
   type Filters,
   OTHER_LOOKS_AT,
-  shownRepos,
   type SortBy,
   type SortDir,
 } from "../schema";
@@ -153,7 +152,7 @@ export function buildBoard(
     return matchesFilter(base, item, { viewer }) && matchesFilter(scope, item, { viewer });
   });
   const present = [...new Set(open.map((issue) => issue.repo))].toSorted();
-  const repos = new Set(shownRepos(filters, present));
+  const repos = new Set(present.filter((repo) => !filters.hide?.includes(repo)));
   const axes = { swimlanes: compile(dashboard.swimlanes), columns: compile(dashboard.columns) };
   const epicLabel = dashboard.epicLabel && labelKey(dashboard.epicLabel);
   // By `labelKey`, like every label comparison here.

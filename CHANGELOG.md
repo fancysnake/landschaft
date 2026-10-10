@@ -7,6 +7,20 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- Dashboards with no items in the repos switched on are dimmed in the top bar.
+- `GET /api/dashboards` lists the repos among each dashboard's items.
+
+### Changed
+
+- Repo chips sit in the top bar and list the global repos. Settings show repositories, users and
+  the refresh interval above the dashboards.
+
+### Removed
+
+- The `repo=` board URL parameter; the top bar's repo chips choose the repos.
+
 ## [1.1.0] - 2026-10-10
 
 ### Added

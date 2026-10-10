@@ -373,21 +373,6 @@ describe("buildBoard", () => {
     expect(numbers(buildBoard(issues, DASHBOARD, { q: "login", assignee: "ann" }))).toEqual([1]);
   });
 
-  it("repo filter keeps only that repo's issues", () => {
-    const issues = [makeIssue({ number: 1 }), makeIssue({ number: 2, repo: "acme/other" })];
-    expect(numbers(buildBoard(issues, DASHBOARD, { repo: ["acme/other"] }))).toEqual([2]);
-  });
-
-  it("repo filter takes a list and skips repos not on the dashboard", () => {
-    const issues = [
-      makeIssue({ number: 1 }),
-      makeIssue({ number: 2, repo: "acme/other" }),
-      makeIssue({ number: 3, repo: "acme/third" }),
-    ];
-    const repo = ["acme/third", "acme/gone", "acme/app"];
-    expect(numbers(buildBoard(issues, DASHBOARD, { repo }))).toEqual([3, 1]);
-  });
-
   it("places pull requests next to issues and never lists them as epics", () => {
     const issues = [makeIssue({ number: 1 }), makeIssue({ number: 2, kind: "pr" })];
     const board = buildBoard(issues, DASHBOARD);
@@ -459,21 +444,21 @@ describe("buildBoard", () => {
     ]);
   });
 
-  it("hides epics from other repos under the repo filter", () => {
+  it("hides epics from hidden repos", () => {
     const issues = [
       makeIssue({ number: 10, labels: [label("epic")] }),
       makeIssue({ number: 11, repo: "acme/other", labels: [label("epic")] }),
     ];
-    const board = buildBoard(issues, DASHBOARD, { repo: ["acme/other"] });
+    const board = buildBoard(issues, DASHBOARD, { hide: [REPO] });
     expect(board.epics.map((epic) => epic.key)).toEqual(["acme/other#11"]);
   });
 
-  it("ignores a repo filter for a repo not on the dashboard", () => {
+  it("ignores hidden repos not on the dashboard", () => {
     const issues = [
       makeIssue({ number: 1 }),
       makeIssue({ number: 10, repo: "acme/other", labels: [label("epic")] }),
     ];
-    const board = buildBoard(issues, DASHBOARD, { repo: ["acme/gone"] });
+    const board = buildBoard(issues, DASHBOARD, { hide: ["acme/gone"] });
     expect(numbers(board)).toEqual([10, 1]);
     expect(board.epics.map((epic) => epic.key)).toEqual(["acme/other#10"]);
   });
@@ -500,14 +485,13 @@ describe("buildBoard", () => {
       makeIssue({ number: 2, repo: "acme/a" }),
       makeIssue({ number: 3, repo: "acme/c", state: "CLOSED" }),
     ];
-    expect(buildBoard(issues, DASHBOARD, { repo: ["acme/a"] }).repos).toEqual(["acme/a", "acme/b"]);
+    expect(buildBoard(issues, DASHBOARD, { hide: ["acme/b"] }).repos).toEqual(["acme/a", "acme/b"]);
   });
 
-  it("hides repos turned off elsewhere unless the URL picks repos", () => {
+  it("hides repos switched off in the nav", () => {
     const issues = [makeIssue({ number: 1 }), makeIssue({ number: 2, repo: "acme/other" })];
     const hide = ["acme/other", "acme/gone"];
     expect(numbers(buildBoard(issues, DASHBOARD, { hide }))).toEqual([1]);
-    expect(numbers(buildBoard(issues, DASHBOARD, { hide, repo: ["acme/other"] }))).toEqual([2]);
     expect(numbers(buildBoard(issues, DASHBOARD, { hide: [REPO, "acme/other"] }))).toEqual([]);
   });
 

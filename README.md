@@ -125,10 +125,10 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
   progress; clicking one filters the board to its sub-issues and to issues it blocks or is
   blocked by; ↗ opens it on GitHub. Pull requests linked to any of those issues (or to the
   epic) show up too.
-- Open **pull requests** are cards like issues. When a board's items span several
-  repositories, chips above it switch each on or off; a repo switched off stays off on every
-  board in this browser.
-- Filters (text, repos, assignee, label, epic, sort) live in the URL, so a view is a link.
+- Open **pull requests** are cards like issues.
+- Repo chips in the top bar switch each global repository on or off for every board, in this
+  browser; a dashboard with no items in the repos switched on is dimmed.
+- Filters (text, assignee, label, epic, sort) live in the URL, so a view is a link.
 
 <!-- --8<-- [end:placement] -->
 

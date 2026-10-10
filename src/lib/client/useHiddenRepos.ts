@@ -1,23 +1,45 @@
-import { useCallback, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 const HIDDEN_KEY = "landschaft:hiddenRepos";
+/** Tells the other islands on this page; `storage` only reaches other tabs. */
+const CHANGED = "landschaft:hiddenRepos";
+const NONE: string[] = [];
 
-/** Repos turned off on any board, shared by every board in this browser. */
+/** Stands in for blocked storage, so a choice lasts until a reload. */
+let memory: string | null = null;
+let cache: { raw: string | null; hidden: string[] } | null = null;
+
+function read(): string[] {
+  let raw = memory;
+  try {
+    raw = localStorage.getItem(HIDDEN_KEY);
+  } catch {
+    // storage blocked: read the stand-in
+  }
+  // Same array for the same value, as useSyncExternalStore requires.
+  if (cache?.raw !== raw) cache = { raw, hidden: raw?.split(",").filter(Boolean) ?? NONE };
+  return cache.hidden;
+}
+
+function subscribe(onChange: () => void): () => void {
+  window.addEventListener(CHANGED, onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener(CHANGED, onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+function setHidden(hidden: string[]): void {
+  try {
+    localStorage.setItem(HIDDEN_KEY, hidden.join(","));
+  } catch {
+    memory = hidden.join(",");
+  }
+  window.dispatchEvent(new Event(CHANGED));
+}
+
+/** Repos switched off in the nav, shared by every board in this browser. */
 export function useHiddenRepos(): [string[], (hidden: string[]) => void] {
-  const [hidden, setHidden] = useState<string[]>(() => {
-    try {
-      return localStorage.getItem(HIDDEN_KEY)?.split(",").filter(Boolean) ?? [];
-    } catch {
-      return [];
-    }
-  });
-  const update = useCallback((next: string[]) => {
-    setHidden(next);
-    try {
-      localStorage.setItem(HIDDEN_KEY, next.join(","));
-    } catch {
-      // storage blocked: the choice lasts until a reload
-    }
-  }, []);
-  return [hidden, update];
+  return [useSyncExternalStore(subscribe, read, () => NONE), setHidden];
 }

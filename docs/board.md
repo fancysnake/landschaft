@@ -47,10 +47,10 @@ opened the PR, as long as the PR is in one of the global repos; such an issue ca
 
 ## Filters
 
-When a board's items span several repositories, chips above it switch each on or off
-(`repo=owner/a,owner/b`); `all` turns every chip on and, once all are on, `none` turns them off.
-A repository switched off stays off on every board, in this browser, and after a reload; a
-`repo=` in the URL overrides that, so shared links show what they were sent with.
+With more than one global repository, chips in the top bar switch each on or off; `all` turns
+every chip on and, once all are on, `none` turns them off. The choice holds on every board, in
+this browser, and after a reload. A dashboard with no items in the repositories switched on is
+dimmed in the top bar.
 
-Text, repos, assignee, label, epic and sort live in the query string, so a filtered view is a link
-you can bookmark or send. Empty values count as unset, except `repo=`, which shows no repository.
+Text, assignee, label, epic and sort live in the query string, so a filtered view is a link you
+can bookmark or send. Empty values count as unset.

@@ -33,7 +33,6 @@ const entry = (active: boolean) =>
 
 export default function Settings() {
   const [config, setConfig] = useState<Config | null>(null);
-  /** The dashboard being edited; null for the global panel. */
   const [selected, setSelected] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -47,7 +46,7 @@ export default function Settings() {
       .config()
       .then((loaded) => {
         setConfig(loaded);
-        setSelected(loaded.repos.length > 0 ? (loaded.dashboards[0]?.id ?? null) : null);
+        setSelected(loaded.dashboards[0]?.id ?? null);
       })
       .catch((cause: unknown) => setNotice({ kind: "error", text: errorMessage(cause) }));
   }, []);
@@ -162,63 +161,63 @@ export default function Settings() {
           className="min-h-0 flex-1 rounded-md border border-neutral-300 bg-white p-3 font-mono text-xs"
         />
       ) : (
-        <div className="grid min-h-0 flex-1 gap-4 sm:grid-cols-[14rem_1fr]">
-          <aside className="space-y-1">
-            <button
-              type="button"
-              onClick={() => setSelected(null)}
-              className={`${entry(current === null)} mb-3`}
-            >
-              Repositories &amp; users
-            </button>
-            {config.dashboards.map((dashboard) => (
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto">
+          <section className="rounded-md border border-neutral-200 bg-white p-4">
+            <h2 className="mb-3 text-sm font-semibold">Shared by every dashboard</h2>
+            <ScopeEditor scope={config} onChange={(scope) => update({ ...config, ...scope })} />
+          </section>
+          <div className="grid gap-4 sm:grid-cols-[14rem_1fr]">
+            <aside className="space-y-1">
+              <h2 className="px-2 pb-1 text-sm font-semibold">Dashboards</h2>
+              {config.dashboards.map((dashboard) => (
+                <button
+                  key={dashboard.id}
+                  type="button"
+                  onClick={() => setSelected(dashboard.id)}
+                  className={entry(dashboard.id === selected)}
+                >
+                  {dashboard.name}
+                </button>
+              ))}
               <button
-                key={dashboard.id}
                 type="button"
-                onClick={() => setSelected(dashboard.id)}
-                className={entry(dashboard.id === selected)}
+                onClick={() => addDashboard()}
+                className="block px-2 py-1 text-sm text-sky-700 hover:underline"
               >
-                {dashboard.name}
+                + new dashboard
               </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => addDashboard()}
-              className="block px-2 py-1 text-sm text-sky-700 hover:underline"
-            >
-              + new dashboard
-            </button>
-          </aside>
-          <div className="min-h-0 overflow-auto rounded-md border border-neutral-200 bg-white p-4">
-            {current ? (
-              <>
-                <div className="mb-4 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => addDashboard(current)}
-                    className={`${button} border-neutral-300 bg-white hover:bg-neutral-50`}
-                  >
-                    Duplicate
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeDashboard(current.id)}
-                    className={`${button} border-red-300 bg-white text-red-700 hover:bg-red-50`}
-                  >
-                    Delete
-                  </button>
-                </div>
-                <DashboardEditor
-                  key={current.id}
-                  dashboard={current}
-                  onChange={updateDashboard}
-                  catalog={catalog}
-                  offer={offer}
-                />
-              </>
-            ) : (
-              <ScopeEditor scope={config} onChange={(scope) => update({ ...config, ...scope })} />
-            )}
+            </aside>
+            <div className="rounded-md border border-neutral-200 bg-white p-4">
+              {current ? (
+                <>
+                  <div className="mb-4 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => addDashboard(current)}
+                      className={`${button} border-neutral-300 bg-white hover:bg-neutral-50`}
+                    >
+                      Duplicate
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeDashboard(current.id)}
+                      className={`${button} border-red-300 bg-white text-red-700 hover:bg-red-50`}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                  <DashboardEditor
+                    key={current.id}
+                    dashboard={current}
+                    onChange={updateDashboard}
+                    catalog={catalog}
+                    offer={offer}
+                  />
+                </>
+              ) : (
+                <p className="text-sm text-neutral-500">No dashboards yet.</p>
+              )}
+            </div>
           </div>
         </div>
       )}
