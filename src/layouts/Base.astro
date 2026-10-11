@@ -3,6 +3,8 @@ import "../styles/global.css";
 
 import Nav from "../components/Nav";
 
+import { getApp } from "../lib/server/app";
+import { scopedIssues } from "../lib/server/board";
 import { loadConfig } from "../lib/server/config";
 
 interface Props {
@@ -10,7 +12,14 @@ interface Props {
 }
 
 const { title } = Astro.props;
-const { dashboards, repos } = loadConfig();
+const { dashboards, repos, users } = loadConfig();
+const { db, syncer } = getApp();
+const viewer = await syncer.viewer().catch(() => null);
+const issues = db.listIssues(repos);
+const tabs = dashboards.map(({ id, name, filter }) => {
+  const scoped = scopedIssues(issues, { filter }, users, viewer);
+  return { id, name, repos: [...new Set(scoped.map((issue) => issue.repo))] };
+});
 ---
 
 <!doctype html>
@@ -22,12 +31,7 @@ const { dashboards, repos } = loadConfig();
     <title>{title} · landschaft</title>
   </head>
   <body class="flex h-full flex-col bg-neutral-100 text-neutral-900">
-    <Nav
-      client:load
-      path={Astro.url.pathname}
-      dashboards={dashboards.map(({ id, name }) => ({ id, name }))}
-      repos={repos}
-    />
+    <Nav client:load path={Astro.url.pathname} dashboards={tabs} repos={repos} />
     <main class="min-h-0 flex-1">
       <slot />
     </main>

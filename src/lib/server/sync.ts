@@ -190,8 +190,9 @@ export class Syncer {
 }
 
 /**
- * Every tick, syncs each configured repo whose last sync is older than the refresh interval. Re-reads the config each tick, so
- * settings changes apply without a restart. Returns a stop function.
+ * Every tick, syncs each configured repo whose last sync is older than the refresh interval.
+ * Re-reads the config each tick, so settings changes apply without a restart. Returns a stop
+ * function.
  */
 export function startScheduler(
   syncer: Syncer,

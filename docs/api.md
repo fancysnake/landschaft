@@ -7,7 +7,6 @@ localhost only. Errors are `{ "error": "message" }` with a matching status.
 | ------------------------------- | ------------------------------------------------------------ |
 | `GET /api/config`               | The whole config, defaults filled in                         |
 | `PUT /api/config`               | Replace the whole config; validated, saved atomically        |
-| `GET /api/dashboards`           | Each dashboard's id and the repositories among its items     |
 | `GET /api/dashboards/:id/board` | Computed board; the query string is the filter set           |
 | `POST /api/sync`                | `{ "repo"?: "owner/repo", "full"?: true }`; `409` while busy |
 | `GET /api/version`              | Sync status per repository plus rate-limit budget            |

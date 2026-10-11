@@ -17,20 +17,20 @@ export interface BoardController {
 }
 
 /** Loads the board for the current query, polls the sync version. */
-export function useBoard(dashboardId: string, filters: BoardQuery): BoardController {
+export function useBoard(dashboardId: string, query: BoardQuery): BoardController {
   const [data, setData] = useState<BoardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const versionRef = useRef(-1);
-  // Read at request time, so a reload after a slow write uses the filters current by then.
-  const filtersRef = useRef(filters);
+  // Read at request time, so a reload after a slow write uses the query current by then.
+  const queryRef = useRef(query);
   const loadSeq = useRef(0);
 
   /** Loads the board; a response is dropped once a newer load has started. */
   const load = useCallback(async () => {
     const seq = ++loadSeq.current;
     try {
-      const response = await api.board(dashboardId, filtersRef.current);
+      const response = await api.board(dashboardId, queryRef.current);
       if (seq !== loadSeq.current) return;
       versionRef.current = response.status.version;
       setData(response);
@@ -41,9 +41,9 @@ export function useBoard(dashboardId: string, filters: BoardQuery): BoardControl
   }, [dashboardId]);
 
   useEffect(() => {
-    filtersRef.current = filters;
+    queryRef.current = query;
     void load();
-  }, [load, filters]);
+  }, [load, query]);
 
   useEffect(() => {
     let cancelled = false;

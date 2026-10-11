@@ -156,17 +156,18 @@ const legacyUsers = (dashboard: Raw) =>
   dashboard.users === undefined ? (dashboard.scope === "all" ? [] : [ME]) : list(dashboard.users);
 
 /**
- * Lifts a config without global `repos`, which predates the global scope, into one with it: its
- * repos and users are the unions of the dashboards' (users empty when any dashboard took
- * everyone's), its refresh interval the shortest any had, and a dashboard narrower than the union
- * gets a `repo:`/`user:` filter. Runs before validation, which strips the leftover fields.
+ * Lifts a config whose dashboards have `repos`, which predates the global scope, into one with
+ * global `repos`: its repos and users are the unions of the dashboards' (users empty when any
+ * dashboard took everyone's), its refresh interval the shortest any had, and a dashboard narrower
+ * than the union gets a `repo:`/`user:` filter. Runs before validation, which strips the leftover
+ * fields.
  */
 function migrateScope(config: unknown): unknown {
   if (!isRaw(config) || config.repos !== undefined || !Array.isArray(config.dashboards)) {
     return config;
   }
   const dashboards: unknown[] = config.dashboards;
-  if (!dashboards.every(isRaw)) return config;
+  if (!dashboards.every(isRaw) || !dashboards.some((d) => d.repos !== undefined)) return config;
   const global = {
     repos: union(dashboards.map((dashboard) => list(dashboard.repos))),
     users:

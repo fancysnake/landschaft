@@ -1,13 +1,11 @@
-import { useEffect, useState } from "react";
-
-import { api } from "../lib/client/api";
 import { repoShortName } from "../lib/client/labels";
 import { useHiddenRepos } from "../lib/client/useHiddenRepos";
 import { Toggles } from "./board/Toggles";
 
 interface Props {
   path: string;
-  dashboards: { id: string; name: string }[];
+  /** Each with the repos among its items. */
+  dashboards: { id: string; name: string; repos: string[] }[];
   /** The global repos. */
   repos: string[];
 }
@@ -25,18 +23,9 @@ const link = (active: boolean, inactive = false) =>
  */
 export default function Nav({ path, dashboards, repos }: Props) {
   const [hidden, setHidden] = useHiddenRepos();
-  const [present, setPresent] = useState<Map<string, string[]> | null>(null);
-
-  useEffect(() => {
-    api
-      .dashboards()
-      .then(({ dashboards: found }) => setPresent(new Map(found.map((d) => [d.id, d.repos]))))
-      .catch(() => undefined);
-  }, []);
-
   const shown = repos.filter((repo) => !hidden.includes(repo));
-  const inactive = (id: string) =>
-    present?.get(id)?.every((repo) => !shown.includes(repo)) ?? false;
+  const inactive = (dashboard: Props["dashboards"][number]) =>
+    dashboard.repos.every((repo) => !shown.includes(repo));
 
   return (
     <nav className="flex flex-wrap items-center gap-1 border-b border-neutral-200 bg-white px-4 py-2">
@@ -47,8 +36,8 @@ export default function Nav({ path, dashboards, repos }: Props) {
         <a
           key={dashboard.id}
           href={`/d/${dashboard.id}`}
-          title={inactive(dashboard.id) ? "No items in the repositories switched on" : undefined}
-          className={link(path === `/d/${dashboard.id}`, inactive(dashboard.id))}
+          title={inactive(dashboard) ? "No items in the repositories switched on" : undefined}
+          className={link(path === `/d/${dashboard.id}`, inactive(dashboard))}
         >
           {dashboard.name}
         </a>

@@ -249,6 +249,13 @@ describe("global scope migration", () => {
     expect(config.dashboards.map((d) => d.filter)).toEqual(["", ""]);
     expect(config.dashboards[0]).not.toHaveProperty("users");
   });
+
+  it("leaves a config without global repos alone when no dashboard has repos", () => {
+    const { repos: _, ...current } = minimal.dashboards[0]!;
+    const config = ConfigSchema.parse({ dashboards: [current] });
+    expect(config).toMatchObject({ repos: [], users: [], refreshMinutes: 5 });
+    expect(config.dashboards[0]?.filter).toBe("");
+  });
 });
 
 describe("config helpers", () => {

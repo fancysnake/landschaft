@@ -1,15 +1,17 @@
-import type { BoardQuery, Config, Dashboard, StarEpicRequest, SyncRequest } from "../schema";
+import type {
+  BoardQuery,
+  Config,
+  Dashboard,
+  Filters,
+  StarEpicRequest,
+  SyncRequest,
+} from "../schema";
 import type { Board, LabelDef, SyncStatus } from "../types";
 
 export interface BoardResponse {
   dashboard: Dashboard;
   board: Board;
   status: SyncStatus;
-}
-
-export interface DashboardsResponse {
-  /** The repos among each dashboard's items. */
-  dashboards: { id: string; repos: string[] }[];
 }
 
 export interface SyncResponse {
@@ -55,21 +57,20 @@ async function request<T>(input: string, init: RequestInit = {}): Promise<T> {
   return payload as T;
 }
 
-export function filtersToQuery(query: BoardQuery): string {
+export function filtersToQuery(filters: Filters): string {
   const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(query)) {
-    if (Array.isArray(value)) params.set(key, value.join(","));
-    else if (value) params.set(key, value);
-  }
+  for (const [key, value] of Object.entries(filters)) if (value) params.set(key, value);
   return params.toString();
 }
 
 export const api = {
-  dashboards: () => request<DashboardsResponse>("/api/dashboards"),
-  board: (dashboardId: string, query: BoardQuery) =>
-    request<BoardResponse>(
-      `/api/dashboards/${encodeURIComponent(dashboardId)}/board?${filtersToQuery(query)}`,
-    ),
+  board: (dashboardId: string, { hide, ...filters }: BoardQuery) => {
+    const params = new URLSearchParams(filtersToQuery(filters));
+    if (hide?.length) params.set("hide", hide.join(","));
+    return request<BoardResponse>(
+      `/api/dashboards/${encodeURIComponent(dashboardId)}/board?${params}`,
+    );
+  },
   version: () => request<SyncStatus>("/api/version"),
   sync: (body: Partial<SyncRequest>) =>
     request<SyncResponse>("/api/sync", { method: "POST", body: JSON.stringify(body) }),

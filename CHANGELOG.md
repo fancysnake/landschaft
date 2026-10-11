@@ -13,7 +13,6 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 - Settings suggest repos after `repo:` and users after `user:`, `author:` and `assignee:`.
 - Dashboards with no items in the repos switched on are dimmed in the top bar.
-- `GET /api/dashboards` lists the repos among each dashboard's items.
 
 ### Changed
 

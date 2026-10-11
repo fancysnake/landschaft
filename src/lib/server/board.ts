@@ -126,10 +126,31 @@ function compareBy(by: SortBy, dir: SortDir) {
 }
 
 /**
- * Lays the open issues out on the dashboard's grid. `issues` are the global repos'; of them,
- * only those one of the global `users` (empty for everyone) authored or is assigned to and that
- * pass the dashboard's filter take part. `starred` epic keys lead the epic strip. `viewer` is
- * what `@me` stands for.
+ * The open items of the global repos' `issues` that one of the global `users` (empty for
+ * everyone) authored or is assigned to and that pass the dashboard's filter. `viewer` is what
+ * `@me` stands for.
+ */
+export function scopedIssues(
+  issues: Issue[],
+  dashboard: Pick<Dashboard, "filter">,
+  users: string[] = [],
+  viewer: string | null = null,
+): Issue[] {
+  const byKey = new Map(issues.map((issue) => [issueKey(issue.repo, issue.number), issue]));
+  // From all of `issues`, not just the open ones.
+  const itemOf = itemsOf(issues, byKey);
+  const scope = parseFilter(dashboard.filter);
+  const base: FilterNode | null =
+    users.length > 0 ? { type: "term", key: "user", values: users } : null;
+  return issues.filter((issue) => {
+    if (issue.state !== "OPEN") return false;
+    const item = itemOf(issue);
+    return matchesFilter(base, item, { viewer }) && matchesFilter(scope, item, { viewer });
+  });
+}
+
+/**
+ * Lays the dashboard's `scopedIssues` out on its grid. `starred` epic keys lead the epic strip.
  */
 export function buildBoard(
   issues: Issue[],
@@ -141,16 +162,9 @@ export function buildBoard(
 ): Board {
   const byKey = new Map(issues.map((issue) => [issueKey(issue.repo, issue.number), issue]));
   const wanted = issueFilter(filters, byKey);
-  // From all of `issues`, not just `open`.
   const itemOf = itemsOf(issues, byKey);
   const scope = parseFilter(dashboard.filter);
-  const base: FilterNode | null =
-    users.length > 0 ? { type: "term", key: "user", values: users } : null;
-  const open = issues.filter((issue) => {
-    if (issue.state !== "OPEN") return false;
-    const item = itemOf(issue);
-    return matchesFilter(base, item, { viewer }) && matchesFilter(scope, item, { viewer });
-  });
+  const open = scopedIssues(issues, dashboard, users, viewer);
   const present = [...new Set(open.map((issue) => issue.repo))].toSorted();
   const repos = new Set(present.filter((repo) => !filters.hide?.includes(repo)));
   const axes = { swimlanes: compile(dashboard.swimlanes), columns: compile(dashboard.columns) };

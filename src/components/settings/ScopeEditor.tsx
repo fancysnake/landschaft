@@ -16,6 +16,7 @@ export function ScopeEditor({ scope, onChange }: Props) {
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_1fr_10rem]">
       <Field
+        group
         label="Repositories"
         hint="Every dashboard starts from these. Labels are suggested from them once they have synced (saving triggers the first sync)."
       >
@@ -28,6 +29,7 @@ export function ScopeEditor({ scope, onChange }: Props) {
       </Field>
 
       <Field
+        group
         label="Users"
         hint="Only issues and pull requests these users created or are assigned to; @me is you (the token's account). Empty shows everyone's."
       >

@@ -5,16 +5,16 @@ const HIDDEN_KEY = "landschaft:hiddenRepos";
 const CHANGED = "landschaft:hiddenRepos";
 const NONE: string[] = [];
 
-/** Stands in for blocked storage, so a choice lasts until a reload. */
+/** Stands in for storage the last write failed on, so a choice lasts until a reload. */
 let memory: string | null = null;
 let cache: { raw: string | null; hidden: string[] } | null = null;
 
 function read(): string[] {
   let raw = memory;
   try {
-    raw = localStorage.getItem(HIDDEN_KEY);
+    raw ??= localStorage.getItem(HIDDEN_KEY);
   } catch {
-    // storage blocked: read the stand-in
+    // storage blocked: nothing stored
   }
   // Same array for the same value, as useSyncExternalStore requires.
   if (cache?.raw !== raw) cache = { raw, hidden: raw?.split(",").filter(Boolean) ?? NONE };
@@ -33,6 +33,7 @@ function subscribe(onChange: () => void): () => void {
 function setHidden(hidden: string[]): void {
   try {
     localStorage.setItem(HIDDEN_KEY, hidden.join(","));
+    memory = null;
   } catch {
     memory = hidden.join(",");
   }

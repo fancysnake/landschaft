@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 
 import type { BoardQuery } from "../schema";
 
-import { api, type BoardResponse, filtersToQuery, type SyncResponse } from "./api";
+import { api, type BoardResponse, type SyncResponse } from "./api";
 import { type BoardController, useBoard } from "./useBoard";
 
 vi.mock("./api", async (importOriginal) => {
@@ -40,11 +40,11 @@ afterEach(async () => {
   vi.resetAllMocks();
 });
 
-test("a reload after sync uses the filters current when the sync finishes", async () => {
+test("a reload after sync uses the query current when the sync finishes", async () => {
   const responses = new Map<string, BoardResponse>();
-  vi.mocked(api.board).mockImplementation((_, filters) => {
+  vi.mocked(api.board).mockImplementation((_, query) => {
     const board = response();
-    responses.set(filtersToQuery(filters), board);
+    responses.set(String(query.hide), board);
     return Promise.resolve(board);
   });
   const sync = Promise.withResolvers<SyncResponse>();
@@ -62,7 +62,7 @@ test("a reload after sync uses the filters current when the sync finishes", asyn
   });
 
   expect(vi.mocked(api.board).mock.lastCall?.[1]).toEqual({ hide: ["a"] });
-  expect(result.current!.data).toBe(responses.get("hide=a"));
+  expect(result.current!.data).toBe(responses.get("a"));
 });
 
 test("a stale board response does not replace a newer one", async () => {

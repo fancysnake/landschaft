@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { askedLabels, type FilterNode } from "../filter";
 import { cellKey } from "../types";
 import { DASHBOARD, label, makeIssue, REPO } from "./__fixtures__/issues";
-import { buildBoard, compile, isBlocked, placeIn } from "./board";
+import { buildBoard, compile, isBlocked, placeIn, scopedIssues } from "./board";
 
 const cell = (laneId: string, colId: string) => cellKey(laneId, colId);
 const numbers = (board: ReturnType<typeof buildBoard>) =>
@@ -52,6 +52,23 @@ describe("isBlocked", () => {
 });
 
 const waitsOn = (number: number) => [{ repo: REPO, number, state: "OPEN" as const }];
+
+describe("scopedIssues", () => {
+  it("keeps the open items of the users that pass the dashboard filter", () => {
+    const issues = [
+      makeIssue({ number: 1, author: "ann", labels: [label("team")] }),
+      makeIssue({ number: 2, author: "me", labels: [label("team")] }),
+      makeIssue({ number: 3, author: "me", labels: [label("team")], state: "CLOSED" }),
+      makeIssue({ number: 4, author: "me" }),
+      makeIssue({ number: 5, author: "bob", labels: [label("team")] }),
+    ];
+    const scoped = (filter: string, users: string[]) =>
+      scopedIssues(issues, { filter }, users, "me").map((issue) => issue.number);
+    expect(scoped("label:team", ["@me", "ann"])).toEqual([1, 2]);
+    expect(scoped("label:team", [])).toEqual([1, 2, 5]);
+    expect(scoped("", ["@me"])).toEqual([2, 4]);
+  });
+});
 
 describe("buildBoard", () => {
   it("places issues by lane and column labels, catch-all otherwise", () => {

@@ -44,6 +44,7 @@ export function DashboardEditor({ dashboard, onChange, catalog, offer }: Props) 
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
+          group
           label="Epic label"
           hint="Issues with this label appear in the epic strip with sub-issue progress."
         >
