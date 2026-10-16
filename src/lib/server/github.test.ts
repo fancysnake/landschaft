@@ -217,11 +217,14 @@ describe("createGithubClient", () => {
       jsonResponse({ errors: [{ message: "bad" }, { message: "worse" }] }),
     );
     const gh = createGithubClient(async () => "tok", fetchImpl);
+    const timeout = vi.spyOn(AbortSignal, "timeout");
     await expect(gh.gql("query {}", {})).rejects.toThrow("bad; worse");
+    expect(timeout).toHaveBeenCalledWith(30_000);
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://api.github.com/graphql");
     expect((init.headers as Record<string, string>).authorization).toBe("Bearer tok");
-    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(init.signal).toBe(timeout.mock.results[0]?.value);
+    timeout.mockRestore();
   });
 
   it("resolves the token once", async () => {
