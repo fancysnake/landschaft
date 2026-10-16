@@ -87,17 +87,15 @@ export class Syncer {
   }
 
   /** Sequential; a failing repo is recorded and skipped, the rest still sync. */
-  async syncAll(repos: string[], options: { full?: boolean } = {}): Promise<SyncResult[]> {
-    const results: SyncResult[] = [];
+  async syncAll(repos: string[], options: { full?: boolean } = {}): Promise<void> {
     for (const repo of repos) {
       if (this.inFlight.has(repo)) continue;
       try {
-        results.push(await this.syncRepo(repo, options));
+        await this.syncRepo(repo, options);
       } catch {
         // recorded in sync_state and lastError by syncRepo
       }
     }
-    return results;
   }
 
   async syncRepo(repo: string, options: { full?: boolean } = {}): Promise<SyncResult> {

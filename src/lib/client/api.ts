@@ -10,7 +10,8 @@ export interface BoardResponse {
 }
 
 export interface SyncResponse {
-  results: { repo: string; full: boolean; upserted: number; closed: number }[];
+  /** Absent on a sync-all, which answers `202` before any repo finishes. */
+  results?: { repo: string; full: boolean; upserted: number; closed: number }[];
   status: SyncStatus;
 }
 

@@ -295,7 +295,7 @@ describe("Syncer", () => {
     const syncer = new Syncer({ db, gh, now: () => now });
     const running = syncer.syncRepo(REPO);
     await expect(syncer.syncRepo(REPO)).rejects.toBeInstanceOf(SyncBusyError);
-    expect(await syncer.syncAll([REPO])).toEqual([]);
+    await expect(syncer.syncAll([REPO])).resolves.toBeUndefined();
     const empty = { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] };
     gate.resolve({
       rateLimit: { remaining: 5000 },
