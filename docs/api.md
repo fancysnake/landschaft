@@ -3,14 +3,14 @@
 All endpoints return JSON and carry no authentication: the server is meant to listen on
 localhost only. Errors are `{ "error": "message" }` with a matching status.
 
-| Route                           | Purpose                                                      |
-| ------------------------------- | ------------------------------------------------------------ |
-| `GET /api/config`               | The whole config, defaults filled in                         |
-| `PUT /api/config`               | Replace the whole config; validated, saved atomically        |
-| `GET /api/dashboards/:id/board` | Computed board; the query string is the filter set           |
-| `POST /api/sync`                | `{ "repo"?: "owner/repo", "full"?: true }`; `409` while busy |
-| `GET /api/version`              | Sync status per repository plus rate-limit budget            |
-| `GET /api/labels?repos=a/b,c/d` | Cached label catalogue for the pickers                       |
+| Route                           | Purpose                                                                                                              |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/config`               | The whole config, defaults filled in                                                                                 |
+| `PUT /api/config`               | Replace the whole config; validated, saved atomically                                                                |
+| `GET /api/dashboards/:id/board` | Computed board; the query string is the filter set                                                                   |
+| `POST /api/sync`                | `{ "repo"?: "owner/repo", "full"?: true }`; `409` while busy; without `repo`, `202` at once, sync runs in background |
+| `GET /api/version`              | Sync status per repository plus rate-limit budget                                                                    |
+| `GET /api/labels?repos=a/b,c/d` | Cached label catalogue for the pickers                                                                               |
 
 ## Board
 

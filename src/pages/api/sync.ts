@@ -25,6 +25,7 @@ export const POST = route(async ({ request }) => {
       throw new ApiError(502, error instanceof Error ? error.message : String(error));
     }
   }
-  const results = await syncer.syncAll(allRepos(loadConfig()), { full: body.full });
-  return json({ results, status: syncer.status() });
+  // Failures land in status.lastError; clients follow progress through /api/version.
+  void syncer.syncAll(allRepos(loadConfig()), { full: body.full });
+  return json({ results: [], status: syncer.status() }, 202);
 });
