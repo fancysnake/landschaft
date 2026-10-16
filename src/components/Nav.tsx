@@ -46,7 +46,9 @@ export default function Nav({ path, dashboards, repos }: Props) {
         {repos.length > 1 && (
           <Toggles
             label="Repositories"
-            options={repos.map((repo) => ({ value: repo, label: repoShortName(repo) }))}
+            options={repos
+              .map((repo) => ({ value: repo, label: repoShortName(repo) }))
+              .toSorted((a, b) => a.label.localeCompare(b.label))}
             selected={shown}
             onChange={(selected) => setHidden(repos.filter((repo) => !selected.includes(repo)))}
           />
