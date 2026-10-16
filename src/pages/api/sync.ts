@@ -27,5 +27,5 @@ export const POST = route(async ({ request }) => {
   }
   // Failures land in status.lastError; clients follow progress through /api/version.
   void syncer.syncAll(allRepos(loadConfig()), { full: body.full });
-  return json({ results: [], status: syncer.status() }, 202);
+  return json({ status: syncer.status() }, 202);
 });
