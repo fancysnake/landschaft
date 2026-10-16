@@ -38,6 +38,13 @@ export default function Board({ dashboardId }: Props) {
             )}
           </span>
         </h1>
+        <a
+          href="/unmatched"
+          title="Open items no dashboard places"
+          className="ml-auto text-sm text-sky-700 hover:underline"
+        >
+          Unmatched items
+        </a>
       </header>
 
       {error && (
@@ -47,16 +54,6 @@ export default function Board({ dashboardId }: Props) {
             dismiss
           </button>
         </div>
-      )}
-      {board.unplaced > 0 && (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          {board.unplaced} issue{board.unplaced === 1 ? "" : "s"} match no swimlane or column. Add a
-          lane or column with the filter <code>other</code> in{" "}
-          <a href="/settings" className="underline">
-            settings
-          </a>
-          .
-        </p>
       )}
       {board.repos.length > 0 && board.repos.every((repo) => hidden.includes(repo)) && (
         <p className="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600">

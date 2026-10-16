@@ -118,7 +118,10 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
 - The term **`other`** holds for issues no swimlane above, or no column to the right,
   matched, so order matters. Alone it makes the bottom swimlane or the leftmost column the
   catch-all; `other label:b` below a `label:a` lane takes the `b` issues the `a` lane did
-  not. Issues that fit no lane or no column are counted as "unplaced" on the board.
+  not. Issues that fit no lane or no column are left off the board.
+- **Unmatched items**, linked from the index and each board header, lists the open items of the
+  global users that no dashboard places in a cell, in the repos switched on. An item a swimlane
+  hides as blocked counts as placed.
 - **Hide blocked** (per swimlane) drops issues that have at least one open blocker
   (GitHub "blocked by" relationships).
 - Issues carrying the **epic label** appear in the strip above the board with sub-issue

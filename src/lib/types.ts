@@ -118,7 +118,6 @@ export interface Board {
   columnTotals: Record<string, number>;
   hiddenBlocked: Record<string, number>;
   epics: Epic[];
-  unplaced: number;
   /** Issues shown in at least one cell; one in several cells counts once. */
   total: number;
   /** Repos among the dashboard's items, whether shown or not; the board's repo chips. */
@@ -127,6 +126,9 @@ export interface Board {
   labels: string[];
   sort: { by: SortBy; dir: SortDir };
 }
+
+/** An item no dashboard places, as the unmatched view lists it. */
+export type UnmatchedItem = Pick<Issue, "kind" | "repo" | "number" | "title" | "url" | "labels">;
 
 export function cellKey(laneId: string, colId: string): string {
   return `${laneId}:${colId}`;

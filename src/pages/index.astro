@@ -7,7 +7,16 @@ const { dashboards } = loadConfig();
 
 <Base title="Dashboards">
   <div class="mx-auto max-w-2xl p-6">
-    <h1 class="mb-4 text-2xl font-semibold">Dashboards</h1>
+    <div class="mb-4 flex items-baseline justify-between">
+      <h1 class="text-2xl font-semibold">Dashboards</h1>
+      {
+        dashboards.length > 0 && (
+          <a href="/unmatched" class="text-sm text-sky-700 underline">
+            Unmatched items
+          </a>
+        )
+      }
+    </div>
     {
       dashboards.length === 0 ? (
         <p class="text-neutral-600">

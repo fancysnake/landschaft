@@ -255,16 +255,22 @@ const optionalText = z
   .optional()
   .transform((value) => (value === "" ? undefined : value));
 
+/** Comma-separated repos, as `hide` carries them. */
+const repoList = z
+  .string()
+  .optional()
+  .transform((value) => value?.split(",").filter(Boolean));
+
 /** The board query string; empty strings count as "not set". */
 export const BoardQuerySchema: z.ZodType<BoardQuery, Record<string, unknown>> = z.object({
   ...(Object.fromEntries(TEXT_FILTER_KEYS.map((key) => [key, optionalText])) as Record<
     TextFilterKey,
     typeof optionalText
   >),
-  hide: z
-    .string()
-    .optional()
-    .transform((value) => value?.split(",").filter(Boolean)),
+  hide: repoList,
   sort: SortBySchema.optional(),
   dir: SortDirSchema.optional(),
 });
+
+/** The unmatched view's query string: the repos hidden in this browser. */
+export const UnmatchedQuerySchema = z.object({ hide: repoList });

@@ -125,6 +125,23 @@ function compareBy(by: SortBy, dir: SortDir) {
   };
 }
 
+/** Holds for items one of the global `users` (empty for everyone) authored or is assigned to. */
+const usersNode = (users: string[]): FilterNode | null =>
+  users.length > 0 ? { type: "term", key: "user", values: users } : null;
+
+/** The swimlanes and columns `item` lands in; it is on the grid only when both are non-empty. */
+function placeOnGrid<L extends Group, C extends Group>(
+  axes: { swimlanes: L[]; columns: C[] },
+  item: FilterItem,
+  viewer: string | null,
+): { lanes: L[]; columns: C[] } {
+  const hit = (node: FilterNode, other: boolean) => matchesFilter(node, item, { viewer, other });
+  return {
+    lanes: placeIn(axes.swimlanes, hit, OTHER_LOOKS_AT.swimlanes),
+    columns: placeIn(axes.columns, hit, OTHER_LOOKS_AT.columns),
+  };
+}
+
 /**
  * The open items of the global repos' `issues` that one of the global `users` (empty for
  * everyone) authored or is assigned to and that pass the dashboard's filter. `viewer` is what
@@ -140,13 +157,45 @@ export function scopedIssues(
   // From all of `issues`, not just the open ones.
   const itemOf = itemsOf(issues, byKey);
   const scope = parseFilter(dashboard.filter);
-  const base: FilterNode | null =
-    users.length > 0 ? { type: "term", key: "user", values: users } : null;
+  const base = usersNode(users);
   return issues.filter((issue) => {
     if (issue.state !== "OPEN") return false;
     const item = itemOf(issue);
     return matchesFilter(base, item, { viewer }) && matchesFilter(scope, item, { viewer });
   });
+}
+
+/**
+ * The open items of the global `users` in `issues` that no dashboard places in a cell, most
+ * recently updated first. One a swimlane hides as blocked counts as placed.
+ */
+export function unmatchedIssues(
+  issues: Issue[],
+  dashboards: Dashboard[],
+  users: string[] = [],
+  viewer: string | null = null,
+): Issue[] {
+  const byKey = new Map(issues.map((issue) => [issueKey(issue.repo, issue.number), issue]));
+  const itemOf = itemsOf(issues, byKey);
+  const base = usersNode(users);
+  const grids = dashboards.map((dashboard) => ({
+    scope: parseFilter(dashboard.filter),
+    swimlanes: compile(dashboard.swimlanes),
+    columns: compile(dashboard.columns),
+  }));
+  const placed = (item: FilterItem) =>
+    grids.some((grid) => {
+      if (!matchesFilter(grid.scope, item, { viewer })) return false;
+      const { lanes, columns } = placeOnGrid(grid, item, viewer);
+      return lanes.length > 0 && columns.length > 0;
+    });
+  return issues
+    .filter((issue) => {
+      if (issue.state !== "OPEN") return false;
+      const item = itemOf(issue);
+      return matchesFilter(base, item, { viewer }) && !placed(item);
+    })
+    .toSorted(compareBy("updated", "desc"));
 }
 
 /**
@@ -184,7 +233,6 @@ export function buildBoard(
     columnTotals: {},
     hiddenBlocked: {},
     epics: [],
-    unplaced: 0,
     total: 0,
     repos: present,
     assignees: [],
@@ -221,13 +269,8 @@ export function buildBoard(
 
     const item = itemOf(issue);
     const { statuses, blocked } = item;
-    const hit = (node: FilterNode, other: boolean) => matchesFilter(node, item, { viewer, other });
-    const lanes = placeIn(axes.swimlanes, hit, OTHER_LOOKS_AT.swimlanes);
-    const columns = placeIn(axes.columns, hit, OTHER_LOOKS_AT.columns);
-    if (lanes.length === 0 || columns.length === 0) {
-      board.unplaced += 1;
-      continue;
-    }
+    const { lanes, columns } = placeOnGrid(axes, item, viewer);
+    if (lanes.length === 0 || columns.length === 0) continue;
     const card: Card = {
       key: issueKey(issue.repo, issue.number),
       kind: issue.kind,
