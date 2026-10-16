@@ -1,5 +1,7 @@
 import { repoShortName } from "../lib/client/labels";
 import { useHiddenRepos } from "../lib/client/useHiddenRepos";
+import { useSyncStatus } from "../lib/client/useSyncStatus";
+import { SyncStatus } from "./board/SyncStatus";
 import { Toggles } from "./board/Toggles";
 
 interface Props {
@@ -18,11 +20,12 @@ const link = (active: boolean, inactive = false) =>
   }`;
 
 /**
- * The dashboards and the repo chips every board follows. A dashboard with no items in the repos
- * switched on is dimmed.
+ * The dashboards, the repo chips every board follows, and the sync status with its buttons. A
+ * dashboard with no items in the repos switched on is dimmed.
  */
 export default function Nav({ path, dashboards, repos }: Props) {
   const [hidden, setHidden] = useHiddenRepos();
+  const { status, error, syncing, sync, dismissError } = useSyncStatus();
   const shown = repos.filter((repo) => !hidden.includes(repo));
   const inactive = (dashboard: Props["dashboards"][number]) =>
     dashboard.repos.every((repo) => !shown.includes(repo));
@@ -43,6 +46,15 @@ export default function Nav({ path, dashboards, repos }: Props) {
         </a>
       ))}
       <div className="ml-auto flex flex-wrap items-center gap-3">
+        {status && (
+          <SyncStatus
+            status={status}
+            syncing={syncing}
+            error={error}
+            onSync={(full) => void sync(full)}
+            onDismissError={dismissError}
+          />
+        )}
         {repos.length > 1 && (
           <Toggles
             label="Repositories"

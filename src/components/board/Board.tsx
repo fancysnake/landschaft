@@ -7,7 +7,6 @@ import { cellKey } from "../../lib/types";
 import { EpicStrip } from "./EpicStrip";
 import { FilterBar } from "./FilterBar";
 import { IssueCard } from "./IssueCard";
-import { SyncStatus } from "./SyncStatus";
 
 interface Props {
   dashboardId: string;
@@ -17,15 +16,12 @@ export default function Board({ dashboardId }: Props) {
   const [filters, updateFilters] = useUrlFilters();
   const [hidden] = useHiddenRepos();
   const request = useMemo(() => ({ ...filters, hide: hidden }), [filters, hidden]);
-  const { data, error, loading, syncing, sync, setEpicStarred, dismissError } = useBoard(
-    dashboardId,
-    request,
-  );
+  const { data, error, loading, setEpicStarred, dismissError } = useBoard(dashboardId, request);
 
   if (!data) {
     return <p className="p-6 text-sm text-neutral-500">{loading ? "Loading board…" : error}</p>;
   }
-  const { dashboard, board, status } = data;
+  const { dashboard, board } = data;
   const showRepo = board.repos.length > 1;
 
   return (
@@ -42,7 +38,6 @@ export default function Board({ dashboardId }: Props) {
             )}
           </span>
         </h1>
-        <SyncStatus status={status} syncing={syncing} onSync={(full) => void sync(full)} />
       </header>
 
       {error && (

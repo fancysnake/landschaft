@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog], and this project adheres to
   `other`. Settings show the global fields above the dashboards. Old configs migrate on load.
 - Repo chips sit in the top bar, list the global repos by name and switch each off on every
   board in this browser.
+- The sync status and the Refresh and full resync buttons sit in the top bar on every page.
 - `POST /api/sync` without `repo` syncs in the background and answers `202` with `{ status }`,
   without `results`; poll `GET /api/version` for progress.
 
@@ -32,6 +33,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 - A sync or a star keeps items from a switched-off repo off the board.
 - A GitHub request gives up after 30 seconds instead of hanging page loads and sync.
+- A failed epic star stays reported instead of vanishing on the reload.
 - Clicking the Repositories, Users or Epic label title in settings no longer clicks the first
   control under it.
 

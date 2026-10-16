@@ -13,10 +13,11 @@ everything the token does. Two kinds of pass:
 
 - **Incremental** — issues updated since the last run, every `refreshMinutes`.
 - **Full** — every open issue, once a day, for repositories just added in settings, and on
-  demand from the sync button on the board.
+  demand from the full resync button in the top bar.
 
-The remaining rate-limit budget is shown next to the sync status. The board polls
-`/api/version` and reloads itself when a sync has landed.
+The top bar shows the sync status on every page, with the remaining rate-limit budget and the
+Refresh and full resync buttons. It polls `/api/version`, and an open board reloads itself when a
+sync has landed.
 
 ## Epics
 
