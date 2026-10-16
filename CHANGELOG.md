@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
-## [2.0.0] - 2026-10-10
+## [2.0.0] - 2026-10-16
 
 ### Added
 
@@ -19,8 +19,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 - Global `repos`, `users` and `refreshMinutes` replace the per-dashboard ones; each dashboard
   narrows them with an optional `filter`, such as `repo:acme/app user:@me`, that may not use
   `other`. Settings show the global fields above the dashboards. Old configs migrate on load.
-- Repo chips sit in the top bar, list the global repos and switch each off on every board in
-  this browser.
+- Repo chips sit in the top bar, list the global repos by name and switch each off on every
+  board in this browser.
+- `POST /api/sync` without `repo` syncs in the background and answers `202` with `{ status }`,
+  without `results`; poll `GET /api/version` for progress.
 
 ### Removed
 
@@ -29,6 +31,9 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Fixed
 
 - A sync or a star keeps items from a switched-off repo off the board.
+- A GitHub request gives up after 30 seconds instead of hanging page loads and sync.
+- Clicking the Repositories, Users or Epic label title in settings no longer clicks the first
+  control under it.
 
 ## [1.0.0] - 2026-10-09
 
