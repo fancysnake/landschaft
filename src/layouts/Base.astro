@@ -1,6 +1,10 @@
 ---
 import "../styles/global.css";
 
+import Nav from "../components/Nav";
+
+import { getApp } from "../lib/server/app";
+import { scopedIssues } from "../lib/server/board";
 import { loadConfig } from "../lib/server/config";
 
 interface Props {
@@ -8,12 +12,14 @@ interface Props {
 }
 
 const { title } = Astro.props;
-const { dashboards } = loadConfig();
-const path = Astro.url.pathname;
-const linkClass = (href: string) =>
-  `rounded-md px-2 py-1 text-sm ${
-    path === href ? "bg-neutral-800 text-white" : "text-neutral-700 hover:bg-neutral-200"
-  }`;
+const { dashboards, repos, users } = loadConfig();
+const { db, syncer } = getApp();
+const viewer = await syncer.viewer().catch(() => null);
+const issues = db.listIssues(repos);
+const tabs = dashboards.map(({ id, name, filter }) => {
+  const scoped = scopedIssues(issues, { filter }, users, viewer);
+  return { id, name, repos: [...new Set(scoped.map((issue) => issue.repo))] };
+});
 ---
 
 <!doctype html>
@@ -25,15 +31,7 @@ const linkClass = (href: string) =>
     <title>{title} · landschaft</title>
   </head>
   <body class="flex h-full flex-col bg-neutral-100 text-neutral-900">
-    <nav class="flex items-center gap-1 border-b border-neutral-200 bg-white px-4 py-2">
-      <a href="/" class="mr-3 font-semibold tracking-tight">landschaft</a>
-      {dashboards.map((dashboard) => (
-        <a href={`/d/${dashboard.id}`} class={linkClass(`/d/${dashboard.id}`)}>
-          {dashboard.name}
-        </a>
-      ))}
-      <a href="/settings" class={`ml-auto ${linkClass("/settings")}`}>Settings</a>
-    </nav>
+    <Nav client:load path={Astro.url.pathname} dashboards={tabs} repos={repos} />
     <main class="min-h-0 flex-1">
       <slot />
     </main>

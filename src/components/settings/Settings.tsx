@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 
+import type { LabelDef } from "../../lib/types";
+
 import { api, errorMessage } from "../../lib/client/api";
-import { type Config, type Dashboard, ME } from "../../lib/schema";
+import { type Config, type Dashboard } from "../../lib/schema";
 import { DashboardEditor } from "./DashboardEditor";
+import { ScopeEditor } from "./ScopeEditor";
 
 function newId(): string {
   return crypto.randomUUID().slice(0, 8);
@@ -12,10 +15,8 @@ function newDashboard(): Dashboard {
   return {
     id: newId(),
     name: "New dashboard",
-    repos: [],
-    users: [ME],
+    filter: "",
     sort: { by: "updated", dir: "desc" },
-    refreshMinutes: 5,
     swimlanes: [{ id: "all", name: "Everything", filter: "", hideBlocked: false }],
     columns: [{ id: "todo", name: "Todo", filter: "" }],
   };
@@ -25,6 +26,11 @@ type Notice = { kind: "ok" | "error"; text: string } | null;
 
 const button = "rounded-md border px-3 py-1 text-sm";
 
+const entry = (active: boolean) =>
+  `block w-full truncate rounded-md px-2 py-1 text-left text-sm ${
+    active ? "bg-neutral-800 text-white" : "hover:bg-neutral-200"
+  }`;
+
 export default function Settings() {
   const [config, setConfig] = useState<Config | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -32,6 +38,8 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
   const [jsonText, setJsonText] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<LabelDef[]>([]);
+  const reposKey = config?.repos.join(",") ?? "";
 
   useEffect(() => {
     api
@@ -42,6 +50,19 @@ export default function Settings() {
       })
       .catch((cause: unknown) => setNotice({ kind: "error", text: errorMessage(cause) }));
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const request = reposKey ? api.labels(reposKey.split(",")) : Promise.resolve([]);
+    request
+      .then((labels) => {
+        if (!cancelled) setCatalog(labels);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [reposKey]);
 
   if (!config) {
     return <p className="p-6 text-sm text-neutral-500">{notice?.text ?? "Loading settings…"}</p>;
@@ -81,7 +102,7 @@ export default function Settings() {
       setConfig(saved);
       setJsonText(null);
       setDirty(false);
-      if (!saved.dashboards.some((d) => d.id === selected))
+      if (selected !== null && !saved.dashboards.some((d) => d.id === selected))
         setSelected(saved.dashboards[0]?.id ?? null);
       setNotice({
         kind: "ok",
@@ -95,6 +116,11 @@ export default function Settings() {
   };
 
   const current = config.dashboards.find((d) => d.id === selected) ?? null;
+  const offer = {
+    labels: [...new Set(catalog.map((label) => label.name))],
+    repos: config.repos,
+    users: config.users,
+  };
 
   return (
     <div className="mx-auto flex h-full max-w-6xl flex-col p-4">
@@ -135,52 +161,63 @@ export default function Settings() {
           className="min-h-0 flex-1 rounded-md border border-neutral-300 bg-white p-3 font-mono text-xs"
         />
       ) : (
-        <div className="grid min-h-0 flex-1 gap-4 sm:grid-cols-[14rem_1fr]">
-          <aside className="space-y-1">
-            {config.dashboards.map((dashboard) => (
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto">
+          <section className="rounded-md border border-neutral-200 bg-white p-4">
+            <h2 className="mb-3 text-sm font-semibold">Shared by every dashboard</h2>
+            <ScopeEditor scope={config} onChange={(scope) => update({ ...config, ...scope })} />
+          </section>
+          <div className="grid gap-4 sm:grid-cols-[14rem_1fr]">
+            <aside className="space-y-1">
+              <h2 className="px-2 pb-1 text-sm font-semibold">Dashboards</h2>
+              {config.dashboards.map((dashboard) => (
+                <button
+                  key={dashboard.id}
+                  type="button"
+                  onClick={() => setSelected(dashboard.id)}
+                  className={entry(dashboard.id === selected)}
+                >
+                  {dashboard.name}
+                </button>
+              ))}
               <button
-                key={dashboard.id}
                 type="button"
-                onClick={() => setSelected(dashboard.id)}
-                className={`block w-full truncate rounded-md px-2 py-1 text-left text-sm ${
-                  dashboard.id === selected ? "bg-neutral-800 text-white" : "hover:bg-neutral-200"
-                }`}
+                onClick={() => addDashboard()}
+                className="block px-2 py-1 text-sm text-sky-700 hover:underline"
               >
-                {dashboard.name}
+                + new dashboard
               </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => addDashboard()}
-              className="block px-2 py-1 text-sm text-sky-700 hover:underline"
-            >
-              + new dashboard
-            </button>
-          </aside>
-          <div className="min-h-0 overflow-auto rounded-md border border-neutral-200 bg-white p-4">
-            {current ? (
-              <>
-                <div className="mb-4 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => addDashboard(current)}
-                    className={`${button} border-neutral-300 bg-white hover:bg-neutral-50`}
-                  >
-                    Duplicate
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeDashboard(current.id)}
-                    className={`${button} border-red-300 bg-white text-red-700 hover:bg-red-50`}
-                  >
-                    Delete
-                  </button>
-                </div>
-                <DashboardEditor key={current.id} dashboard={current} onChange={updateDashboard} />
-              </>
-            ) : (
-              <p className="text-sm text-neutral-500">Create a dashboard to get started.</p>
-            )}
+            </aside>
+            <div className="rounded-md border border-neutral-200 bg-white p-4">
+              {current ? (
+                <>
+                  <div className="mb-4 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => addDashboard(current)}
+                      className={`${button} border-neutral-300 bg-white hover:bg-neutral-50`}
+                    >
+                      Duplicate
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeDashboard(current.id)}
+                      className={`${button} border-red-300 bg-white text-red-700 hover:bg-red-50`}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                  <DashboardEditor
+                    key={current.id}
+                    dashboard={current}
+                    onChange={updateDashboard}
+                    catalog={catalog}
+                    offer={offer}
+                  />
+                </>
+              ) : (
+                <p className="text-sm text-neutral-500">No dashboards yet.</p>
+              )}
+            </div>
           </div>
         </div>
       )}

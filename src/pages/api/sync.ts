@@ -1,7 +1,7 @@
 import { SyncRequestSchema } from "../../lib/schema";
 import { ApiError, json, route } from "../../lib/server/api";
 import { getApp } from "../../lib/server/app";
-import { allRepos, loadConfig } from "../../lib/server/config";
+import { loadConfig } from "../../lib/server/config";
 import { SyncBusyError } from "../../lib/server/sync";
 
 export const POST = route(async ({ request }) => {
@@ -26,6 +26,6 @@ export const POST = route(async ({ request }) => {
     }
   }
   // Failures land in status.lastError; clients follow progress through /api/version.
-  void syncer.syncAll(allRepos(loadConfig()), { full: body.full });
+  void syncer.syncAll(loadConfig().repos, { full: body.full });
   return json({ status: syncer.status() }, 202);
 });

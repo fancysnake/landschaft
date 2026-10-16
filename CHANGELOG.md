@@ -7,10 +7,35 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-16
+
+### Added
+
+- Settings suggest repos after `repo:` and users after `user:`, `author:` and `assignee:`.
+- Dashboards with no items in the repos switched on are dimmed in the top bar.
+
+### Changed
+
+- Global `repos`, `users` and `refreshMinutes` replace the per-dashboard ones; each dashboard
+  narrows them with an optional `filter`, such as `repo:acme/app user:@me`, that may not use
+  `other`. Settings show the global fields above the dashboards. Old configs migrate on load.
+- Repo chips sit in the top bar, list the global repos by name and switch each off on every
+  board in this browser.
+- The sync status and the Refresh and full resync buttons sit in the top bar on every page.
+- `POST /api/sync` without `repo` syncs in the background and answers `202` with `{ status }`,
+  without `results`; poll `GET /api/version` for progress.
+
+### Removed
+
+- The `repo=` board URL parameter; the top bar's repo chips choose the repos.
+
 ### Fixed
 
-- The board no longer shows items from a deselected repo after a sync. A reload after sync or
-  starring uses the current filters, and a slow response for older filters is dropped.
+- A sync or a star keeps items from a switched-off repo off the board.
+- A GitHub request gives up after 30 seconds instead of hanging page loads and sync.
+- A failed epic star stays reported instead of vanishing on the reload.
+- Clicking the Repositories, Users or Epic label title in settings no longer clicks the first
+  control under it.
 
 ## [1.0.0] - 2026-10-09
 
@@ -171,7 +196,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v1.0.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/fancysnake/landschaft/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/fancysnake/landschaft/compare/v0.10.1...v1.0.0
 [0.10.1]: https://github.com/fancysnake/landschaft/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/fancysnake/landschaft/compare/v0.9.1...v0.10.0

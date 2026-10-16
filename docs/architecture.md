@@ -15,7 +15,7 @@ Astro 7 in SSR mode (`@astrojs/node`, standalone) with React 19 islands, Tailwin
 - `src/lib/server/github.ts` — GraphQL sync queries; token from
   `GITHUB_TOKEN` or `gh auth token`.
 - `src/lib/server/sync.ts` — the `Syncer` (sequential, incremental and full passes) and the
-  scheduler that follows `refreshMinutes`.
+  scheduler that syncs every global repository each `refreshMinutes`.
 - `src/lib/server/board.ts` — the **pure** board builder. Everything
   about placement lives here and is unit-tested against fixtures.
 - `src/lib/server/app.ts` — one DB handle, GitHub client and scheduler per process, booted by

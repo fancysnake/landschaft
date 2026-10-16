@@ -37,11 +37,9 @@ export function label(name: string): { name: string; color: string } {
 export const DASHBOARD: Dashboard = {
   id: "main",
   name: "Main",
-  repos: [REPO],
-  users: [],
+  filter: "",
   epicLabel: "epic",
   sort: { by: "updated", dir: "desc" },
-  refreshMinutes: 5,
   swimlanes: [
     { id: "high", name: "High", filter: "label:prio:high", hideBlocked: false },
     { id: "low", name: "Low", filter: "label:prio:low", hideBlocked: true },

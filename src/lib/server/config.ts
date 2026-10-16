@@ -8,7 +8,7 @@ export function configPath(): string {
 }
 
 export function loadConfig(file = configPath()): Config {
-  if (!existsSync(file)) return { dashboards: [] };
+  if (!existsSync(file)) return ConfigSchema.parse({});
   return ConfigSchema.parse(JSON.parse(readFileSync(file, "utf8")));
 }
 
@@ -24,22 +24,4 @@ export function saveConfig(config: unknown, file = configPath()): Config {
 
 export function findDashboard(config: Config, id: string): Dashboard | undefined {
   return config.dashboards.find((dashboard) => dashboard.id === id);
-}
-
-export function allRepos(config: Config): string[] {
-  return [...new Set(config.dashboards.flatMap((dashboard) => dashboard.repos))];
-}
-
-/** Smallest refresh interval any dashboard asks for, per repo. */
-export function refreshMinutesByRepo(config: Config): Map<string, number> {
-  const minutes = new Map<string, number>();
-  for (const dashboard of config.dashboards) {
-    for (const repo of dashboard.repos) {
-      const current = minutes.get(repo);
-      if (current === undefined || dashboard.refreshMinutes < current) {
-        minutes.set(repo, dashboard.refreshMinutes);
-      }
-    }
-  }
-  return minutes;
 }

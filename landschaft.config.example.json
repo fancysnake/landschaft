@@ -1,13 +1,14 @@
 {
+  "repos": ["owner/repo", "owner/other-repo"],
+  "users": ["@me"],
+  "refreshMinutes": 5,
   "dashboards": [
     {
       "id": "main",
       "name": "Main",
-      "repos": ["owner/repo", "owner/other-repo"],
-      "users": ["@me"],
+      "filter": "",
       "epicLabel": "epic",
       "sort": { "by": "updated", "dir": "desc" },
-      "refreshMinutes": 5,
       "swimlanes": [
         {
           "id": "fix",

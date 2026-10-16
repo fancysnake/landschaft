@@ -167,6 +167,14 @@ export function quoteValue(value: string): string {
   return /[\s()|"\\]/.test(value) ? `"${value.replaceAll(/["\\]/g, "\\$&")}"` : value;
 }
 
+/** Whether `node` uses the term `other` anywhere. */
+export function usesOther(node: FilterNode | null): boolean {
+  if (!node || node.type === "term") return false;
+  if (node.type === "other") return true;
+  if (node.type === "not") return usesOther(node.node);
+  return node.nodes.some(usesOther);
+}
+
 /** Labels a filter asks for outside a `-`, as `labelKey`s. */
 export function askedLabels(node: FilterNode | null): string[] {
   if (!node || node.type === "not" || node.type === "other") return [];
@@ -208,11 +216,18 @@ function isLogin(value: string, login: string | null, viewer: string | null = nu
   return wanted !== null && login !== null && same(wanted, login);
 }
 
+/** What the filter input completes values from. */
+export interface Offer {
+  labels: string[];
+  repos: string[];
+  users: string[];
+}
+
 interface KeySpec {
   /** What every value must pass, and how to describe it; absent when any value goes. */
   check?: { test: (value: string) => boolean; expected: string };
-  /** Values to complete after the key, given the labels on offer. */
-  suggest?: (labels: string[]) => readonly string[];
+  /** Values to complete after the key, given what is on offer. */
+  suggest?: (offer: Offer) => readonly string[];
   /** Whether `item` has `value` for this key. */
   holds: (value: string, item: FilterItem, ctx: FilterContext) => boolean;
 }
@@ -233,11 +248,14 @@ function oneOf(tests: Record<string, (item: FilterItem) => boolean>): KeySpec {
 const matching = (pattern: RegExp, expected: string) => ({
   check: { test: (value: string) => pattern.test(value), expected },
 });
-const person = { ...matching(LOGIN, "a GitHub login or @me"), suggest: () => ["@me"] };
+const person = {
+  ...matching(LOGIN, "a GitHub login or @me"),
+  suggest: ({ users }: Offer) => [...new Set(["@me", ...users])],
+};
 
 const KEYS = {
   label: {
-    suggest: (labels) => labels.map(quoteValue),
+    suggest: ({ labels }) => labels.map(quoteValue),
     holds: (value, item) => item.labels.some((label) => labelKey(label.name) === labelKey(value)),
   },
   is: oneOf({
@@ -263,6 +281,7 @@ const KEYS = {
   },
   repo: {
     ...matching(REPO, "owner/repo"),
+    suggest: ({ repos }) => repos,
     holds: (value, item) => same(item.repo, value),
   },
   author: { ...person, holds: (value, item, { viewer }) => isLogin(value, item.author, viewer) },
@@ -306,10 +325,10 @@ export function matchesFilter(
 }
 
 /**
- * Completions for the last term of `text`: keys, then the key's values (`labels` for
- * `label:`), each as the whole filter text with that term completed.
+ * Completions for the last term of `text`: keys, then the key's values (from `offer` for
+ * `label:`, `repo:` and the user keys), each as the whole filter text with that term completed.
  */
-export function suggestFilter(text: string, labels: string[]): string[] {
+export function suggestFilter(text: string, offer: Offer): string[] {
   // ponytail: a term is what follows the last space or paren, so a half-typed quoted value
   // holding a space gets no suggestions.
   const word = /[^\s(]*$/.exec(text)![0].replace(/^-+/, "");
@@ -321,7 +340,7 @@ export function suggestFilter(text: string, labels: string[]): string[] {
   const candidates =
     key === null
       ? [...FILTER_KEYS.map((name) => `${name}:`), "other"]
-      : (spec?.suggest?.(labels) ?? []);
+      : (spec?.suggest?.(offer) ?? []);
   return candidates
     .filter((option) => option !== partial && same(option.slice(0, partial.length), partial))
     .map((option) => head + option);

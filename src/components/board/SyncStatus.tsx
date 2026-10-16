@@ -7,10 +7,13 @@ import { relativeTime } from "../../lib/client/labels";
 interface Props {
   status: Status;
   syncing: boolean;
+  /** A failed sync request, or the error the sync it started finished with. */
+  error: string | null;
   onSync(full: boolean): void;
+  onDismissError(): void;
 }
 
-export function SyncStatus({ status, syncing, onSync }: Props) {
+export function SyncStatus({ status, syncing, error, onSync, onDismissError }: Props) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 15_000);
@@ -30,6 +33,14 @@ export function SyncStatus({ status, syncing, onSync }: Props) {
           ? `Syncing ${status.inFlight.join(", ")}…`
           : `Synced ${relativeTime(status.lastSyncAt, now)}`}
       </span>
+      {error && (
+        <span className="text-red-700">
+          {error}{" "}
+          <button type="button" onClick={onDismissError} className="font-medium hover:underline">
+            dismiss
+          </button>
+        </span>
+      )}
       {status.rateRemaining !== null && (
         <span className="text-neutral-400" title="GitHub API points left this hour">
           · {status.rateRemaining} left

@@ -6,10 +6,11 @@ import { parseIssueKey } from "../../../../lib/types";
 
 export const POST = route(async ({ params, request }) => {
   const { epic, starred } = await parseBody(StarEpicRequestSchema, request);
-  const dashboard = findDashboard(loadConfig(), params.id ?? "");
+  const config = loadConfig();
+  const dashboard = findDashboard(config, params.id ?? "");
   if (!dashboard) throw new ApiError(404, "dashboard not found");
-  if (starred && !dashboard.repos.includes(parseIssueKey(epic)?.repo ?? "")) {
-    throw new ApiError(400, "epic is not in a repository of this dashboard");
+  if (starred && !config.repos.includes(parseIssueKey(epic)?.repo ?? "")) {
+    throw new ApiError(400, "epic is not in a configured repository");
   }
   const { db } = getApp();
   db.setEpicStarred(dashboard.id, epic, starred);

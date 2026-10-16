@@ -33,6 +33,9 @@ export interface GithubClient {
 
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
+/** Bounds every request, so a stalled GitHub cannot hang page renders or sync. */
+const REQUEST_TIMEOUT_MS = 30_000;
+
 export function createGithubClient(
   tokenSource: () => Promise<string>,
   fetchImpl: FetchLike = (input, init) => fetch(input, init),
@@ -54,6 +57,7 @@ export function createGithubClient(
           "content-type": "application/json",
         },
         body: JSON.stringify({ query, variables }),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
       if (!response.ok) {
         throw new GithubError(`GraphQL HTTP ${response.status}: ${await response.text()}`);

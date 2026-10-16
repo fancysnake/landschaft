@@ -343,18 +343,10 @@ describe("startScheduler", () => {
     const { gh, calls } = fakeGithub([[]]);
     const syncer = new Syncer({ db, gh });
     const config: Config = {
-      dashboards: [
-        {
-          id: "d",
-          name: "D",
-          repos: ["acme/due", "acme/fresh"],
-          users: [],
-          sort: { by: "updated", dir: "desc" },
-          refreshMinutes: 5,
-          swimlanes: [{ id: "a", name: "A", filter: "", hideBlocked: false }],
-          columns: [{ id: "c", name: "C", filter: "" }],
-        },
-      ],
+      repos: ["acme/due", "acme/fresh"],
+      users: [],
+      refreshMinutes: 5,
+      dashboards: [],
     };
     const stop = startScheduler(syncer, () => config, { tickMs: 60_000, firstDelayMs: 0 });
 
