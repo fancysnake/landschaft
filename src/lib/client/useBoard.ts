@@ -25,6 +25,8 @@ export function useBoard(dashboardId: string, query: BoardQuery): BoardControlle
   // Read at request time, so a reload after a slow write uses the query current by then.
   const queryRef = useRef(query);
   const loadSeq = useRef(0);
+  // Set by sync(); the first load with nothing in flight reports that sync's error, if any.
+  const awaitingSync = useRef(false);
 
   /** Loads the board; a response is dropped once a newer load has started. */
   const load = useCallback(async () => {
@@ -34,7 +36,10 @@ export function useBoard(dashboardId: string, query: BoardQuery): BoardControlle
       if (seq !== loadSeq.current) return;
       versionRef.current = response.status.version;
       setData(response);
-      setError(null);
+      const { inFlight, lastError } = response.status;
+      const finished = awaitingSync.current && inFlight.length === 0;
+      if (finished) awaitingSync.current = false;
+      setError(finished ? lastError : null);
     } catch (cause) {
       if (seq === loadSeq.current) setError(errorMessage(cause));
     }
@@ -89,8 +94,8 @@ export function useBoard(dashboardId: string, query: BoardQuery): BoardControlle
       setSyncing(true);
       await mutate("Sync", async () => {
         try {
-          const response = await api.sync({ full });
-          if (response.status.lastError) setError(response.status.lastError);
+          await api.sync({ full });
+          awaitingSync.current = true;
         } finally {
           setSyncing(false);
         }
