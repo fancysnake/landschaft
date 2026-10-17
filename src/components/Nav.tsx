@@ -45,6 +45,15 @@ export default function Nav({ path, dashboards, repos }: Props) {
           {dashboard.name}
         </a>
       ))}
+      {dashboards.length > 0 && (
+        <a
+          href="/unmatched"
+          title="Open items no dashboard places"
+          className={link(path === "/unmatched")}
+        >
+          Unmatched
+        </a>
+      )}
       <div className="ml-auto flex flex-wrap items-center gap-3">
         {status && (
           <SyncStatus

@@ -118,7 +118,6 @@ export interface Board {
   columnTotals: Record<string, number>;
   hiddenBlocked: Record<string, number>;
   epics: Epic[];
-  unplaced: number;
   /** Issues shown in at least one cell; one in several cells counts once. */
   total: number;
   /** Repos among the dashboard's items, whether shown or not; the board's repo chips. */

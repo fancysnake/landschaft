@@ -6,11 +6,16 @@ import type {
   StarEpicRequest,
   SyncRequest,
 } from "../schema";
-import type { Board, LabelDef, SyncStatus } from "../types";
+import type { Board, Card, LabelDef, SyncStatus } from "../types";
 
 export interface BoardResponse {
   dashboard: Dashboard;
   board: Board;
+  status: SyncStatus;
+}
+
+export interface UnmatchedResponse {
+  items: Card[];
   status: SyncStatus;
 }
 
@@ -72,6 +77,8 @@ export const api = {
       `/api/dashboards/${encodeURIComponent(dashboardId)}/board?${params}`,
     );
   },
+  unmatched: (hide: string[]) =>
+    request<UnmatchedResponse>(`/api/unmatched?hide=${encodeURIComponent(hide.join(","))}`),
   version: () => request<SyncStatus>("/api/version"),
   sync: (body: Partial<SyncRequest>) =>
     request<SyncResponse>("/api/sync", { method: "POST", body: JSON.stringify(body) }),

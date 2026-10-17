@@ -4,6 +4,7 @@ import { useBoard } from "../../lib/client/useBoard";
 import { useHiddenRepos } from "../../lib/client/useHiddenRepos";
 import { useUrlFilters } from "../../lib/client/useUrlFilters";
 import { cellKey } from "../../lib/types";
+import { ErrorBanner } from "../ErrorBanner";
 import { EpicStrip } from "./EpicStrip";
 import { FilterBar } from "./FilterBar";
 import { IssueCard } from "./IssueCard";
@@ -40,24 +41,7 @@ export default function Board({ dashboardId }: Props) {
         </h1>
       </header>
 
-      {error && (
-        <div className="flex items-start gap-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          <span className="flex-1">{error}</span>
-          <button type="button" onClick={dismissError} className="font-medium hover:underline">
-            dismiss
-          </button>
-        </div>
-      )}
-      {board.unplaced > 0 && (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          {board.unplaced} issue{board.unplaced === 1 ? "" : "s"} match no swimlane or column. Add a
-          lane or column with the filter <code>other</code> in{" "}
-          <a href="/settings" className="underline">
-            settings
-          </a>
-          .
-        </p>
-      )}
+      {error && <ErrorBanner error={error} onDismiss={dismissError} />}
       {board.repos.length > 0 && board.repos.every((repo) => hidden.includes(repo)) && (
         <p className="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600">
           Every repository with items on this board is switched off in the bar above.

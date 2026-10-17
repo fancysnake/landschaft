@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { askedLabels, type FilterNode } from "../filter";
 import { cellKey } from "../types";
 import { DASHBOARD, label, makeIssue, REPO } from "./__fixtures__/issues";
-import { buildBoard, compile, isBlocked, placeIn, scopedIssues } from "./board";
+import { buildBoard, compile, isBlocked, placeIn, scopedIssues, unmatchedIssues } from "./board";
 
 const cell = (laneId: string, colId: string) => cellKey(laneId, colId);
 const numbers = (board: ReturnType<typeof buildBoard>) =>
@@ -70,6 +70,67 @@ describe("scopedIssues", () => {
   });
 });
 
+describe("unmatchedIssues", () => {
+  it("lists the users' open items no dashboard places, newest first", () => {
+    const narrow = {
+      ...DASHBOARD,
+      id: "narrow",
+      filter: "label:team",
+      columns: [{ id: "doing", name: "Doing", filter: "label:phase:doing" }],
+    };
+    const wide = { ...DASHBOARD, id: "wide", filter: "label:infra" };
+    const mine = { author: "me" };
+    const issues = [
+      makeIssue({ number: 1, ...mine, labels: [label("team"), label("phase:doing")] }),
+      makeIssue({ number: 2, ...mine, labels: [label("team")] }),
+      makeIssue({ number: 3, ...mine, labels: [label("infra")] }),
+      makeIssue({ number: 4, ...mine }),
+      makeIssue({ number: 5, ...mine, state: "CLOSED" }),
+      makeIssue({ number: 6, author: "bob" }),
+      // In a lane that hides it as blocked, by an item outside the users.
+      makeIssue({
+        number: 7,
+        ...mine,
+        labels: [label("infra"), label("prio:low")],
+        blockedBy: waitsOn(8),
+        blockedByTotal: 1,
+      }),
+      makeIssue({ number: 8, author: "bob" }),
+    ];
+    const unmatched = unmatchedIssues(issues, [narrow, wide], ["@me"], "me");
+    expect(unmatched.map((issue) => issue.number)).toEqual([4, 2]);
+  });
+
+  it("drops hidden repos after placement, so their items still count", () => {
+    const dashboard = {
+      ...DASHBOARD,
+      swimlanes: [{ id: "all", name: "All", filter: "", hideBlocked: false }],
+      columns: [
+        { id: "review", name: "Review", filter: "is:has-pr" },
+        { id: "blocking", name: "Blocking", filter: "is:blocking" },
+      ],
+    };
+    const lib = { repo: "acme/lib" };
+    const issues = [
+      makeIssue({ number: 1 }),
+      makeIssue({ number: 2 }),
+      makeIssue({ number: 3 }),
+      makeIssue({ number: 10, ...lib, kind: "pr", linked: [{ repo: REPO, number: 1 }] }),
+      makeIssue({ number: 11, ...lib, blockedBy: waitsOn(2), blockedByTotal: 1 }),
+    ];
+    const unmatched = (hide: string[]) =>
+      unmatchedIssues(issues, [dashboard], [], null, hide).map((card) => card.number);
+    expect(unmatched([])).toEqual([11, 10, 3]);
+    expect(unmatched(["acme/lib"])).toEqual([3]);
+  });
+
+  it("lists every open item when no dashboard has a swimlane", () => {
+    const dashboard = { ...DASHBOARD, swimlanes: [] };
+    const unmatched = unmatchedIssues([makeIssue({ number: 1 })], [dashboard]);
+    expect(unmatched.map((issue) => issue.number)).toEqual([1]);
+  });
+});
+
 describe("buildBoard", () => {
   it("places issues by lane and column labels, catch-all otherwise", () => {
     const issues = [
@@ -85,7 +146,6 @@ describe("buildBoard", () => {
     expect(board.cells[cell("rest", "done")]?.map((c) => c.number)).toEqual([3]);
     expect(board.cells[cell("rest", "todo")]?.map((c) => c.number)).toEqual([4]);
     expect(board.laneTotals).toEqual({ high: 1, low: 1, rest: 2 });
-    expect(board.unplaced).toBe(0);
   });
 
   it("places by a column that asks for every one of its labels", () => {
@@ -275,13 +335,13 @@ describe("buildBoard", () => {
     ]);
   });
 
-  it("counts issues that fit no group when an axis has no catch-all", () => {
+  it("leaves out issues that fit no group when an axis has no catch-all", () => {
     const dashboard = {
       ...DASHBOARD,
       columns: [{ id: "doing", name: "Doing", filter: "label:phase:doing" }],
     };
     const board = buildBoard([makeIssue({ number: 1 })], dashboard);
-    expect(board.unplaced).toBe(1);
+    expect(board.total).toBe(0);
     expect(board.laneTotals.rest).toBe(0);
   });
 

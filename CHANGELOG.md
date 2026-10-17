@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- An Unmatched tab in the top bar lists the open items no dashboard places in a cell;
+  `GET /api/unmatched` serves it.
+
+### Removed
+
+- The board's "N issues match no swimlane or column" warning and the `unplaced` count in the
+  board API.
+
 ## [2.0.0] - 2026-10-16
 
 ### Added
