@@ -15,6 +15,9 @@ swimlanes × columns, each defined by a filter in GitHub search syntax. The boar
 GitHub. Everything runs on your machine against a local SQLite cache that refreshes in the
 background.
 
+A dashboard can instead be an inbox: a flat list of PRs and issues, each in the first of its
+groups whose filter it matches, for triage.
+
 <!-- --8<-- [end:grid] -->
 
 Documentation is at [landschaft.fancysnake.dev](https://landschaft.fancysnake.dev).

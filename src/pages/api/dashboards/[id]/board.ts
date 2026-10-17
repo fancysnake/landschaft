@@ -7,7 +7,7 @@ import { findDashboard, loadConfig } from "../../../../lib/server/config";
 export const GET = route(async ({ params, url }) => {
   const config = loadConfig();
   const dashboard = findDashboard(config, params.id ?? "");
-  if (!dashboard) throw new ApiError(404, "dashboard not found");
+  if (dashboard?.type !== "board") throw new ApiError(404, "board not found");
   const query = parseQuery(BoardQuerySchema, url);
   const { db, syncer } = getApp();
   const viewer = await syncer.viewer().catch(() => null);

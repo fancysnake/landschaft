@@ -1,7 +1,14 @@
 import type { Offer } from "../../lib/filter";
 import type { LabelDef } from "../../lib/types";
 
-import { type Dashboard, dashboardFilterError, type SortBy, type SortDir } from "../../lib/schema";
+import {
+  type Dashboard,
+  dashboardFilterError,
+  type DashboardType,
+  type SortBy,
+  type SortDir,
+  withType,
+} from "../../lib/schema";
 import { Field, input } from "./Field";
 import { FilterInput } from "./FilterInput";
 import { LabelPicker } from "./LabelPicker";
@@ -17,17 +24,33 @@ interface Props {
 }
 
 export function DashboardEditor({ dashboard, onChange, catalog, offer }: Props) {
-  const patch = (changes: Partial<Dashboard>) => onChange({ ...dashboard, ...changes });
+  const patch = (changes: Partial<Pick<Dashboard, "name" | "filter" | "sort">>) =>
+    onChange({ ...dashboard, ...changes });
 
   return (
     <div className="space-y-6">
-      <Field label="Name">
-        <input
-          value={dashboard.name}
-          onChange={(event) => patch({ name: event.target.value })}
-          className={`${input} w-full`}
-        />
-      </Field>
+      <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
+        <Field label="Name">
+          <input
+            value={dashboard.name}
+            onChange={(event) => patch({ name: event.target.value })}
+            className={`${input} w-full`}
+          />
+        </Field>
+        <Field
+          label="Type"
+          hint="Switching keeps the name, filter and sort, and starts the rest afresh."
+        >
+          <select
+            value={dashboard.type}
+            onChange={(event) => onChange(withType(event.target.value as DashboardType, dashboard))}
+            className={input}
+          >
+            <option value="board">board</option>
+            <option value="inbox">inbox</option>
+          </select>
+        </Field>
+      </div>
 
       <Field
         label="Filter"
@@ -43,19 +66,21 @@ export function DashboardEditor({ dashboard, onChange, catalog, offer }: Props) 
       </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field
-          group
-          label="Epic label"
-          hint="Issues with this label appear in the epic strip with sub-issue progress."
-        >
-          <LabelPicker
-            single
-            value={dashboard.epicLabel ? [dashboard.epicLabel] : []}
-            onChange={([epicLabel]) => patch({ epicLabel })}
-            options={catalog}
-            placeholder="none"
-          />
-        </Field>
+        {dashboard.type === "board" && (
+          <Field
+            group
+            label="Epic label"
+            hint="Issues with this label appear in the epic strip with sub-issue progress."
+          >
+            <LabelPicker
+              single
+              value={dashboard.epicLabel ? [dashboard.epicLabel] : []}
+              onChange={([epicLabel]) => onChange({ ...dashboard, epicLabel })}
+              options={catalog}
+              placeholder="none"
+            />
+          </Field>
+        )}
         <Field label="Default sort">
           <div className="flex gap-2">
             <select
@@ -82,22 +107,35 @@ export function DashboardEditor({ dashboard, onChange, catalog, offer }: Props) 
         </Field>
       </div>
 
-      <LaneColumnEditor
-        title="Swimlanes"
-        items={dashboard.swimlanes}
-        onChange={(swimlanes) => patch({ swimlanes })}
-        create={(id) => ({ id, name: "New lane", filter: "", hideBlocked: false })}
-        offer={offer}
-        axis="swimlanes"
-      />
-      <LaneColumnEditor
-        title="Columns"
-        items={dashboard.columns}
-        onChange={(columns) => patch({ columns })}
-        create={(id) => ({ id, name: "New column", filter: "" })}
-        offer={offer}
-        axis="columns"
-      />
+      {dashboard.type === "board" ? (
+        <>
+          <LaneColumnEditor
+            title="Swimlanes"
+            items={dashboard.swimlanes}
+            onChange={(swimlanes) => onChange({ ...dashboard, swimlanes })}
+            create={(id) => ({ id, name: "New lane", filter: "", hideBlocked: false })}
+            offer={offer}
+            axis="swimlanes"
+          />
+          <LaneColumnEditor
+            title="Columns"
+            items={dashboard.columns}
+            onChange={(columns) => onChange({ ...dashboard, columns })}
+            create={(id) => ({ id, name: "New column", filter: "" })}
+            offer={offer}
+            axis="columns"
+          />
+        </>
+      ) : (
+        <LaneColumnEditor
+          title="Groups"
+          items={dashboard.groups}
+          onChange={(groups) => onChange({ ...dashboard, groups })}
+          create={(id) => ({ id, name: "New group", filter: "", collapsed: false })}
+          offer={offer}
+          axis="groups"
+        />
+      )}
     </div>
   );
 }

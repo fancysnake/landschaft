@@ -8,6 +8,7 @@ localhost only. Errors are `{ "error": "message" }` with a matching status.
 | `GET /api/config`               | The whole config, defaults filled in                  |
 | `PUT /api/config`               | Replace the whole config; validated, saved atomically |
 | `GET /api/dashboards/:id/board` | Computed board; the query string is the filter set    |
+| `GET /api/dashboards/:id/inbox` | Computed inbox; same query string as the board        |
 | `GET /api/unmatched?hide=a/b`   | Open items no dashboard places; see [Board](#board)   |
 | `POST /api/sync`                | `{ "repo"?, "full"? }`; see [Sync](#sync)             |
 | `GET /api/version`              | Sync status per repository plus rate-limit budget     |
@@ -20,6 +21,10 @@ returns the grid as cells keyed by swimlane and column id, the epic strip, the r
 among the dashboard's items and the label catalogue used for colouring. `hide` lists
 repositories to leave out. The React island renders it as-is; all placement logic is server-side
 and unit-tested.
+
+`GET /api/dashboards/:id/inbox` takes the same query string and returns the inbox's cards by
+group id, with the same repositories, label catalogue and sort. Each endpoint answers `404` for
+a dashboard of the other type.
 
 `GET /api/unmatched?hide=` returns `{ "items", "status" }`: the open items of the global users
 that no dashboard places in a cell, most recently updated first, as cards shaped like the

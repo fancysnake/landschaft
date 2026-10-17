@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 
-import type { Board } from "../../lib/types";
+import type { Epic, Facets } from "../../lib/types";
 
 import { type Filters, TEXT_FILTER_KEYS } from "../../lib/schema";
 
 interface Props {
   filters: Filters;
-  board: Board;
+  /** The view it filters; only a board has epics. */
+  board: Facets & { epics?: Epic[] };
   onChange(patch: Partial<Filters>): void;
 }
 
@@ -58,7 +59,7 @@ export function FilterBar({ filters, board, onChange }: Props) {
           </option>
         ))}
       </select>
-      {board.epics.length > 0 && (
+      {board.epics && board.epics.length > 0 && (
         <select
           aria-label="Epic"
           value={filters.epic ?? ""}

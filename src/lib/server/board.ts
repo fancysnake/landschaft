@@ -7,9 +7,11 @@ import {
   parseFilter,
 } from "../filter";
 import {
+  type BoardDashboard,
   type BoardQuery,
   type Dashboard,
   type Filters,
+  type InboxDashboard,
   OTHER_LOOKS_AT,
   type SortBy,
   type SortDir,
@@ -19,6 +21,8 @@ import {
   type Card,
   cellKey,
   type Epic,
+  type Facets,
+  type Inbox,
   type Issue,
   issueKey,
   type IssueRef,
@@ -154,7 +158,7 @@ function openItemsOf(
 }
 
 /** The dashboard's filter, swimlanes and columns, parsed. */
-function compileGrid(dashboard: Dashboard) {
+function compileGrid(dashboard: BoardDashboard) {
   return {
     scope: parseFilter(dashboard.filter),
     swimlanes: compile(dashboard.swimlanes),
@@ -173,6 +177,64 @@ function placeOnGrid<L extends Group, C extends Group>(
   const columns = placeIn(axes.columns, hit, OTHER_LOOKS_AT.columns);
   return lanes.length > 0 && columns.length > 0 ? { lanes, columns } : null;
 }
+
+/** The first inbox group `item` matches; `other` holds in each, as no earlier one took it. */
+function firstGroup<G extends Group>(
+  groups: G[],
+  item: FilterItem,
+  viewer: string | null,
+): G | undefined {
+  return groups.find((group) => matchesFilter(group.node, item, { viewer, other: true }));
+}
+
+/** Whether the dashboard shows `item` in a cell or group, blocked-hiding aside. */
+function placer(dashboard: Dashboard, viewer: string | null): (item: FilterItem) => boolean {
+  const scope = parseFilter(dashboard.filter);
+  const inScope = (item: FilterItem) => matchesFilter(scope, item, { viewer });
+  if (dashboard.type === "inbox") {
+    const groups = compile(dashboard.groups);
+    return (item) => inScope(item) && firstGroup(groups, item, viewer) !== undefined;
+  }
+  const grid = compileGrid(dashboard);
+  return (item) => inScope(item) && placeOnGrid(grid, item, viewer) !== null;
+}
+
+/**
+ * The repo chips, filter options and sort of a view over `open`; the repos it shows; and which
+ * labels its cards keep: all but the `structural` ones, compared by `labelKey`.
+ */
+function facetsOf(
+  open: { issue: Issue }[],
+  structural: Set<string>,
+  filters: BoardQuery,
+  sort: Dashboard["sort"],
+): { facets: Facets; shownRepos: Set<string>; shown: (label: { name: string }) => boolean } {
+  const present = [...new Set(open.map(({ issue }) => issue.repo))].toSorted();
+  const shown = (label: { name: string }) => !structural.has(labelKey(label.name));
+  const assignees = new Set<string>();
+  /** First spelling seen of each label, by its `labelKey`. */
+  const labels = new Map<string, string>();
+  for (const { issue } of open) {
+    for (const assignee of issue.assignees) assignees.add(assignee.login);
+    for (const label of issue.labels.filter(shown)) {
+      const key = labelKey(label.name);
+      if (!labels.has(key)) labels.set(key, label.name);
+    }
+  }
+  return {
+    facets: {
+      repos: present,
+      assignees: [...assignees].toSorted(),
+      labels: [...labels.values()].toSorted(),
+      sort: { by: filters.sort ?? sort.by, dir: filters.dir ?? sort.dir },
+    },
+    shownRepos: new Set(present.filter((repo) => !filters.hide?.includes(repo))),
+    shown,
+  };
+}
+
+/** The labels `nodes` ask for, by `labelKey`. */
+const structuralOf = (nodes: (FilterNode | null)[]) => new Set(nodes.flatMap(askedLabels));
 
 /** `item` as a card showing `labels`. */
 const toCard = (item: Item, labels: LabelRef[], isEpic: boolean): Card => ({
@@ -208,8 +270,8 @@ export function scopedIssues(
 }
 
 /**
- * Cards for the open items of the global `users` in `issues` that no dashboard places in a
- * cell, outside the `hide` repos, most recently updated first. One a swimlane hides as blocked
+ * Cards for the open items of the global `users` in `issues` that no dashboard places in a cell
+ * or group, outside the `hide` repos, most recently updated first. One a swimlane hides as blocked
  * counts as placed.
  */
 export function unmatchedIssues(
@@ -219,12 +281,8 @@ export function unmatchedIssues(
   viewer: string | null = null,
   hide: readonly string[] = [],
 ): Card[] {
-  const grids = dashboards.map(compileGrid);
-  const placed = (item: Item) =>
-    grids.some(
-      (grid) =>
-        matchesFilter(grid.scope, item, { viewer }) && placeOnGrid(grid, item, viewer) !== null,
-    );
+  const placers = dashboards.map((dashboard) => placer(dashboard, viewer));
+  const placed = (item: Item) => placers.some((places) => places(item));
   // Hidden repos are dropped last: their items still count for `is:has-pr` and blockers.
   return openItemsOf(issues, users, viewer)
     .open.filter(({ issue, item }) => !hide.includes(issue.repo) && !placed(item))
@@ -237,7 +295,7 @@ export function unmatchedIssues(
  */
 export function buildBoard(
   issues: Issue[],
-  dashboard: Dashboard,
+  dashboard: BoardDashboard,
   filters: BoardQuery = {},
   users: string[] = [],
   starred: ReadonlySet<string> = new Set(),
@@ -247,29 +305,23 @@ export function buildBoard(
   const { scope } = axes;
   const { byKey, open } = openItemsOf(issues, users, viewer, scope);
   const wanted = issueFilter(filters, byKey);
-  const present = [...new Set(open.map(({ issue }) => issue.repo))].toSorted();
-  const repos = new Set(present.filter((repo) => !filters.hide?.includes(repo)));
   const epicLabel = dashboard.epicLabel && labelKey(dashboard.epicLabel);
-  // By `labelKey`, like every label comparison here.
-  const structural = new Set<string>([
-    ...askedLabels(scope),
-    ...[...axes.swimlanes, ...axes.columns].flatMap((group) => askedLabels(group.node)),
-    ...(epicLabel ? [epicLabel] : []),
+  const structural = structuralOf([
+    scope,
+    ...[...axes.swimlanes, ...axes.columns].map((group) => group.node),
   ]);
-  const shown = (label: { name: string }) => !structural.has(labelKey(label.name));
-  const sort = { by: filters.sort ?? dashboard.sort.by, dir: filters.dir ?? dashboard.sort.dir };
+  if (epicLabel) structural.add(epicLabel);
+  const { facets, shownRepos: repos, shown } = facetsOf(open, structural, filters, dashboard.sort);
+  const { sort } = facets;
 
   const board: Board = {
+    ...facets,
     cells: {},
     laneTotals: {},
     columnTotals: {},
     hiddenBlocked: {},
     epics: [],
     total: 0,
-    repos: present,
-    assignees: [],
-    labels: [],
-    sort,
   };
   for (const lane of dashboard.swimlanes) {
     board.laneTotals[lane.id] = 0;
@@ -278,17 +330,9 @@ export function buildBoard(
   }
   for (const column of dashboard.columns) board.columnTotals[column.id] = 0;
 
-  const assignees = new Set<string>();
-  /** First spelling seen of each label, by its `labelKey`. */
-  const labels = new Map<string, string>();
   const epicIssues: Issue[] = [];
 
   for (const { issue, item } of open) {
-    for (const assignee of issue.assignees) assignees.add(assignee.login);
-    for (const label of issue.labels.filter(shown)) {
-      const key = labelKey(label.name);
-      if (!labels.has(key)) labels.set(key, label.name);
-    }
     if (!repos.has(issue.repo)) continue;
 
     const isEpic =
@@ -335,7 +379,36 @@ export function buildBoard(
       progress: issue.subIssues.total > 0 ? issue.subIssues : null,
       starred: isStarred(issue),
     }));
-  board.assignees = [...assignees].toSorted();
-  board.labels = [...labels.values()].toSorted();
   return board;
+}
+
+/** Puts each of the dashboard's `scopedIssues` in the first group it matches, in sort order. */
+export function buildInbox(
+  issues: Issue[],
+  dashboard: InboxDashboard,
+  filters: BoardQuery = {},
+  users: string[] = [],
+  viewer: string | null = null,
+): Inbox {
+  const scope = parseFilter(dashboard.filter);
+  const groups = compile(dashboard.groups);
+  const { byKey, open } = openItemsOf(issues, users, viewer, scope);
+  const wanted = issueFilter(filters, byKey);
+  const structural = structuralOf([scope, ...groups.map((group) => group.node)]);
+  const { facets, shownRepos, shown } = facetsOf(open, structural, filters, dashboard.sort);
+  const cards = new Map<string, Card[]>(groups.map((group) => [group.id, []]));
+  let total = 0;
+  for (const { issue, item } of open) {
+    if (!shownRepos.has(issue.repo) || !wanted(issue)) continue;
+    const group = firstGroup(groups, item, viewer);
+    if (!group) continue;
+    cards.get(group.id)!.push(toCard(item, issue.labels.filter(shown), false));
+    total += 1;
+  }
+  const compare = compareBy(facets.sort.by, facets.sort.dir);
+  return {
+    ...facets,
+    groups: Object.fromEntries([...cards].map(([id, list]) => [id, list.toSorted(compare)])),
+    total,
+  };
 }

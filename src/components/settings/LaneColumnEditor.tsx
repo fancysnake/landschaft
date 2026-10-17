@@ -8,6 +8,7 @@ interface Group {
   name: string;
   filter: string;
   hideBlocked?: boolean;
+  collapsed?: boolean;
 }
 
 interface Props<T extends Group> {
@@ -17,8 +18,8 @@ interface Props<T extends Group> {
   create(id: string): T;
   /** Completed in filters. */
   offer: Offer;
-  /** Swimlanes get the "hide blocked" toggle. */
-  axis: Axis;
+  /** Swimlanes get the "hide blocked" toggle, inbox groups "start collapsed". */
+  axis: Axis | "groups";
 }
 
 function slug(name: string, taken: Set<string>): string {
@@ -57,9 +58,15 @@ export function LaneColumnEditor<T extends Group>({
       <div className="mb-2 flex items-baseline justify-between">
         <h3 className="font-medium">{title}</h3>
         <span className="text-xs text-neutral-500">
-          every matching entry shows the item · GitHub search syntax · empty = all ·{" "}
-          <code>other</code> = matched by no{" "}
-          {axis === "swimlanes" ? "lane above" : "column to the right"}
+          {axis === "groups" ? (
+            "the first matching group takes the item · GitHub search syntax · empty = all"
+          ) : (
+            <>
+              every matching entry shows the item · GitHub search syntax · empty = all ·{" "}
+              <code>other</code> = matched by no{" "}
+              {axis === "swimlanes" ? "lane above" : "column to the right"}
+            </>
+          )}
         </span>
       </div>
       <ol className="space-y-2">
@@ -82,6 +89,18 @@ export function LaneColumnEditor<T extends Group>({
                     }
                   />
                   hide blocked
+                </label>
+              )}
+              {axis === "groups" && (
+                <label className="mt-1 flex items-center gap-1 text-xs text-neutral-700">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(item.collapsed)}
+                    onChange={(event) =>
+                      replace(index, { ...item, collapsed: event.target.checked })
+                    }
+                  />
+                  start collapsed
                 </label>
               )}
             </div>
@@ -112,7 +131,7 @@ export function LaneColumnEditor<T extends Group>({
               <button
                 type="button"
                 className={button}
-                disabled={items.length === 1}
+                disabled={axis !== "groups" && items.length === 1}
                 onClick={() => onChange(items.filter((_, i) => i !== index))}
               >
                 remove
