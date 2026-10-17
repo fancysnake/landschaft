@@ -9,8 +9,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Added
 
-- An Unmatched view, linked from the index and each board header, lists the open items no
-  dashboard places in a cell; `GET /api/unmatched` serves it.
+- An Unmatched tab in the top bar lists the open items no dashboard places in a cell;
+  `GET /api/unmatched` serves it.
 
 ### Removed
 

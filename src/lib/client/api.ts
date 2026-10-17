@@ -6,7 +6,7 @@ import type {
   StarEpicRequest,
   SyncRequest,
 } from "../schema";
-import type { Board, LabelDef, SyncStatus, UnmatchedItem } from "../types";
+import type { Board, Card, LabelDef, SyncStatus } from "../types";
 
 export interface BoardResponse {
   dashboard: Dashboard;
@@ -15,7 +15,7 @@ export interface BoardResponse {
 }
 
 export interface UnmatchedResponse {
-  items: UnmatchedItem[];
+  items: Card[];
   status: SyncStatus;
 }
 

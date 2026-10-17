@@ -22,6 +22,7 @@ import {
   type Issue,
   issueKey,
   type IssueRef,
+  type LabelRef,
 } from "../types";
 
 /** A swimlane or column with its filter parsed; a null `node` matches everything. */
@@ -64,15 +65,15 @@ export function isBlocked(issue: Issue, byKey: Map<string, Issue>): boolean {
 
 const keyOf = (ref: { repo: string; number: number }): string => issueKey(ref.repo, ref.number);
 
+/** An issue with what filters test it on; see `itemsOf`. */
+type Item = Omit<Issue, "statuses"> & FilterItem;
+
 /**
  * An issue with what filters test it on: its statuses plus `is:has-pr` when an open PR closes
  * it, whether an open blocker holds it, and whether it blocks an open issue. Every open item in
  * `issues` counts, whoever's it is; one in a repo outside them is never seen.
  */
-export function itemsOf(
-  issues: Issue[],
-  byKey: Map<string, Issue>,
-): (issue: Issue) => Omit<Issue, "statuses"> & FilterItem {
+export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Issue) => Item {
   const opened = issues.filter((issue) => issue.state === "OPEN");
   const withPr = new Set(opened.flatMap((pr) => pr.linked.map(keyOf)));
   const blocking = new Set(opened.flatMap((issue) => issue.blockedBy.map(keyOf)));
@@ -129,18 +130,67 @@ function compareBy(by: SortBy, dir: SortDir) {
 const usersNode = (users: string[]): FilterNode | null =>
   users.length > 0 ? { type: "term", key: "user", values: users } : null;
 
-/** The swimlanes and columns `item` lands in; it is on the grid only when both are non-empty. */
+/**
+ * `issues` by key, and the open ones that one of the global `users` (empty for everyone)
+ * authored or is assigned to and that pass `scope`, each with its item.
+ */
+function openItemsOf(
+  issues: Issue[],
+  users: string[],
+  viewer: string | null,
+  scope: FilterNode | null = null,
+): { byKey: Map<string, Issue>; open: { issue: Issue; item: Item }[] } {
+  const byKey = new Map(issues.map((issue) => [keyOf(issue), issue]));
+  // From all of `issues`, not just the open ones.
+  const itemOf = itemsOf(issues, byKey);
+  const base = usersNode(users);
+  const open = issues.flatMap((issue) => {
+    if (issue.state !== "OPEN") return [];
+    const item = itemOf(issue);
+    const passes = matchesFilter(base, item, { viewer }) && matchesFilter(scope, item, { viewer });
+    return passes ? [{ issue, item }] : [];
+  });
+  return { byKey, open };
+}
+
+/** The dashboard's filter, swimlanes and columns, parsed. */
+function compileGrid(dashboard: Dashboard) {
+  return {
+    scope: parseFilter(dashboard.filter),
+    swimlanes: compile(dashboard.swimlanes),
+    columns: compile(dashboard.columns),
+  };
+}
+
+/** The swimlanes and columns `item` lands in, or null when it misses either. */
 function placeOnGrid<L extends Group, C extends Group>(
   axes: { swimlanes: L[]; columns: C[] },
   item: FilterItem,
   viewer: string | null,
-): { lanes: L[]; columns: C[] } {
+): { lanes: L[]; columns: C[] } | null {
   const hit = (node: FilterNode, other: boolean) => matchesFilter(node, item, { viewer, other });
-  return {
-    lanes: placeIn(axes.swimlanes, hit, OTHER_LOOKS_AT.swimlanes),
-    columns: placeIn(axes.columns, hit, OTHER_LOOKS_AT.columns),
-  };
+  const lanes = placeIn(axes.swimlanes, hit, OTHER_LOOKS_AT.swimlanes);
+  const columns = placeIn(axes.columns, hit, OTHER_LOOKS_AT.columns);
+  return lanes.length > 0 && columns.length > 0 ? { lanes, columns } : null;
 }
+
+/** `item` as a card showing `labels`. */
+const toCard = (item: Item, labels: LabelRef[], isEpic: boolean): Card => ({
+  key: keyOf(item),
+  kind: item.kind,
+  repo: item.repo,
+  number: item.number,
+  title: item.title,
+  url: item.url,
+  assignees: item.assignees,
+  labels,
+  progress: item.subIssues.total > 0 ? item.subIssues : null,
+  blocked: item.blocked,
+  isEpic,
+  statuses: item.statuses,
+  createdAt: item.createdAt,
+  updatedAt: item.updatedAt,
+});
 
 /**
  * The open items of the global repos' `issues` that one of the global `users` (empty for
@@ -153,48 +203,32 @@ export function scopedIssues(
   users: string[] = [],
   viewer: string | null = null,
 ): Issue[] {
-  const byKey = new Map(issues.map((issue) => [issueKey(issue.repo, issue.number), issue]));
-  // From all of `issues`, not just the open ones.
-  const itemOf = itemsOf(issues, byKey);
-  const scope = parseFilter(dashboard.filter);
-  const base = usersNode(users);
-  return issues.filter((issue) => {
-    if (issue.state !== "OPEN") return false;
-    const item = itemOf(issue);
-    return matchesFilter(base, item, { viewer }) && matchesFilter(scope, item, { viewer });
-  });
+  const { open } = openItemsOf(issues, users, viewer, parseFilter(dashboard.filter));
+  return open.map(({ issue }) => issue);
 }
 
 /**
- * The open items of the global `users` in `issues` that no dashboard places in a cell, most
- * recently updated first. One a swimlane hides as blocked counts as placed.
+ * Cards for the open items of the global `users` in `issues` that no dashboard places in a
+ * cell, outside the `hide` repos, most recently updated first. One a swimlane hides as blocked
+ * counts as placed.
  */
 export function unmatchedIssues(
   issues: Issue[],
   dashboards: Dashboard[],
   users: string[] = [],
   viewer: string | null = null,
-): Issue[] {
-  const byKey = new Map(issues.map((issue) => [issueKey(issue.repo, issue.number), issue]));
-  const itemOf = itemsOf(issues, byKey);
-  const base = usersNode(users);
-  const grids = dashboards.map((dashboard) => ({
-    scope: parseFilter(dashboard.filter),
-    swimlanes: compile(dashboard.swimlanes),
-    columns: compile(dashboard.columns),
-  }));
-  const placed = (item: FilterItem) =>
-    grids.some((grid) => {
-      if (!matchesFilter(grid.scope, item, { viewer })) return false;
-      const { lanes, columns } = placeOnGrid(grid, item, viewer);
-      return lanes.length > 0 && columns.length > 0;
-    });
-  return issues
-    .filter((issue) => {
-      if (issue.state !== "OPEN") return false;
-      const item = itemOf(issue);
-      return matchesFilter(base, item, { viewer }) && !placed(item);
-    })
+  hide: readonly string[] = [],
+): Card[] {
+  const grids = dashboards.map(compileGrid);
+  const placed = (item: Item) =>
+    grids.some(
+      (grid) =>
+        matchesFilter(grid.scope, item, { viewer }) && placeOnGrid(grid, item, viewer) !== null,
+    );
+  // Hidden repos are dropped last: their items still count for `is:has-pr` and blockers.
+  return openItemsOf(issues, users, viewer)
+    .open.filter(({ issue, item }) => !hide.includes(issue.repo) && !placed(item))
+    .map(({ item }) => toCard(item, item.labels, false))
     .toSorted(compareBy("updated", "desc"));
 }
 
@@ -209,14 +243,12 @@ export function buildBoard(
   starred: ReadonlySet<string> = new Set(),
   viewer: string | null = null,
 ): Board {
-  const byKey = new Map(issues.map((issue) => [issueKey(issue.repo, issue.number), issue]));
+  const axes = compileGrid(dashboard);
+  const { scope } = axes;
+  const { byKey, open } = openItemsOf(issues, users, viewer, scope);
   const wanted = issueFilter(filters, byKey);
-  const itemOf = itemsOf(issues, byKey);
-  const scope = parseFilter(dashboard.filter);
-  const open = scopedIssues(issues, dashboard, users, viewer);
-  const present = [...new Set(open.map((issue) => issue.repo))].toSorted();
+  const present = [...new Set(open.map(({ issue }) => issue.repo))].toSorted();
   const repos = new Set(present.filter((repo) => !filters.hide?.includes(repo)));
-  const axes = { swimlanes: compile(dashboard.swimlanes), columns: compile(dashboard.columns) };
   const epicLabel = dashboard.epicLabel && labelKey(dashboard.epicLabel);
   // By `labelKey`, like every label comparison here.
   const structural = new Set<string>([
@@ -251,7 +283,7 @@ export function buildBoard(
   const labels = new Map<string, string>();
   const epicIssues: Issue[] = [];
 
-  for (const issue of open) {
+  for (const { issue, item } of open) {
     for (const assignee of issue.assignees) assignees.add(assignee.login);
     for (const label of issue.labels.filter(shown)) {
       const key = labelKey(label.name);
@@ -267,26 +299,11 @@ export function buildBoard(
 
     if (!wanted(issue)) continue;
 
-    const item = itemOf(issue);
-    const { statuses, blocked } = item;
-    const { lanes, columns } = placeOnGrid(axes, item, viewer);
-    if (lanes.length === 0 || columns.length === 0) continue;
-    const card: Card = {
-      key: issueKey(issue.repo, issue.number),
-      kind: issue.kind,
-      repo: issue.repo,
-      number: issue.number,
-      title: issue.title,
-      url: issue.url,
-      assignees: issue.assignees,
-      labels: issue.labels.filter(shown),
-      progress: issue.subIssues.total > 0 ? issue.subIssues : null,
-      blocked,
-      isEpic,
-      statuses,
-      createdAt: issue.createdAt,
-      updatedAt: issue.updatedAt,
-    };
+    const placed = placeOnGrid(axes, item, viewer);
+    if (!placed) continue;
+    const { lanes, columns } = placed;
+    const { blocked } = item;
+    const card = toCard(item, issue.labels.filter(shown), isEpic);
     let shownInAny = false;
     for (const lane of lanes) {
       if (lane.hideBlocked && blocked) {

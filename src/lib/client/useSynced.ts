@@ -12,7 +12,10 @@ export interface SyncedController<T> {
   load(): Promise<void>;
 }
 
-/** Loads with `get` whenever it changes, and again whenever a sync lands. */
+/**
+ * Loads with `get` whenever it changes, and again whenever a sync lands. `get` must keep its
+ * identity across renders (from `useCallback`, say); a new one each render reloads forever.
+ */
 export function useSynced<T extends { status: SyncStatus }>(
   get: () => Promise<T>,
 ): SyncedController<T> {

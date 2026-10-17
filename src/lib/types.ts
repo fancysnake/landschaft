@@ -127,9 +127,6 @@ export interface Board {
   sort: { by: SortBy; dir: SortDir };
 }
 
-/** An item no dashboard places, as the unmatched view lists it. */
-export type UnmatchedItem = Pick<Issue, "kind" | "repo" | "number" | "title" | "url" | "labels">;
-
 export function cellKey(laneId: string, colId: string): string {
   return `${laneId}:${colId}`;
 }

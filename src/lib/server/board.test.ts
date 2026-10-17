@@ -101,6 +101,29 @@ describe("unmatchedIssues", () => {
     expect(unmatched.map((issue) => issue.number)).toEqual([4, 2]);
   });
 
+  it("drops hidden repos after placement, so their items still count", () => {
+    const dashboard = {
+      ...DASHBOARD,
+      swimlanes: [{ id: "all", name: "All", filter: "", hideBlocked: false }],
+      columns: [
+        { id: "review", name: "Review", filter: "is:has-pr" },
+        { id: "blocking", name: "Blocking", filter: "is:blocking" },
+      ],
+    };
+    const lib = { repo: "acme/lib" };
+    const issues = [
+      makeIssue({ number: 1 }),
+      makeIssue({ number: 2 }),
+      makeIssue({ number: 3 }),
+      makeIssue({ number: 10, ...lib, kind: "pr", linked: [{ repo: REPO, number: 1 }] }),
+      makeIssue({ number: 11, ...lib, blockedBy: waitsOn(2), blockedByTotal: 1 }),
+    ];
+    const unmatched = (hide: string[]) =>
+      unmatchedIssues(issues, [dashboard], [], null, hide).map((card) => card.number);
+    expect(unmatched([])).toEqual([11, 10, 3]);
+    expect(unmatched(["acme/lib"])).toEqual([3]);
+  });
+
   it("lists every open item when no dashboard has a swimlane", () => {
     const dashboard = { ...DASHBOARD, swimlanes: [] };
     const unmatched = unmatchedIssues([makeIssue({ number: 1 })], [dashboard]);
