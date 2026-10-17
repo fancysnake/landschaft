@@ -46,6 +46,16 @@ A PR card shows a pill for each status that holds, whatever lane it is in: `conf
 opened the PR, as long as the PR is in one of the global repos; such an issue card shows a
 `PR open` pill. It drops once the PR is merged or closed.
 
+## Inbox
+
+An inbox dashboard lists its items instead of laying them out on a grid. Each group has a
+filter in the same language; an item lands in the **first** group it matches, so `other` (or an
+empty filter) in the last group catches the rest. An item no group takes is left out and shows
+on the Unmatched page. PRs and issues render the same way, in the dashboard's sort.
+
+Each group header shows its count and folds the group away on click; `collapsed` in the config
+sets how a group starts on every page load. An inbox has no epic strip.
+
 ## Filters
 
 With more than one global repository, chips in the top bar switch each on or off; `all` turns

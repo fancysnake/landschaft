@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { ConfigSchema } from "../schema";
+import { type BoardDashboard, ConfigSchema, type Dashboard } from "../schema";
 import { findDashboard, loadConfig, saveConfig } from "./config";
 
 const minimal = {
@@ -70,8 +70,16 @@ describe("config file", () => {
   });
 });
 
+/** `dashboard`, which the test expects to be a board. */
+function asBoard(dashboard: Dashboard | undefined): BoardDashboard {
+  if (dashboard?.type !== "board") throw new Error("expected a board");
+  return dashboard;
+}
+
 const parseDashboard = (extra: object) =>
-  ConfigSchema.parse({ dashboards: [{ ...minimal.dashboards[0]!, ...extra }] }).dashboards[0]!;
+  asBoard(
+    ConfigSchema.parse({ dashboards: [{ ...minimal.dashboards[0]!, ...extra }] }).dashboards[0],
+  );
 
 const lane = (group: object) =>
   parseDashboard({ swimlanes: [{ id: "a", name: "A", ...group }] }).swimlanes[0];
@@ -150,12 +158,12 @@ describe("config schema rules", () => {
       { id: "c", name: "C", filter: "" },
     ];
     const parsed = ConfigSchema.parse({ dashboards: [{ ...base, swimlanes, columns }] });
-    expect(parsed.dashboards[0]?.swimlanes.map((group) => group.filter)).toEqual([
+    expect(asBoard(parsed.dashboards[0]).swimlanes.map((group) => group.filter)).toEqual([
       "label:a",
       "other -(label:b)",
       "label:b",
     ]);
-    expect(parsed.dashboards[0]?.columns.map((column) => column.filter)).toEqual([
+    expect(asBoard(parsed.dashboards[0]).columns.map((column) => column.filter)).toEqual([
       "label:a",
       "other -(label:a)",
       "is:pr label:b",
@@ -215,7 +223,7 @@ describe("global scope migration", () => {
     const epic = ConfigSchema.parse({
       dashboards: [{ ...minimal.dashboards[1], epicLabel: "epic" }],
     });
-    expect(epic.dashboards[0]?.epicLabel).toBe("epic");
+    expect(asBoard(epic.dashboards[0]).epicLabel).toBe("epic");
     const slow = minimal.dashboards.map((d) => ({ ...d, refreshMinutes: 10 }));
     expect(ConfigSchema.parse({ dashboards: slow }).refreshMinutes).toBe(10);
   });
@@ -255,6 +263,48 @@ describe("global scope migration", () => {
     const config = ConfigSchema.parse({ dashboards: [current] });
     expect(config).toMatchObject({ repos: [], users: [], refreshMinutes: 5 });
     expect(config.dashboards[0]?.filter).toBe("");
+  });
+});
+
+describe("dashboard type", () => {
+  const inbox = {
+    type: "inbox",
+    id: "inbox",
+    name: "Inbox",
+    groups: [
+      { id: "fix", name: "Fix", filter: "is:pr is:ci:failed" },
+      { id: "rest", name: "Rest" },
+    ],
+  };
+
+  it("loads a dashboard without a type as a board", () => {
+    expect(ConfigSchema.parse(minimal).dashboards[0]?.type).toBe("board");
+  });
+
+  it("fills in an inbox, dropping board fields", () => {
+    const parsed = ConfigSchema.parse({ dashboards: [{ ...inbox, epicLabel: "epic" }] });
+    expect(parsed.dashboards[0]).toEqual({
+      type: "inbox",
+      id: "inbox",
+      name: "Inbox",
+      filter: "",
+      sort: { by: "updated", dir: "desc" },
+      groups: [
+        { id: "fix", name: "Fix", filter: "is:pr is:ci:failed", collapsed: false },
+        { id: "rest", name: "Rest", filter: "", collapsed: false },
+      ],
+    });
+  });
+
+  it("starts an inbox with no groups", () => {
+    const { groups: _, ...empty } = inbox;
+    expect(ConfigSchema.parse({ dashboards: [empty] }).dashboards[0]).toMatchObject({ groups: [] });
+  });
+
+  it("rejects duplicate group ids and unknown types", () => {
+    const twice = { ...inbox, groups: [inbox.groups[0], inbox.groups[0]] };
+    expect(() => ConfigSchema.parse({ dashboards: [twice] })).toThrow("ids must be unique");
+    expect(() => ConfigSchema.parse({ dashboards: [{ ...inbox, type: "heatmap" }] })).toThrow();
   });
 });
 

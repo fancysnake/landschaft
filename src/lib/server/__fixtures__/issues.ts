@@ -1,4 +1,4 @@
-import type { Dashboard } from "../../schema";
+import type { BoardDashboard } from "../../schema";
 import type { Issue } from "../../types";
 import type { Db } from "../db";
 
@@ -34,7 +34,8 @@ export function label(name: string): { name: string; color: string } {
   return { name, color: "cccccc" };
 }
 
-export const DASHBOARD: Dashboard = {
+export const DASHBOARD: BoardDashboard = {
+  type: "board",
   id: "main",
   name: "Main",
   filter: "",
