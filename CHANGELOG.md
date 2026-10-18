@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-10-18
+
+### Added
+
+- A CI job carries its branch's open PR labels: its card shows them, and `label:` and the label
+  filter match them.
+
 ## [4.0.0] - 2026-10-18
 
 ### Changed
@@ -239,7 +246,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v4.0.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v4.1.0...HEAD
+[4.1.0]: https://github.com/fancysnake/landschaft/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/fancysnake/landschaft/compare/v3.0.0...v4.0.0
 [3.0.0]: https://github.com/fancysnake/landschaft/compare/v2.0.0...v3.0.0
 [2.0.0]: https://github.com/fancysnake/landschaft/compare/v1.0.0...v2.0.0

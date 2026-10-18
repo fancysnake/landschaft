@@ -1,5 +1,5 @@
 import type { PullStatusLabel } from "../../lib/status";
-import type { Card, CiJobCard, IssueItemCard } from "../../lib/types";
+import type { Card, CiJobCard, IssueItemCard, LabelRef } from "../../lib/types";
 
 import { labelStyle, relativeTime, repoShortName } from "../../lib/client/labels";
 import { ProgressBar } from "./ProgressBar";
@@ -19,6 +19,24 @@ const cardClass = (accent: string, surface = "border-neutral-200 bg-white") =>
 const metaRow = "mb-1 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500";
 
 const titleLink = "leading-snug font-medium text-neutral-900 hover:underline";
+
+function Labels({ labels }: { labels: LabelRef[] }) {
+  return (
+    labels.length > 0 && (
+      <div className="mt-1.5 flex flex-wrap gap-1">
+        {labels.map((label) => (
+          <span
+            key={label.name}
+            style={labelStyle(label.color)}
+            className="rounded-full px-1.5 text-[0.6875rem] leading-4"
+          >
+            {label.name}
+          </span>
+        ))}
+      </div>
+    )
+  );
+}
 
 function CiJobItem({ card, showRepo }: { card: CiJobCard; showRepo: boolean }) {
   return (
@@ -46,6 +64,7 @@ function CiJobItem({ card, showRepo }: { card: CiJobCard; showRepo: boolean }) {
       <a href={card.url} target="_blank" rel="noreferrer" className={titleLink}>
         {card.workflow ? `${card.workflow} / ${card.name}` : card.name}
       </a>
+      <Labels labels={card.labels} />
     </article>
   );
 }
@@ -113,19 +132,7 @@ function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean 
       <a href={card.url} target="_blank" rel="noreferrer" className={titleLink}>
         {card.title}
       </a>
-      {card.labels.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap gap-1">
-          {card.labels.map((label) => (
-            <span
-              key={label.name}
-              style={labelStyle(label.color)}
-              className="rounded-full px-1.5 text-[0.6875rem] leading-4"
-            >
-              {label.name}
-            </span>
-          ))}
-        </div>
-      )}
+      <Labels labels={card.labels} />
       {card.progress && (
         <div
           className="mt-2 flex items-center gap-2"
