@@ -252,7 +252,13 @@ function firstGroup<G extends Group>(
   return groups.find((group) => matchesFilter(group.node, item, { viewer, other: true }));
 }
 
-/** Whether the dashboard shows `item` in a cell or group, blocked-hiding aside. */
+/** An issue with the board's `epicLabel`, a `labelKey`. */
+const isEpicOf = (item: FilterItem, epicLabel: string | undefined): boolean =>
+  item.kind === "issue" &&
+  epicLabel !== undefined &&
+  item.labels.some((label) => labelKey(label.name) === epicLabel);
+
+/** Whether the dashboard shows `item` in a cell, group or epic strip, blocked-hiding aside. */
 function placer(dashboard: Dashboard, viewer: string | null): (item: FilterItem) => boolean {
   const passes = inScope([], viewer, parseFilter(dashboard.filter));
   if (dashboard.type === "inbox") {
@@ -260,7 +266,9 @@ function placer(dashboard: Dashboard, viewer: string | null): (item: FilterItem)
     return (item) => passes(item) && firstGroup(groups, item, viewer) !== undefined;
   }
   const grid = compileGrid(dashboard);
-  return (item) => passes(item) && placeOnGrid(grid, item, viewer) !== null;
+  const epicLabel = dashboard.epicLabel && labelKey(dashboard.epicLabel);
+  return (item) =>
+    passes(item) && (isEpicOf(item, epicLabel) || placeOnGrid(grid, item, viewer) !== null);
 }
 
 /**
@@ -445,10 +453,7 @@ export function buildBoard(
   for (const { issue, item } of open) {
     if (filters.hide?.includes(issue.repo)) continue;
 
-    const isEpic =
-      issue.kind === "issue" &&
-      epicLabel !== undefined &&
-      issue.labels.some((label) => labelKey(label.name) === epicLabel);
+    const isEpic = isEpicOf(item, epicLabel);
     if (isEpic) epicIssues.push(issue);
 
     if (wanted(item, keyOf(issue), `${issue.number} ${issue.title}`))

@@ -115,6 +115,16 @@ describe("unmatchedItems", () => {
     expect(unmatched.map(numberOf)).toEqual([4, 2]);
   });
 
+  it("counts an epic in a board's strip as placed", () => {
+    const board = { ...DASHBOARD, columns: [{ id: "doing", name: "Doing", filter: "label:x" }] };
+    const issues = [
+      makeIssue({ number: 1, labels: [label("Epic")] }),
+      makeIssue({ number: 2, kind: "pr", labels: [label("epic")] }),
+      makeIssue({ number: 3 }),
+    ];
+    expect(unmatchedItems(issues, [board]).items.map(numberOf)).toEqual([3, 2]);
+  });
+
   it("drops hidden repos after placement, so their items still count", () => {
     const dashboard = {
       ...DASHBOARD,
