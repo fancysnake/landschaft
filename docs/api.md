@@ -26,9 +26,10 @@ and unit-tested.
 group id, with the same repositories, label catalogue and sort. Each endpoint answers `404` for
 a dashboard of the other type.
 
-`GET /api/unmatched?hide=` returns `{ "items", "status" }`: the open items of the global users
-that no dashboard places in a cell or inbox group, most recently updated first, as cards shaped
-like the board's with every label. `hide` works as on the board.
+`GET /api/unmatched?hide=&filter=` returns `{ "items", "offer", "status" }`: the open items of
+the global users that no dashboard places in a cell or inbox group, most recently updated first,
+as cards shaped like the board's with every label. `hide` works as on the board; `filter` takes a
+dashboard filter expression; `offer` holds the repos, labels and users the filter box suggests.
 
 `POST /api/dashboards/:id/starred-epics` with `{ "epic": "owner/repo#12", "starred": true }`
 marks the epic as in active development (`false` clears the mark) and returns the dashboard's
