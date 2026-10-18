@@ -77,8 +77,10 @@ export const api = {
       `/api/dashboards/${encodeURIComponent(dashboardId)}/board?${params}`,
     );
   },
-  unmatched: (hide: string[]) =>
-    request<UnmatchedResponse>(`/api/unmatched?hide=${encodeURIComponent(hide.join(","))}`),
+  unmatched: (hide: string[], filter: string) =>
+    request<UnmatchedResponse>(
+      `/api/unmatched?${new URLSearchParams({ hide: hide.join(","), filter })}`,
+    ),
   version: () => request<SyncStatus>("/api/version"),
   sync: (body: Partial<SyncRequest>) =>
     request<SyncResponse>("/api/sync", { method: "POST", body: JSON.stringify(body) }),

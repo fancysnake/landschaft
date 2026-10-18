@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { askedLabels, type FilterNode } from "../filter";
+import { askedLabels, type FilterNode, parseFilter } from "../filter";
 import { type Card, cellKey } from "../types";
 import { DASHBOARD, label, makeIssue, makeJob, REPO } from "./__fixtures__/issues";
 import { buildBoard, compile, isBlocked, placeIn, scopedIssues, unmatchedItems } from "./board";
@@ -132,6 +132,13 @@ describe("unmatchedItems", () => {
     const dashboard = { ...DASHBOARD, swimlanes: [] };
     const unmatched = unmatchedItems([makeIssue({ number: 1 })], [dashboard]);
     expect(unmatched.map(numberOf)).toEqual([1]);
+  });
+
+  it("keeps only the items that pass the filter", () => {
+    const dashboard = { ...DASHBOARD, swimlanes: [] };
+    const issues = [makeIssue({ number: 1 }), makeIssue({ number: 2, kind: "pr" })];
+    const unmatched = unmatchedItems(issues, [dashboard], [], null, [], [], parseFilter("is:pr"));
+    expect(unmatched.map(numberOf)).toEqual([2]);
   });
 });
 

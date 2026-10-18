@@ -272,8 +272,8 @@ export function scopedIssues(
 
 /**
  * Cards for the open items of the global `users` in `issues` that no dashboard places in a
- * cell, and of their failed CI `jobs`, outside the `hide` repos, most recently updated first. One
- * a swimlane hides as blocked counts as placed.
+ * cell, and of their failed CI `jobs`, outside the `hide` repos and passing `filter`, most recently
+ * updated first. One a swimlane hides as blocked counts as placed.
  */
 export function unmatchedItems(
   issues: Issue[],
@@ -282,6 +282,7 @@ export function unmatchedItems(
   viewer: string | null = null,
   hide: readonly string[] = [],
   jobs: CiJob[] = [],
+  filter: FilterNode | null = null,
 ): Card[] {
   const grids = dashboards.map(compileGrid);
   const placed = (item: FilterItem) =>
@@ -289,7 +290,8 @@ export function unmatchedItems(
       (grid) =>
         matchesFilter(grid.scope, item, { viewer }) && placeOnGrid(grid, item, viewer) !== null,
     );
-  const missed = ({ item }: { item: FilterItem }) => !hide.includes(item.repo) && !placed(item);
+  const missed = ({ item }: { item: FilterItem }) =>
+    !hide.includes(item.repo) && matchesFilter(filter, item, { viewer }) && !placed(item);
   // Hidden repos are dropped last: their items still count for `is:has-pr` and blockers.
   return [
     ...openItemsOf(issues, users, viewer)
