@@ -636,6 +636,13 @@ describe("CI jobs", () => {
     expect(shownJobs({ hide: [REPO] })).toEqual([]);
   });
 
+  it("filters by job name, which hides every issue, and lists the names", () => {
+    const issues = [makeIssue({ number: 1 })];
+    const board = buildBoard(issues, DASHBOARD, { job: "lint" }, [], new Set(), null, jobs);
+    expect(keys(board.cells[cell("rest", "todo")])).toEqual(["acme/app:fix/y:CI/lint"]);
+    expect(board.jobs).toEqual(["lint", "test"]);
+  });
+
   it("lists a job no dashboard places as unmatched", () => {
     const issuesOnly = { ...DASHBOARD, filter: "-is:ci-job" };
     const unmatched = unmatchedIssues([], [issuesOnly], ["bob"], null, [], jobs);

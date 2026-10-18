@@ -73,6 +73,21 @@ export function FilterBar({ filters, board, onChange }: Props) {
           ))}
         </select>
       )}
+      {board.jobs.length > 0 && (
+        <select
+          aria-label="CI job"
+          value={filters.job ?? ""}
+          onChange={(event) => onChange({ job: event.target.value || undefined })}
+          className={select}
+        >
+          <option value="">Any CI job</option>
+          {board.jobs.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+      )}
       <span className="ml-auto flex items-center gap-1 text-sm text-neutral-600">
         Sort
         <select

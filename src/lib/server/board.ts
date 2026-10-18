@@ -150,9 +150,10 @@ function relatedTo(epicKey: string, byKey: Map<string, Issue>): Set<string> {
 
 /**
  * Text, assignee, label and epic filters as one predicate; an unset filter passes
- * everything.
+ * everything, and the job filter passes no issue.
  */
 function issueFilter(filters: Filters, byKey: Map<string, Issue>): (issue: Issue) => boolean {
+  if (filters.job) return () => false;
   const query = filters.q?.trim().toLowerCase();
   const related = filters.epic ? relatedTo(filters.epic, byKey) : null;
   const wantedLabel = filters.label && labelKey(filters.label);
@@ -163,11 +164,16 @@ function issueFilter(filters: Filters, byKey: Map<string, Issue>): (issue: Issue
     (!related || related.has(keyOf(issue)));
 }
 
-/** The text filter over a job's name and branch; assignee, label and epic filters pass none. */
+/**
+ * The text filter over a job's name and branch, and the job filter over its name; assignee,
+ * label and epic filters pass none.
+ */
 function jobFilter(filters: Filters): (job: CiJob) => boolean {
   if (filters.assignee || filters.label || filters.epic) return () => false;
   const query = filters.q?.trim().toLowerCase();
-  return (job) => !query || `${job.name} ${job.branch}`.toLowerCase().includes(query);
+  return (job) =>
+    (!query || `${job.name} ${job.branch}`.toLowerCase().includes(query)) &&
+    (!filters.job || job.name === filters.job);
 }
 
 function compareBy(by: SortBy, dir: SortDir) {
@@ -344,6 +350,7 @@ export function buildBoard(
     repos: present,
     assignees: [],
     labels: [],
+    jobs: [],
     sort,
   };
   for (const lane of dashboard.swimlanes) {
@@ -357,6 +364,7 @@ export function buildBoard(
   /** First spelling seen of each label, by its `labelKey`. */
   const labels = new Map<string, string>();
   const epicIssues: Issue[] = [];
+  const jobNames = new Set<string>();
 
   /** Puts `card` in every cell `item` lands in, and counts it once if it shows in any. */
   const put = (item: FilterItem, card: Card) => {
@@ -396,6 +404,7 @@ export function buildBoard(
     if (wanted(issue)) put(item, toCard(item, issue.labels.filter(shown), isEpic));
   }
   for (const { job, item } of openJobs) {
+    jobNames.add(job.name);
     if (repos.has(job.repo) && wantedJob(job)) put(item, jobCard(job));
   }
 
@@ -416,5 +425,6 @@ export function buildBoard(
     }));
   board.assignees = [...assignees].toSorted();
   board.labels = [...labels.values()].toSorted();
+  board.jobs = [...jobNames].toSorted();
   return board;
 }

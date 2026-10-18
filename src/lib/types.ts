@@ -155,6 +155,8 @@ export interface Board {
   repos: string[];
   assignees: string[];
   labels: string[];
+  /** Names of the failed CI jobs among the dashboard's items. */
+  jobs: string[];
   sort: { by: SortBy; dir: SortDir };
 }
 

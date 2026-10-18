@@ -61,8 +61,8 @@ top of main stays off. `author:` and `user:` match those commit authors.
 `is:ci-job` picks the jobs, `name:` and `branch:` match job and branch names (any case,
 `a|b` for either), and `is:has-pr` holds when an open PR comes from the branch. A catch-all
 swimlane or column takes jobs like any other item; `-is:ci-job` in a dashboard's filter keeps
-them off it. The search box matches job and branch names; the assignee, label and epic
-filters hide jobs.
+them off it. The search box matches job and branch names, and the CI job filter picks jobs by
+name and hides issues; the assignee, label and epic filters hide jobs.
 
 Each sync first reads the head commit status of every branch, then fetches jobs and commit
 authors for the failing ones alone. It looks at the head commit only, so a job that skipped
