@@ -27,8 +27,8 @@ group id, with the same repositories, label catalogue and sort. Each endpoint an
 a dashboard of the other type.
 
 `GET /api/unmatched?hide=` returns `{ "items", "status" }`: the open items of the global users
-that no dashboard places in a cell, most recently updated first, as cards shaped like the
-board's with every label. `hide` works as on the board.
+that no dashboard places in a cell or inbox group, most recently updated first, as cards shaped
+like the board's with every label. `hide` works as on the board.
 
 `POST /api/dashboards/:id/starred-epics` with `{ "epic": "owner/repo#12", "starred": true }`
 marks the epic as in active development (`false` clears the mark) and returns the dashboard's

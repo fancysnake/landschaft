@@ -1,6 +1,6 @@
 import type {
   BoardDashboard,
-  BoardQuery,
+  ViewQuery,
   Config,
   Filters,
   InboxDashboard,
@@ -76,16 +76,16 @@ export function filtersToQuery(filters: Filters): string {
   return params.toString();
 }
 
-function viewUrl(dashboardId: string, view: "board" | "inbox", { hide, ...filters }: BoardQuery) {
+function viewUrl(dashboardId: string, view: "board" | "inbox", { hide, ...filters }: ViewQuery) {
   const params = new URLSearchParams(filtersToQuery(filters));
   if (hide?.length) params.set("hide", hide.join(","));
   return `/api/dashboards/${encodeURIComponent(dashboardId)}/${view}?${params}`;
 }
 
 export const api = {
-  board: (dashboardId: string, query: BoardQuery) =>
+  board: (dashboardId: string, query: ViewQuery) =>
     request<BoardResponse>(viewUrl(dashboardId, "board", query)),
-  inbox: (dashboardId: string, query: BoardQuery) =>
+  inbox: (dashboardId: string, query: ViewQuery) =>
     request<InboxResponse>(viewUrl(dashboardId, "inbox", query)),
   unmatched: (hide: string[]) =>
     request<UnmatchedResponse>(`/api/unmatched?hide=${encodeURIComponent(hide.join(","))}`),

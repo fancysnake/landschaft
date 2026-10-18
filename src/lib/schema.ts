@@ -298,8 +298,8 @@ export type Filters = { [K in TextFilterKey]?: string } & {
   dir?: SortDir;
 };
 
-/** What the board endpoint takes: the URL filters plus the repos hidden in this browser. */
-export type BoardQuery = Filters & {
+/** What the view endpoints take: the URL filters plus the repos hidden in this browser. */
+export type ViewQuery = Filters & {
   /** Repos switched off in the nav, kept per browser. */
   hide?: string[];
 };
@@ -315,8 +315,8 @@ const repoList = z
   .optional()
   .transform((value) => value?.split(",").filter(Boolean));
 
-/** The board query string; empty strings count as "not set". */
-export const BoardQuerySchema: z.ZodType<BoardQuery, Record<string, unknown>> = z.object({
+/** The view endpoints' query string; empty strings count as "not set". */
+export const ViewQuerySchema: z.ZodType<ViewQuery, Record<string, unknown>> = z.object({
   ...(Object.fromEntries(TEXT_FILTER_KEYS.map((key) => [key, optionalText])) as Record<
     TextFilterKey,
     typeof optionalText

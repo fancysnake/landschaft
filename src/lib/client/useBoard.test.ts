@@ -2,7 +2,7 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
-import type { BoardQuery } from "../schema";
+import type { ViewQuery } from "../schema";
 
 import { api, type BoardResponse } from "./api";
 import { type BoardController, useBoard } from "./useBoard";
@@ -19,18 +19,18 @@ const response = () => ({ status: { version: 1 } }) as BoardResponse;
 
 const roots: Root[] = [];
 
-async function renderBoard(initial: BoardQuery) {
+async function renderBoard(initial: ViewQuery) {
   const root = createRoot(document.createElement("div"));
   roots.push(root);
   const result: { current: BoardController | null } = { current: null };
   const report = (board: BoardController) => {
     result.current = board;
   };
-  function Probe({ filters }: { filters: BoardQuery }) {
+  function Probe({ filters }: { filters: ViewQuery }) {
     report(useBoard("main", filters));
     return null;
   }
-  const render = (filters: BoardQuery) =>
+  const render = (filters: ViewQuery) =>
     act(async () => root.render(createElement(Probe, { filters })));
   await render(initial);
   return { result, render };

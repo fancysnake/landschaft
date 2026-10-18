@@ -1,63 +1,48 @@
-import { Fragment, useMemo } from "react";
+import { Fragment } from "react";
 
 import { useBoard } from "../../lib/client/useBoard";
-import { useHiddenRepos } from "../../lib/client/useHiddenRepos";
-import { useUrlFilters } from "../../lib/client/useUrlFilters";
+import { useViewRequest } from "../../lib/client/useViewRequest";
 import { cellKey } from "../../lib/types";
-import { ErrorBanner } from "../ErrorBanner";
 import { EpicStrip } from "./EpicStrip";
-import { FilterBar } from "./FilterBar";
 import { IssueCard } from "./IssueCard";
+import { ViewShell } from "./ViewShell";
 
 interface Props {
   dashboardId: string;
 }
 
 export default function Board({ dashboardId }: Props) {
-  const [filters, updateFilters] = useUrlFilters();
-  const [hidden] = useHiddenRepos();
-  const request = useMemo(() => ({ ...filters, hide: hidden }), [filters, hidden]);
-  const { data, error, loading, setEpicStarred, dismissError } = useBoard(dashboardId, request);
+  const view = useViewRequest();
+  const { data, error, setEpicStarred, dismissError } = useBoard(dashboardId, view.request);
 
   if (!data) {
-    return <p className="p-6 text-sm text-neutral-500">{loading ? "Loading board…" : error}</p>;
+    return <p className="p-6 text-sm text-neutral-500">{error ?? "Loading board…"}</p>;
   }
   const { dashboard, board } = data;
   const showRepo = board.repos.length > 1;
 
   return (
-    <div className="flex h-full flex-col gap-3 p-4">
-      <header className="flex flex-wrap items-center gap-4">
-        <h1 className="text-lg font-semibold">
-          {dashboard.name}
-          <span className="ml-2 text-sm font-normal text-neutral-500">
-            {board.total} issues
-            {dashboard.filter && (
-              <code title="Dashboard filter" className="ml-2 text-xs">
-                {dashboard.filter}
-              </code>
-            )}
-          </span>
-        </h1>
-      </header>
-
-      {error && <ErrorBanner error={error} onDismiss={dismissError} />}
-      {board.repos.length > 0 && board.repos.every((repo) => hidden.includes(repo)) && (
-        <p className="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600">
-          Every repository with items on this board is switched off in the bar above.
-        </p>
-      )}
-
-      {dashboard.epicLabel && (
-        <EpicStrip
-          epics={board.epics}
-          active={filters.epic}
-          onSelect={(key) => updateFilters({ epic: key })}
-          onSetStarred={(key, starred) => void setEpicStarred(key, starred)}
-        />
-      )}
-      <FilterBar filters={filters} board={board} onChange={updateFilters} />
-
+    <ViewShell
+      view={view}
+      dashboard={dashboard}
+      facets={board}
+      count={`${board.total} issues`}
+      where="on this board"
+      error={error}
+      onDismissError={dismissError}
+      epics={board.epics}
+      above={
+        dashboard.epicLabel && (
+          <EpicStrip
+            epics={board.epics}
+            active={view.filters.epic}
+            onSelect={(key) => view.updateFilters({ epic: key })}
+            onSetStarred={(key, starred) => void setEpicStarred(key, starred)}
+          />
+        )
+      }
+      className="h-full"
+    >
       <div className="min-h-0 flex-1 overflow-auto">
         <div
           className="grid gap-2"
@@ -102,6 +87,6 @@ export default function Board({ dashboardId }: Props) {
           ))}
         </div>
       </div>
-    </div>
+    </ViewShell>
   );
 }

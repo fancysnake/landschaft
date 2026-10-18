@@ -9,8 +9,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Added
 
-- An Unmatched tab in the top bar lists the open items no dashboard places in a cell;
-  `GET /api/unmatched` serves it.
+- An Unmatched tab in the top bar lists the open items no dashboard places in a cell or inbox
+  group; `GET /api/unmatched` serves it.
 - A dashboard `type`, `board` or `inbox`, chosen in Settings; dashboards without one load as
   boards.
 - Inbox dashboards list PRs and issues in groups, each item in the first group whose filter it

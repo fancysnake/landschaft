@@ -2,9 +2,11 @@ import type { Offer } from "../../lib/filter";
 import type { LabelDef } from "../../lib/types";
 
 import {
+  type BoardDashboard,
   type Dashboard,
   dashboardFilterError,
   type DashboardType,
+  type InboxDashboard,
   type SortBy,
   type SortDir,
   withType,
@@ -65,77 +67,113 @@ export function DashboardEditor({ dashboard, onChange, catalog, offer }: Props) 
         />
       </Field>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {dashboard.type === "board" && (
-          <Field
-            group
-            label="Epic label"
-            hint="Issues with this label appear in the epic strip with sub-issue progress."
+      <Field label="Default sort">
+        <div className="flex gap-2">
+          <select
+            value={dashboard.sort.by}
+            onChange={(event) =>
+              patch({ sort: { ...dashboard.sort, by: event.target.value as SortBy } })
+            }
+            className={input}
           >
-            <LabelPicker
-              single
-              value={dashboard.epicLabel ? [dashboard.epicLabel] : []}
-              onChange={([epicLabel]) => onChange({ ...dashboard, epicLabel })}
-              options={catalog}
-              placeholder="none"
-            />
-          </Field>
-        )}
-        <Field label="Default sort">
-          <div className="flex gap-2">
-            <select
-              value={dashboard.sort.by}
-              onChange={(event) =>
-                patch({ sort: { ...dashboard.sort, by: event.target.value as SortBy } })
-              }
-              className={input}
-            >
-              <option value="updated">updated</option>
-              <option value="created">created</option>
-            </select>
-            <select
-              value={dashboard.sort.dir}
-              onChange={(event) =>
-                patch({ sort: { ...dashboard.sort, dir: event.target.value as SortDir } })
-              }
-              className={input}
-            >
-              <option value="desc">newest first</option>
-              <option value="asc">oldest first</option>
-            </select>
-          </div>
-        </Field>
-      </div>
+            <option value="updated">updated</option>
+            <option value="created">created</option>
+          </select>
+          <select
+            value={dashboard.sort.dir}
+            onChange={(event) =>
+              patch({ sort: { ...dashboard.sort, dir: event.target.value as SortDir } })
+            }
+            className={input}
+          >
+            <option value="desc">newest first</option>
+            <option value="asc">oldest first</option>
+          </select>
+        </div>
+      </Field>
 
       {dashboard.type === "board" ? (
-        <>
-          <LaneColumnEditor
-            title="Swimlanes"
-            items={dashboard.swimlanes}
-            onChange={(swimlanes) => onChange({ ...dashboard, swimlanes })}
-            create={(id) => ({ id, name: "New lane", filter: "", hideBlocked: false })}
-            offer={offer}
-            axis="swimlanes"
-          />
-          <LaneColumnEditor
-            title="Columns"
-            items={dashboard.columns}
-            onChange={(columns) => onChange({ ...dashboard, columns })}
-            create={(id) => ({ id, name: "New column", filter: "" })}
-            offer={offer}
-            axis="columns"
-          />
-        </>
+        <BoardFields dashboard={dashboard} onChange={onChange} catalog={catalog} offer={offer} />
       ) : (
-        <LaneColumnEditor
-          title="Groups"
-          items={dashboard.groups}
-          onChange={(groups) => onChange({ ...dashboard, groups })}
-          create={(id) => ({ id, name: "New group", filter: "", collapsed: false })}
-          offer={offer}
-          axis="groups"
-        />
+        <InboxFields dashboard={dashboard} onChange={onChange} offer={offer} />
       )}
     </div>
+  );
+}
+
+/** How a swimlane's or column's filter combines, `other` looking at `others`. */
+const gridHint = (others: string) => (
+  <>
+    every matching entry shows the item · GitHub search syntax · empty = all · <code>other</code> =
+    matched by no {others}
+  </>
+);
+
+function BoardFields({
+  dashboard,
+  onChange,
+  catalog,
+  offer,
+}: Omit<Props, "dashboard" | "onChange"> & {
+  dashboard: BoardDashboard;
+  onChange(dashboard: BoardDashboard): void;
+}) {
+  return (
+    <>
+      <Field
+        group
+        label="Epic label"
+        hint="Issues with this label appear in the epic strip with sub-issue progress."
+      >
+        <LabelPicker
+          single
+          value={dashboard.epicLabel ? [dashboard.epicLabel] : []}
+          onChange={([epicLabel]) => onChange({ ...dashboard, epicLabel })}
+          options={catalog}
+          placeholder="none"
+        />
+      </Field>
+      <LaneColumnEditor
+        title="Swimlanes"
+        items={dashboard.swimlanes}
+        onChange={(swimlanes) => onChange({ ...dashboard, swimlanes })}
+        create={(id) => ({ id, name: "New lane", filter: "", hideBlocked: false })}
+        offer={offer}
+        hint={gridHint("lane above")}
+        minItems={1}
+        flag={{ key: "hideBlocked", label: "hide blocked" }}
+      />
+      <LaneColumnEditor
+        title="Columns"
+        items={dashboard.columns}
+        onChange={(columns) => onChange({ ...dashboard, columns })}
+        create={(id) => ({ id, name: "New column", filter: "" })}
+        offer={offer}
+        hint={gridHint("column to the right")}
+        minItems={1}
+      />
+    </>
+  );
+}
+
+function InboxFields({
+  dashboard,
+  onChange,
+  offer,
+}: Pick<Props, "offer"> & {
+  dashboard: InboxDashboard;
+  onChange(dashboard: InboxDashboard): void;
+}) {
+  return (
+    <LaneColumnEditor
+      title="Groups"
+      items={dashboard.groups}
+      onChange={(groups) => onChange({ ...dashboard, groups })}
+      create={(id) => ({ id, name: "New group", filter: "", collapsed: false })}
+      offer={offer}
+      hint="the first matching group takes the item · GitHub search syntax · empty = all"
+      minItems={0}
+      flag={{ key: "collapsed", label: "start collapsed" }}
+    />
   );
 }

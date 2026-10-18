@@ -8,7 +8,7 @@ import {
 } from "../filter";
 import {
   type BoardDashboard,
-  type BoardQuery,
+  type ViewQuery,
   type Dashboard,
   type Filters,
   type InboxDashboard,
@@ -199,18 +199,13 @@ function placer(dashboard: Dashboard, viewer: string | null): (item: FilterItem)
   return (item) => inScope(item) && placeOnGrid(grid, item, viewer) !== null;
 }
 
-/**
- * The repo chips, filter options and sort of a view over `open`; the repos it shows; and which
- * labels its cards keep: all but the `structural` ones, compared by `labelKey`.
- */
+/** The repo chips, filter options and sort of a view over `open`, offering the `shown` labels. */
 function facetsOf(
   open: { issue: Issue }[],
-  structural: Set<string>,
-  filters: BoardQuery,
+  shown: (label: { name: string }) => boolean,
+  filters: ViewQuery,
   sort: Dashboard["sort"],
-): { facets: Facets; shownRepos: Set<string>; shown: (label: { name: string }) => boolean } {
-  const present = [...new Set(open.map(({ issue }) => issue.repo))].toSorted();
-  const shown = (label: { name: string }) => !structural.has(labelKey(label.name));
+): Facets {
   const assignees = new Set<string>();
   /** First spelling seen of each label, by its `labelKey`. */
   const labels = new Map<string, string>();
@@ -222,19 +217,24 @@ function facetsOf(
     }
   }
   return {
-    facets: {
-      repos: present,
-      assignees: [...assignees].toSorted(),
-      labels: [...labels.values()].toSorted(),
-      sort: { by: filters.sort ?? sort.by, dir: filters.dir ?? sort.dir },
-    },
-    shownRepos: new Set(present.filter((repo) => !filters.hide?.includes(repo))),
-    shown,
+    repos: [...new Set(open.map(({ issue }) => issue.repo))].toSorted(),
+    assignees: [...assignees].toSorted(),
+    labels: [...labels.values()].toSorted(),
+    sort: { by: filters.sort ?? sort.by, dir: filters.dir ?? sort.dir },
   };
 }
 
-/** The labels `nodes` ask for, by `labelKey`. */
-const structuralOf = (nodes: (FilterNode | null)[]) => new Set(nodes.flatMap(askedLabels));
+/**
+ * Whether a card keeps a label: all but the ones `nodes` ask for and the `epicLabel`, compared
+ * by `labelKey`.
+ */
+function labelShown(
+  nodes: (FilterNode | null)[],
+  epicLabel?: string,
+): (label: { name: string }) => boolean {
+  const structural = new Set([...nodes.flatMap(askedLabels), ...(epicLabel ? [epicLabel] : [])]);
+  return (label) => !structural.has(labelKey(label.name));
+}
 
 /** `item` as a card showing `labels`. */
 const toCard = (item: Item, labels: LabelRef[], isEpic: boolean): Card => ({
@@ -296,7 +296,7 @@ export function unmatchedIssues(
 export function buildBoard(
   issues: Issue[],
   dashboard: BoardDashboard,
-  filters: BoardQuery = {},
+  filters: ViewQuery = {},
   users: string[] = [],
   starred: ReadonlySet<string> = new Set(),
   viewer: string | null = null,
@@ -306,12 +306,11 @@ export function buildBoard(
   const { byKey, open } = openItemsOf(issues, users, viewer, scope);
   const wanted = issueFilter(filters, byKey);
   const epicLabel = dashboard.epicLabel && labelKey(dashboard.epicLabel);
-  const structural = structuralOf([
-    scope,
-    ...[...axes.swimlanes, ...axes.columns].map((group) => group.node),
-  ]);
-  if (epicLabel) structural.add(epicLabel);
-  const { facets, shownRepos: repos, shown } = facetsOf(open, structural, filters, dashboard.sort);
+  const shown = labelShown(
+    [scope, ...[...axes.swimlanes, ...axes.columns].map((group) => group.node)],
+    epicLabel,
+  );
+  const facets = facetsOf(open, shown, filters, dashboard.sort);
   const { sort } = facets;
 
   const board: Board = {
@@ -333,7 +332,7 @@ export function buildBoard(
   const epicIssues: Issue[] = [];
 
   for (const { issue, item } of open) {
-    if (!repos.has(issue.repo)) continue;
+    if (filters.hide?.includes(issue.repo)) continue;
 
     const isEpic =
       issue.kind === "issue" &&
@@ -386,7 +385,7 @@ export function buildBoard(
 export function buildInbox(
   issues: Issue[],
   dashboard: InboxDashboard,
-  filters: BoardQuery = {},
+  filters: ViewQuery = {},
   users: string[] = [],
   viewer: string | null = null,
 ): Inbox {
@@ -394,12 +393,12 @@ export function buildInbox(
   const groups = compile(dashboard.groups);
   const { byKey, open } = openItemsOf(issues, users, viewer, scope);
   const wanted = issueFilter(filters, byKey);
-  const structural = structuralOf([scope, ...groups.map((group) => group.node)]);
-  const { facets, shownRepos, shown } = facetsOf(open, structural, filters, dashboard.sort);
+  const shown = labelShown([scope, ...groups.map((group) => group.node)]);
+  const facets = facetsOf(open, shown, filters, dashboard.sort);
   const cards = new Map<string, Card[]>(groups.map((group) => [group.id, []]));
   let total = 0;
   for (const { issue, item } of open) {
-    if (!shownRepos.has(issue.repo) || !wanted(issue)) continue;
+    if (filters.hide?.includes(issue.repo) || !wanted(issue)) continue;
     const group = firstGroup(groups, item, viewer);
     if (!group) continue;
     cards.get(group.id)!.push(toCard(item, issue.labels.filter(shown), false));
