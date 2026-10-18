@@ -58,7 +58,7 @@ users': one of them authored a commit the branch has on top of the default branc
 nothing on top, one of its last three commits. A branch with nothing but a bot's commit on
 top of main stays off. `author:` and `user:` match those commit authors.
 
-`is:ci-job` picks the jobs, `name:` and `branch:` match job and branch names (any case,
+`is:ci-job` picks the jobs, `job:` and `branch:` match job and branch names (any case,
 `a|b` for either), and `is:has-pr` holds when an open PR comes from the branch. A catch-all
 swimlane or column takes jobs like any other item; `-is:ci-job` in a dashboard's filter keeps
 them off it. The search box matches job and branch names, and the CI job filter picks jobs by

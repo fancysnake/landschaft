@@ -103,7 +103,8 @@ export interface CiJob {
 }
 
 export function ciJobKey(job: Pick<CiJob, "repo" | "branch" | "workflow" | "name">): string {
-  return `${job.repo}:${job.branch}:${job.workflow ?? ""}/${job.name}`;
+  // Fields apart, since a workflow or job name may hold any separator.
+  return JSON.stringify([job.repo, job.branch, job.workflow, job.name]);
 }
 
 export type Card = IssueItemCard | CiJobCard;

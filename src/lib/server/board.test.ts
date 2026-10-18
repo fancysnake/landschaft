@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 import { askedLabels, type FilterNode } from "../filter";
 import { type Card, cellKey } from "../types";
 import { DASHBOARD, label, makeIssue, makeJob, REPO } from "./__fixtures__/issues";
-import { buildBoard, compile, isBlocked, placeIn, scopedIssues, unmatchedIssues } from "./board";
+import { buildBoard, compile, isBlocked, placeIn, scopedIssues, unmatchedItems } from "./board";
 
 /** An issue card's number, a CI job card's key. */
-const numberOf = (card: Card) => (card.kind === "ci-job" ? card.key : card.number);
+const numberOf = (card: Card) => (card.kind === "ci-job" ? card.name : card.number);
 const asIssue = (card: Card | undefined) => (card?.kind === "ci-job" ? undefined : card);
 
 const cell = (laneId: string, colId: string) => cellKey(laneId, colId);
@@ -74,7 +74,7 @@ describe("scopedIssues", () => {
   });
 });
 
-describe("unmatchedIssues", () => {
+describe("unmatchedItems", () => {
   it("lists the users' open items no dashboard places, newest first", () => {
     const narrow = {
       ...DASHBOARD,
@@ -101,7 +101,7 @@ describe("unmatchedIssues", () => {
       }),
       makeIssue({ number: 8, author: "bob" }),
     ];
-    const unmatched = unmatchedIssues(issues, [narrow, wide], ["@me"], "me");
+    const unmatched = unmatchedItems(issues, [narrow, wide], ["@me"], "me");
     expect(unmatched.map(numberOf)).toEqual([4, 2]);
   });
 
@@ -123,14 +123,14 @@ describe("unmatchedIssues", () => {
       makeIssue({ number: 11, ...lib, blockedBy: waitsOn(2), blockedByTotal: 1 }),
     ];
     const unmatched = (hide: string[]) =>
-      unmatchedIssues(issues, [dashboard], [], null, hide).map(numberOf);
+      unmatchedItems(issues, [dashboard], [], null, hide).map(numberOf);
     expect(unmatched([])).toEqual([11, 10, 3]);
     expect(unmatched(["acme/lib"])).toEqual([3]);
   });
 
   it("lists every open item when no dashboard has a swimlane", () => {
     const dashboard = { ...DASHBOARD, swimlanes: [] };
-    const unmatched = unmatchedIssues([makeIssue({ number: 1 })], [dashboard]);
+    const unmatched = unmatchedItems([makeIssue({ number: 1 })], [dashboard]);
     expect(unmatched.map(numberOf)).toEqual([1]);
   });
 });
@@ -592,19 +592,16 @@ const jobs = [
   makeJob({ name: "test" }),
   makeJob({ name: "lint", branch: "fix/y", authors: ["bob"] }),
 ];
-const keys = (cards: Card[] | undefined) => cards?.map((card) => card.key);
-/** Keys of the job cards in the catch-all cell under `filters`. */
+/** Names of the job cards in the catch-all cell under `filters`. */
 const shownJobs = (filters: Parameters<typeof buildBoard>[2]) =>
-  keys(buildBoard([], DASHBOARD, filters, [], new Set(), null, jobs).cells[cell("rest", "todo")]);
+  buildBoard([], DASHBOARD, filters, [], new Set(), null, jobs).cells[cell("rest", "todo")]?.map(
+    numberOf,
+  );
 
 describe("CI jobs", () => {
   it("lands on the grid like an issue, sorted with the issues", () => {
     const board = buildBoard([makeIssue({ number: 1 })], DASHBOARD, {}, [], new Set(), null, jobs);
-    expect(board.cells[cell("rest", "todo")]?.map(numberOf)).toEqual([
-      "acme/app:feat/x:CI/test",
-      "acme/app:fix/y:CI/lint",
-      1,
-    ]);
+    expect(board.cells[cell("rest", "todo")]?.map(numberOf)).toEqual(["test", "lint", 1]);
     expect(board.total).toBe(3);
     expect(board.cells[cell("rest", "todo")]?.[0]).toMatchObject({
       kind: "ci-job",
@@ -615,37 +612,39 @@ describe("CI jobs", () => {
 
   it("shows only the jobs of branches the global users have commits in", () => {
     const mine = buildBoard([], DASHBOARD, {}, ["@me"], new Set(), "bob", jobs);
-    expect(keys(mine.cells[cell("rest", "todo")])).toEqual(["acme/app:fix/y:CI/lint"]);
+    expect(mine.cells[cell("rest", "todo")]?.map(numberOf)).toEqual(["lint"]);
   });
 
   it("follows the dashboard filter and the swimlanes", () => {
     const lanes = [
-      { id: "ci", name: "CI", filter: "is:ci-job name:lint", hideBlocked: false },
+      { id: "ci", name: "CI", filter: "is:ci-job job:lint", hideBlocked: false },
       { id: "rest", name: "Rest", filter: "other", hideBlocked: false },
     ];
     const board = buildBoard([], { ...DASHBOARD, swimlanes: lanes }, {}, [], new Set(), null, jobs);
-    expect(keys(board.cells[cell("ci", "todo")])).toEqual(["acme/app:fix/y:CI/lint"]);
+    expect(board.cells[cell("ci", "todo")]?.map(numberOf)).toEqual(["lint"]);
     const scoped = { ...DASHBOARD, filter: "-is:ci-job" };
     expect(buildBoard([], scoped, {}, [], new Set(), null, jobs).total).toBe(0);
   });
 
   it("matches the text filter on job and branch names, and no other filter", () => {
-    expect(shownJobs({ q: "FIX/" })).toEqual(["acme/app:fix/y:CI/lint"]);
-    expect(shownJobs({ q: "test" })).toEqual(["acme/app:feat/x:CI/test"]);
+    expect(shownJobs({ q: "FIX/" })).toEqual(["lint"]);
+    expect(shownJobs({ q: "test" })).toEqual(["test"]);
     expect(shownJobs({ label: "bug" })).toEqual([]);
+    expect(shownJobs({ assignee: "bob" })).toEqual([]);
+    expect(shownJobs({ epic: "acme/app#1" })).toEqual([]);
     expect(shownJobs({ hide: [REPO] })).toEqual([]);
   });
 
-  it("filters by job name, which hides every issue, and lists the names", () => {
+  it("filters by job name in any case, which hides every issue, and lists the names", () => {
     const issues = [makeIssue({ number: 1 })];
-    const board = buildBoard(issues, DASHBOARD, { job: "lint" }, [], new Set(), null, jobs);
-    expect(keys(board.cells[cell("rest", "todo")])).toEqual(["acme/app:fix/y:CI/lint"]);
+    const board = buildBoard(issues, DASHBOARD, { job: "LINT" }, [], new Set(), null, jobs);
+    expect(board.cells[cell("rest", "todo")]?.map(numberOf)).toEqual(["lint"]);
     expect(board.jobs).toEqual(["lint", "test"]);
   });
 
   it("lists a job no dashboard places as unmatched", () => {
     const issuesOnly = { ...DASHBOARD, filter: "-is:ci-job" };
-    const unmatched = unmatchedIssues([], [issuesOnly], ["bob"], null, [], jobs);
-    expect(keys(unmatched)).toEqual(["acme/app:fix/y:CI/lint"]);
+    const unmatched = unmatchedItems([], [issuesOnly], ["bob"], null, [], jobs);
+    expect(unmatched.map(numberOf)).toEqual(["lint"]);
   });
 });

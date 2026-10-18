@@ -86,6 +86,19 @@ describe("toCiJobs", () => {
     expect(jobs.map(({ name, failedAt }) => [name, failedAt])).toEqual([["lint", later]]);
   });
 
+  it("tells apart jobs whose workflow and name join into the same path", () => {
+    const jobs = toCiJobs(
+      "acme/app",
+      "x",
+      branch([checkRun("c", "FAILURE", "a/b"), checkRun("b/c", "FAILURE", "a")]),
+      null,
+    );
+    expect(jobs.map(({ workflow, name }) => [workflow, name])).toEqual([
+      ["a/b", "c"],
+      ["a", "b/c"],
+    ]);
+  });
+
   it("skips check runs that have not finished, timestamps and all", () => {
     const jobs = toCiJobs(
       "acme/app",

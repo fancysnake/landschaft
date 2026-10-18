@@ -279,7 +279,7 @@ const KEYS = {
     "parent-issue": (item) => item.parent !== null,
     "sub-issues": (item) => item.subIssues.total > 0,
   }),
-  name: { holds: (value, item) => item.name !== null && same(item.name, value) },
+  job: { holds: (value, item) => item.name !== null && same(item.name, value) },
   branch: { holds: (value, item) => item.branch !== null && same(item.branch, value) },
   "parent-issue": {
     ...matching(ISSUE_REF, "owner/repo#number"),

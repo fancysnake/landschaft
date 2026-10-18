@@ -156,8 +156,8 @@ describe("matchesFilter", () => {
     });
     expect(fits("is:ci-job", job)).toBe(true);
     expect(fits("is:ci-job", item())).toBe(false);
-    expect(fits('name:"unit tests"|lint', job)).toBe(true);
-    expect(fits("name:lint", job)).toBe(false);
+    expect(fits('job:"unit tests"|lint', job)).toBe(true);
+    expect(fits("job:lint", job)).toBe(false);
     expect(fits("branch:FEAT/x", job)).toBe(true);
     expect(fits("branch:main", item())).toBe(false);
     expect(fits("is:has-pr", job)).toBe(true);

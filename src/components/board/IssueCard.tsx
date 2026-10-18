@@ -1,5 +1,5 @@
 import type { StatusLabel } from "../../lib/status";
-import type { Card, CiJobCard } from "../../lib/types";
+import type { Card, CiJobCard, IssueItemCard } from "../../lib/types";
 
 import { labelStyle, relativeTime, repoShortName } from "../../lib/client/labels";
 
@@ -26,11 +26,6 @@ const STATUS_PILLS: Record<StatusLabel, { text: string; title: string; className
     className: "bg-sky-100 text-sky-800",
   },
 };
-
-interface Props {
-  card: Card;
-  showRepo: boolean;
-}
 
 function CiJobItem({ card, showRepo }: { card: CiJobCard; showRepo: boolean }) {
   return (
@@ -67,8 +62,16 @@ function CiJobItem({ card, showRepo }: { card: CiJobCard; showRepo: boolean }) {
   );
 }
 
-export function IssueCard({ card, showRepo }: Props) {
-  if (card.kind === "ci-job") return <CiJobItem card={card} showRepo={showRepo} />;
+/** `card` as its kind shows. */
+export function CardView({ card, showRepo }: { card: Card; showRepo: boolean }) {
+  return card.kind === "ci-job" ? (
+    <CiJobItem card={card} showRepo={showRepo} />
+  ) : (
+    <IssueCard card={card} showRepo={showRepo} />
+  );
+}
+
+function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean }) {
   return (
     <article
       className={`rounded-md border border-l-4 p-2 text-sm shadow-xs ${

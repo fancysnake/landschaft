@@ -149,38 +149,30 @@ function relatedTo(epicKey: string, byKey: Map<string, Issue>): Set<string> {
 }
 
 /**
- * Text, assignee, label and epic filters as one predicate; an unset filter passes
- * everything, and the job filter passes no issue.
+ * Text, assignee, label, job and epic filters as one predicate over an item, its card `key` and
+ * the `text` the search box matches; an unset filter passes everything.
  */
-function issueFilter(filters: Filters, byKey: Map<string, Issue>): (issue: Issue) => boolean {
-  if (filters.job) return () => false;
+function barFilter(
+  filters: Filters,
+  byKey: Map<string, Issue>,
+): (item: FilterItem, key: string, text: string) => boolean {
   const query = filters.q?.trim().toLowerCase();
   const related = filters.epic ? relatedTo(filters.epic, byKey) : null;
   const wantedLabel = filters.label && labelKey(filters.label);
-  return (issue) =>
-    (!query || `${issue.number} ${issue.title}`.toLowerCase().includes(query)) &&
-    (!filters.assignee || issue.assignees.some((a) => a.login === filters.assignee)) &&
-    (!wantedLabel || issue.labels.some((l) => labelKey(l.name) === wantedLabel)) &&
-    (!related || related.has(keyOf(issue)));
-}
-
-/**
- * The text filter over a job's name and branch, and the job filter over its name; assignee,
- * label and epic filters pass none.
- */
-function jobFilter(filters: Filters): (job: CiJob) => boolean {
-  if (filters.assignee || filters.label || filters.epic) return () => false;
-  const query = filters.q?.trim().toLowerCase();
-  return (job) =>
-    (!query || `${job.name} ${job.branch}`.toLowerCase().includes(query)) &&
-    (!filters.job || job.name === filters.job);
+  const wantedJob = filters.job?.toLowerCase();
+  return (item, key, text) =>
+    (!query || text.toLowerCase().includes(query)) &&
+    (!filters.assignee || item.assignees.some((a) => a.login === filters.assignee)) &&
+    (!wantedLabel || item.labels.some((l) => labelKey(l.name) === wantedLabel)) &&
+    (!wantedJob || item.name?.toLowerCase() === wantedJob) &&
+    (!related || related.has(key));
 }
 
 function compareBy(by: SortBy, dir: SortDir) {
   const field = by === "created" ? "createdAt" : "updatedAt";
   const sign = dir === "asc" ? 1 : -1;
   // A CI job sorts by when it failed, by either field.
-  const at = (x: Card | Issue) => ("failedAt" in x ? x.failedAt : x[field]);
+  const at = (x: Card | Issue) => (x.kind === "ci-job" ? x.failedAt : x[field]);
   return (a: Card | Issue, b: Card | Issue): number => {
     const left = at(a);
     const right = at(b);
@@ -283,7 +275,7 @@ export function scopedIssues(
  * cell, and of their failed CI `jobs`, outside the `hide` repos, most recently updated first. One
  * a swimlane hides as blocked counts as placed.
  */
-export function unmatchedIssues(
+export function unmatchedItems(
   issues: Issue[],
   dashboards: Dashboard[],
   users: string[] = [],
@@ -326,8 +318,7 @@ export function buildBoard(
   const { scope } = axes;
   const { byKey, open } = openItemsOf(issues, users, viewer, scope);
   const openJobs = scopedJobs(jobs, users, viewer, scope);
-  const wanted = issueFilter(filters, byKey);
-  const wantedJob = jobFilter(filters);
+  const wanted = barFilter(filters, byKey);
   const present = [...new Set([...open, ...openJobs].map(({ item }) => item.repo))].toSorted();
   const repos = new Set(present.filter((repo) => !filters.hide?.includes(repo)));
   const epicLabel = dashboard.epicLabel && labelKey(dashboard.epicLabel);
@@ -401,11 +392,13 @@ export function buildBoard(
       issue.labels.some((label) => labelKey(label.name) === epicLabel);
     if (isEpic) epicIssues.push(issue);
 
-    if (wanted(issue)) put(item, toCard(item, issue.labels.filter(shown), isEpic));
+    if (wanted(item, keyOf(issue), `${issue.number} ${issue.title}`))
+      put(item, toCard(item, issue.labels.filter(shown), isEpic));
   }
   for (const { job, item } of openJobs) {
     jobNames.add(job.name);
-    if (repos.has(job.repo) && wantedJob(job)) put(item, jobCard(job));
+    if (repos.has(job.repo) && wanted(item, ciJobKey(job), `${job.name} ${job.branch}`))
+      put(item, jobCard(job));
   }
 
   const compare = compareBy(sort.by, sort.dir);
