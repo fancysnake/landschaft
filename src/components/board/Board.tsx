@@ -5,6 +5,7 @@ import { useViewRequest } from "../../lib/client/useViewRequest";
 import { cellKey } from "../../lib/types";
 import { EpicStrip } from "./EpicStrip";
 import { CardView } from "./IssueCard";
+import { TONE } from "./tone";
 import { ViewShell } from "./ViewShell";
 
 interface Props {
@@ -57,14 +58,14 @@ export default function Board({ dashboardId }: Props) {
               className="sticky top-0 z-10 flex items-center gap-2 rounded-lg border border-neutral-200 bg-white/90 px-3 py-1.5 text-sm font-semibold text-neutral-900 shadow-xs backdrop-blur"
             >
               {column.name}
-              <span className="pill bg-neutral-100 text-neutral-600 ring-neutral-200 tabular-nums">
+              <span className={`pill tabular-nums ${TONE.neutral}`}>
                 {board.columnTotals[column.id] ?? 0}
               </span>
             </div>
           ))}
           {dashboard.swimlanes.map((lane) => (
             <Fragment key={lane.id}>
-              <div className="sticky left-0 z-10 self-start rounded-lg border border-l-[3px] border-neutral-200 border-l-neutral-400 bg-white/90 px-3 py-2 text-sm shadow-xs backdrop-blur">
+              <div className="sticky left-0 z-10 self-start rounded-lg border border-neutral-200 bg-white/90 px-3 py-2 text-sm shadow-xs backdrop-blur">
                 <div className="font-semibold text-neutral-900">{lane.name}</div>
                 <div className="text-xs text-neutral-500 tabular-nums">
                   {board.laneTotals[lane.id] ?? 0} issues

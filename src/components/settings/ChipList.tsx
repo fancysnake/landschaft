@@ -58,15 +58,10 @@ export function ChipList({ items, onChange, schema, placeholder }: Props) {
           onChange={(event) => setText(event.target.value)}
           onKeyDown={keyDown}
           placeholder={placeholder}
-          className={`w-64 rounded-md border bg-white px-2.5 py-1 text-sm shadow-xs ${
-            invalid ? "border-red-400" : "border-neutral-300"
-          }`}
+          aria-invalid={Boolean(invalid)}
+          className="field w-64 aria-invalid:border-red-400"
         />
-        <button
-          type="button"
-          onClick={add}
-          className="btn border-neutral-300 bg-white shadow-xs hover:bg-neutral-50"
-        >
+        <button type="button" onClick={add} className="btn">
           Add
         </button>
         {invalid && <span className="self-center text-xs text-red-700">{invalid}</span>}

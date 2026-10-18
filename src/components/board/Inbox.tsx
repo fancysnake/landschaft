@@ -48,7 +48,7 @@ export default function Inbox({ dashboardId }: Props) {
           const cards = inbox.groups[group.id] ?? [];
           const collapsed = overrides[group.id] ?? group.collapsed;
           return (
-            <section key={group.id} className="panel overflow-hidden shadow-xs">
+            <section key={group.id} className="panel overflow-hidden">
               <button
                 type="button"
                 aria-expanded={!collapsed}
@@ -57,7 +57,7 @@ export default function Inbox({ dashboardId }: Props) {
               >
                 <span className="w-3 text-xs text-neutral-400">{collapsed ? "▸" : "▾"}</span>
                 {group.name}
-                <span className="font-normal text-neutral-400 tabular-nums">{cards.length}</span>
+                <span className="font-normal text-neutral-500 tabular-nums">{cards.length}</span>
               </button>
               {!collapsed && cards.length > 0 && (
                 <ul className="flex flex-col gap-2 border-t border-neutral-100 bg-neutral-50 p-2">

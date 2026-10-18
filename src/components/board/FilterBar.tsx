@@ -13,8 +13,6 @@ interface Props {
   onChange(patch: Partial<Filters>): void;
 }
 
-const select = "field";
-
 export function FilterBar({ filters, facets, epics, onChange }: Props) {
   const [text, setText] = useState(filters.q ?? "");
 
@@ -28,11 +26,19 @@ export function FilterBar({ filters, facets, epics, onChange }: Props) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      <input
+        type="search"
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        aria-label="Search"
+        placeholder="Search title, #number, job or branch"
+        className="field w-72 max-w-full"
+      />
       <select
         aria-label="Assignee"
         value={filters.assignee ?? ""}
         onChange={(event) => onChange({ assignee: event.target.value || undefined })}
-        className={select}
+        className="field"
       >
         <option value="">Any assignee</option>
         {facets.assignees.map((login) => (
@@ -45,7 +51,7 @@ export function FilterBar({ filters, facets, epics, onChange }: Props) {
         aria-label="Label"
         value={filters.label ?? ""}
         onChange={(event) => onChange({ label: event.target.value || undefined })}
-        className={select}
+        className="field"
       >
         <option value="">Any label</option>
         {facets.labels.map((name) => (
@@ -59,7 +65,7 @@ export function FilterBar({ filters, facets, epics, onChange }: Props) {
           aria-label="Epic"
           value={filters.epic ?? ""}
           onChange={(event) => onChange({ epic: event.target.value || undefined })}
-          className={`${select} max-w-72 truncate`}
+          className="field max-w-72 truncate"
         >
           <option value="">Any epic</option>
           {epics.map((epic) => (
@@ -74,7 +80,7 @@ export function FilterBar({ filters, facets, epics, onChange }: Props) {
           aria-label="CI job"
           value={filters.job ?? ""}
           onChange={(event) => onChange({ job: event.target.value || undefined })}
-          className={select}
+          className="field"
         >
           <option value="">Any CI job</option>
           {facets.jobs.map((name) => (
@@ -84,27 +90,22 @@ export function FilterBar({ filters, facets, epics, onChange }: Props) {
           ))}
         </select>
       )}
-      <input
-        type="search"
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        placeholder="Search title, #number, job or branch"
-        className={`${select} ml-auto w-72 max-w-full`}
-      />
-      <span className="flex items-center gap-2 text-sm text-neutral-500">
-        Sort
-        <select
-          value={facets.sort.by}
-          onChange={(event) => onChange({ sort: event.target.value as Filters["sort"] })}
-          className={select}
-        >
-          <option value="updated">updated</option>
-          <option value="created">created</option>
-        </select>
+      <span className="ml-auto flex items-center gap-2 text-sm text-neutral-500">
+        <label className="flex items-center gap-2">
+          Sort
+          <select
+            value={facets.sort.by}
+            onChange={(event) => onChange({ sort: event.target.value as Filters["sort"] })}
+            className="field"
+          >
+            <option value="updated">updated</option>
+            <option value="created">created</option>
+          </select>
+        </label>
         <button
           type="button"
           onClick={() => onChange({ dir: facets.sort.dir === "asc" ? "desc" : "asc" })}
-          className={`${select} hover:bg-neutral-50`}
+          className="field hover:bg-neutral-50"
           title="Toggle direction"
         >
           {facets.sort.dir === "asc" ? "↑ oldest first" : "↓ newest first"}

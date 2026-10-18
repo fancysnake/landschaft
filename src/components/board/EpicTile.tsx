@@ -1,5 +1,8 @@
 import type { Epic } from "../../lib/types";
 
+import { ProgressBar } from "./ProgressBar";
+import { TONE } from "./tone";
+
 interface Props {
   epic: Epic;
   selected: boolean;
@@ -46,17 +49,10 @@ export function EpicTile({ epic, selected, onToggle, onToggleStar }: Props) {
           >
             {epic.title}
           </span>
-          {epic.starred && (
-            <span className="pill shrink-0 bg-amber-50 text-amber-700 ring-amber-200">active</span>
-          )}
+          {epic.starred && <span className={`pill shrink-0 ${TONE.amber}`}>active</span>}
         </div>
         <div className="mt-1 flex items-center gap-2">
-          <div className="h-1 flex-1 overflow-hidden rounded-full bg-neutral-100">
-            <div
-              className="h-full rounded-full bg-emerald-500"
-              style={{ width: `${epic.progress?.percent ?? 0}%` }}
-            />
-          </div>
+          <ProgressBar percent={epic.progress?.percent ?? 0} />
           <span className="tabular-nums text-neutral-500">
             {epic.progress ? `${epic.progress.completed}/${epic.progress.total}` : "–"}
           </span>

@@ -42,16 +42,18 @@ export function ViewShell({
   return (
     <div className={`flex flex-col gap-4 p-5 ${className}`}>
       <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
-          <a href="/" className="font-normal text-neutral-400 hover:text-neutral-700">
-            Dashboards
-          </a>
-          <span className="mx-1.5 font-normal text-neutral-300">/</span>
-          {dashboard.name}
-        </h1>
-        <span className="rounded border border-neutral-300 px-1.5 text-[11px] font-medium tracking-wider text-neutral-500 uppercase">
-          {dashboard.type}
-        </span>
+        <div className="flex items-baseline">
+          <nav aria-label="Breadcrumb" className="text-2xl tracking-tight">
+            <a href="/" className="text-neutral-500 hover:text-neutral-700">
+              Dashboards
+            </a>
+            <span aria-hidden="true" className="mx-1.5 text-neutral-300">
+              /
+            </span>
+          </nav>
+          <h1 className="page-title">{dashboard.name}</h1>
+        </div>
+        <span className="pill text-neutral-500 ring-neutral-300">{dashboard.type}</span>
         <span className="text-sm text-neutral-500 tabular-nums">{count}</span>
         {dashboard.filter && (
           <code
@@ -65,7 +67,7 @@ export function ViewShell({
 
       {error && <ErrorBanner error={error} onDismiss={onDismissError} />}
       {facets.repos.length > 0 && facets.repos.every((repo) => hidden.includes(repo)) && (
-        <p className="panel px-3 py-2 text-sm text-neutral-600">
+        <p className="panel px-3 py-2 text-sm text-neutral-600 shadow-none">
           Every repository with items {where} is switched off in the bar above.
         </p>
       )}

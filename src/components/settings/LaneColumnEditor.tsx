@@ -38,9 +38,6 @@ function slug(name: string, taken: Set<string>): string {
   return candidate;
 }
 
-const button =
-  "rounded-md border border-neutral-200 bg-white px-1.5 text-xs leading-5 text-neutral-600 shadow-xs hover:bg-neutral-50 disabled:opacity-40";
-
 export function LaneColumnEditor<T extends Group>({
   title,
   items,
@@ -99,7 +96,7 @@ export function LaneColumnEditor<T extends Group>({
             <div className="flex gap-1">
               <button
                 type="button"
-                className={button}
+                className="btn btn-sm"
                 disabled={index === 0}
                 onClick={() => swap(index, index - 1)}
               >
@@ -107,7 +104,7 @@ export function LaneColumnEditor<T extends Group>({
               </button>
               <button
                 type="button"
-                className={button}
+                className="btn btn-sm"
                 disabled={index === items.length - 1}
                 onClick={() => swap(index, index + 1)}
               >
@@ -115,7 +112,7 @@ export function LaneColumnEditor<T extends Group>({
               </button>
               <button
                 type="button"
-                className={button}
+                className="btn btn-sm"
                 disabled={items.length <= minItems}
                 onClick={() => onChange(items.filter((_, i) => i !== index))}
               >

@@ -5,7 +5,10 @@ interface Props {
 
 export function ErrorBanner({ error, onDismiss }: Props) {
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 shadow-xs px-3 py-2 text-sm text-red-800">
+    <div
+      role="alert"
+      className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 shadow-xs px-3 py-2 text-sm text-red-800"
+    >
       <span className="flex-1">{error}</span>
       <button type="button" onClick={onDismiss} className="font-medium hover:underline">
         dismiss

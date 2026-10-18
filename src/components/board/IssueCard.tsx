@@ -2,39 +2,30 @@ import type { StatusLabel } from "../../lib/status";
 import type { Card, CiJobCard, IssueItemCard } from "../../lib/types";
 
 import { labelStyle, relativeTime, repoShortName } from "../../lib/client/labels";
+import { ProgressBar } from "./ProgressBar";
+import { TONE, type Tone } from "./tone";
 
-const RED = "bg-red-50 text-red-700 ring-red-200";
-const SKY = "bg-sky-50 text-sky-700 ring-sky-200";
-
-const STATUS_PILLS: Record<StatusLabel, { text: string; title: string; className: string }> = {
-  "is:conflicting": { text: "conflict", title: "Merge conflict", className: RED },
-  "is:ci:failed": { text: "CI ✗", title: "CI failed", className: RED },
-  "is:ci:running": {
-    text: "CI …",
-    title: "CI running",
-    className: "bg-amber-50 text-amber-700 ring-amber-200",
-  },
-  "is:unanswered": {
-    text: "comments",
-    title: "Unanswered review comments",
-    className: "bg-orange-50 text-orange-700 ring-orange-200",
-  },
-  "is:has-pr": { text: "PR open", title: "An open PR closes it", className: SKY },
+const STATUS_PILLS: Record<StatusLabel, { text: string; title: string; tone: Tone }> = {
+  "is:conflicting": { text: "conflict", title: "Merge conflict", tone: "red" },
+  "is:ci:failed": { text: "CI ✗", title: "CI failed", tone: "red" },
+  "is:ci:running": { text: "CI …", title: "CI running", tone: "amber" },
+  "is:unanswered": { text: "comments", title: "Unanswered review comments", tone: "orange" },
+  "is:has-pr": { text: "PR open", title: "An open PR closes it", tone: "sky" },
 };
 
-/** White card with a coloured bar on the left for its kind. */
-const cardClass = (accent: string) =>
-  `rounded-lg border border-neutral-200 border-l-[3px] bg-white px-3 py-2 text-sm shadow-xs transition-shadow hover:shadow-md ${accent}`;
+/** Card with a coloured bar on the left for its kind; white unless `surface` tints it. */
+const cardClass = (accent: string, surface = "border-neutral-200 bg-white") =>
+  `rounded-lg border border-l-[3px] px-3 py-2 text-sm shadow-xs ${surface} ${accent}`;
 
-const meta = "mb-1 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500";
+const metaRow = "mb-1 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500";
 
-const title = "leading-snug font-medium text-neutral-900 hover:underline";
+const titleLink = "leading-snug font-medium text-neutral-900 hover:underline";
 
 function CiJobItem({ card, showRepo }: { card: CiJobCard; showRepo: boolean }) {
   return (
     <article className={cardClass("border-l-orange-500")}>
-      <div className={meta}>
-        <span className={`pill ${RED}`}>CI ✗</span>
+      <div className={metaRow}>
+        <span className={`pill ${TONE.red}`}>CI ✗</span>
         <span className="font-mono text-[11px]">
           {showRepo && `${repoShortName(card.repo)}:`}
           {card.branch}
@@ -44,7 +35,7 @@ function CiJobItem({ card, showRepo }: { card: CiJobCard; showRepo: boolean }) {
             href={card.pr.url}
             target="_blank"
             rel="noreferrer"
-            className={`pill ${SKY} hover:underline`}
+            className={`pill ${TONE.sky} hover:underline`}
           >
             PR #{card.pr.number}
           </a>
@@ -53,7 +44,7 @@ function CiJobItem({ card, showRepo }: { card: CiJobCard; showRepo: boolean }) {
           failed {relativeTime(card.failedAt)}
         </span>
       </div>
-      <a href={card.url} target="_blank" rel="noreferrer" className={title}>
+      <a href={card.url} target="_blank" rel="noreferrer" className={titleLink}>
         {card.workflow ? `${card.workflow} / ${card.name}` : card.name}
       </a>
     </article>
@@ -72,31 +63,31 @@ export function CardView({ card, showRepo }: { card: Card; showRepo: boolean }) 
 function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean }) {
   return (
     <article
-      className={cardClass(
+      className={
         card.blocked
-          ? "border-l-red-500"
-          : card.isEpic
-            ? "border-l-violet-500"
-            : card.kind === "pr"
-              ? "border-l-sky-500"
-              : "border-l-emerald-500",
-      )}
+          ? cardClass("border-l-red-500", "border-red-200 bg-red-50/60")
+          : cardClass(
+              card.isEpic
+                ? "border-l-violet-500"
+                : card.kind === "pr"
+                  ? "border-l-sky-500"
+                  : "border-l-emerald-500",
+            )
+      }
     >
-      <div className={meta}>
+      <div className={metaRow}>
         <span className="font-mono text-[11px]">
           {showRepo ? `${repoShortName(card.repo)}#` : "#"}
           {card.number}
         </span>
-        {card.kind === "pr" && <span className={`pill ${SKY}`}>PR</span>}
-        {card.isEpic && (
-          <span className="pill bg-violet-50 text-violet-700 ring-violet-200">epic</span>
-        )}
-        {card.blocked && <span className={`pill ${RED}`}>blocked</span>}
+        {card.kind === "pr" && <span className={`pill ${TONE.sky}`}>PR</span>}
+        {card.isEpic && <span className={`pill ${TONE.violet}`}>epic</span>}
+        {card.blocked && <span className={`pill ${TONE.red}`}>blocked</span>}
         {card.statuses.map((status) => (
           <span
             key={status}
             title={STATUS_PILLS[status].title}
-            className={`pill ${STATUS_PILLS[status].className}`}
+            className={`pill ${TONE[STATUS_PILLS[status].tone]}`}
           >
             {STATUS_PILLS[status].text}
           </span>
@@ -115,7 +106,7 @@ function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean 
           </span>
         )}
       </div>
-      <a href={card.url} target="_blank" rel="noreferrer" className={title}>
+      <a href={card.url} target="_blank" rel="noreferrer" className={titleLink}>
         {card.title}
       </a>
       {card.labels.length > 0 && (
@@ -136,12 +127,7 @@ function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean 
           className="mt-2 flex items-center gap-2"
           title={`${card.progress.completed} of ${card.progress.total} sub-issues done`}
         >
-          <div className="h-1 flex-1 overflow-hidden rounded-full bg-neutral-100">
-            <div
-              className="h-full rounded-full bg-emerald-500"
-              style={{ width: `${card.progress.percent}%` }}
-            />
-          </div>
+          <ProgressBar percent={card.progress.percent} />
           <span className="text-[11px] text-neutral-500 tabular-nums">
             {card.progress.completed}/{card.progress.total}
           </span>

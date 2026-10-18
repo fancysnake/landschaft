@@ -16,13 +16,6 @@ export function Toggles({ label, options, selected, onChange }: Props) {
 
   return (
     <div role="group" aria-label={label} className="flex flex-wrap items-center gap-1.5">
-      <button
-        type="button"
-        onClick={() => onChange(allOn ? [] : options.map((option) => option.value))}
-        className="rounded-full px-2 text-xs font-medium text-neutral-500 hover:text-neutral-900"
-      >
-        {allOn ? "none" : "all"}
-      </button>
       {options.map((option) => {
         const on = selected.includes(option.value);
         return (
@@ -38,14 +31,21 @@ export function Toggles({ label, options, selected, onChange }: Props) {
             }
             className={`rounded-full border px-2.5 text-sm leading-6 transition-colors ${
               on
-                ? "border-neutral-900 bg-neutral-900 text-white hover:bg-neutral-700"
-                : "border-neutral-300 bg-white text-neutral-500 hover:border-neutral-500 hover:text-neutral-800"
+                ? "border-neutral-400 bg-neutral-100 text-neutral-900 hover:bg-neutral-200"
+                : "border-dashed border-neutral-300 bg-white text-neutral-500 line-through hover:border-neutral-500 hover:text-neutral-800"
             }`}
           >
             {option.label}
           </button>
         );
       })}
+      <button
+        type="button"
+        onClick={() => onChange(allOn ? [] : options.map((option) => option.value))}
+        className="rounded-full px-2 text-xs font-medium text-neutral-500 hover:text-neutral-900"
+      >
+        {allOn ? "none" : "all"}
+      </button>
     </div>
   );
 }

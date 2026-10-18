@@ -12,12 +12,10 @@ interface Props {
   repos: string[];
 }
 
-const link = (active: boolean, inactive = false) =>
-  `rounded-md px-2.5 py-1 text-sm transition-colors ${
-    active
-      ? "bg-neutral-900 font-medium text-white"
-      : `${inactive ? "text-neutral-400" : "text-neutral-600"} hover:bg-neutral-100 hover:text-neutral-900`
-  }`;
+const link = (inactive = false) =>
+  `nav-item px-2.5 py-1 ${inactive ? "text-neutral-400" : "text-neutral-600"} hover:bg-neutral-100 hover:text-neutral-900`;
+
+const current = (active: boolean) => (active ? "page" : undefined);
 
 /**
  * The dashboards, the repo chips every board follows, and the sync status with its buttons. A
@@ -41,7 +39,8 @@ export default function Nav({ path, dashboards, repos }: Props) {
             key={dashboard.id}
             href={`/d/${dashboard.id}`}
             title={inactive(dashboard) ? "No items in the repositories switched on" : undefined}
-            className={link(path === `/d/${dashboard.id}`, inactive(dashboard))}
+            aria-current={current(path === `/d/${dashboard.id}`)}
+            className={link(inactive(dashboard))}
           >
             {dashboard.name}
           </a>
@@ -50,7 +49,8 @@ export default function Nav({ path, dashboards, repos }: Props) {
           <a
             href="/unmatched"
             title="Open items no dashboard places"
-            className={link(path === "/unmatched")}
+            aria-current={current(path === "/unmatched")}
+            className={link()}
           >
             Unmatched
           </a>
@@ -65,7 +65,7 @@ export default function Nav({ path, dashboards, repos }: Props) {
               onDismissError={dismissError}
             />
           )}
-          <a href="/settings" className={link(path === "/settings")}>
+          <a href="/settings" aria-current={current(path === "/settings")} className={link()}>
             Settings
           </a>
         </div>

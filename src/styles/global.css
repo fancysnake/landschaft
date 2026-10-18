@@ -14,13 +14,26 @@
   }
 }
 
-/* Shape only, so a colour class next to them never fights over the same property. */
+/* Shape only: the colour comes from a `TONE` next to it. */
 @utility pill {
   @apply inline-flex items-center rounded px-1.5 text-[11px] leading-[18px] font-medium ring-1 ring-inset;
 }
 
+/* `btn`, `field` and `panel` carry a default look; variants below override it. */
 @utility btn {
-  @apply inline-flex items-center gap-1 rounded-md border px-3 py-1 text-sm font-medium transition-colors disabled:opacity-40;
+  @apply inline-flex items-center gap-1 rounded-md border border-neutral-300 bg-white px-3 py-1 text-sm font-medium text-neutral-800 shadow-xs transition-colors enabled:hover:bg-neutral-50 disabled:opacity-40;
+}
+
+@utility btn-primary {
+  @apply border-neutral-900 bg-neutral-900 text-white enabled:hover:bg-neutral-700;
+}
+
+@utility btn-danger {
+  @apply border-red-300 text-red-700 enabled:hover:bg-red-50;
+}
+
+@utility btn-sm {
+  @apply px-2 py-0.5 text-xs;
 }
 
 @utility field {
@@ -28,5 +41,23 @@
 }
 
 @utility panel {
-  @apply rounded-lg border border-neutral-200 bg-white;
+  @apply rounded-lg border border-neutral-200 bg-white shadow-xs;
+}
+
+@utility page-title {
+  @apply text-2xl font-semibold tracking-tight text-neutral-900;
+}
+
+/* Label over a section. */
+@utility eyebrow {
+  @apply text-sm font-semibold text-neutral-700;
+}
+
+/* The active look outranks a hover class next to it: the attribute selectors add specificity. */
+@utility nav-item {
+  @apply rounded-md text-sm transition-colors;
+
+  &[aria-current]:not([aria-current="false"]) {
+    @apply bg-neutral-900 font-medium text-white;
+  }
 }
