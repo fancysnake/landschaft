@@ -609,7 +609,7 @@ describe("CI jobs", () => {
     expect(board.cells[cell("rest", "todo")]?.[0]).toMatchObject({
       kind: "ci-job",
       branch: "feat/x",
-      updatedAt: "2026-02-15T00:00:00Z",
+      failedAt: "2026-02-15T00:00:00Z",
     });
   });
 

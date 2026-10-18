@@ -111,8 +111,6 @@ export type Card = IssueItemCard | CiJobCard;
 export interface CiJobCard extends Omit<CiJob, "authors"> {
   key: string;
   kind: "ci-job";
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface IssueItemCard {

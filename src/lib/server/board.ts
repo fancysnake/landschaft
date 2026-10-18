@@ -21,7 +21,6 @@ import {
   type CiJob,
   type CiJobCard,
   ciJobKey,
-  type Epic,
   type Issue,
   issueKey,
   type IssueRef,
@@ -88,7 +87,6 @@ export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Iss
     blocking: blocking.has(keyOf(issue)),
     name: null,
     branch: null,
-    hasPr: false,
   });
 }
 
@@ -99,14 +97,13 @@ const jobItem = (job: CiJob): FilterItem => ({
   authors: job.authors,
   assignees: [],
   labels: [],
-  statuses: [],
+  statuses: job.pr ? ["is:has-pr"] : [],
   parent: null,
   subIssues: { total: 0 },
   blocked: false,
   blocking: false,
   name: job.name,
   branch: job.branch,
-  hasPr: job.pr !== null,
 });
 
 const jobCard = (job: CiJob): CiJobCard => ({
@@ -119,8 +116,6 @@ const jobCard = (job: CiJob): CiJobCard => ({
   url: job.url,
   failedAt: job.failedAt,
   pr: job.pr,
-  createdAt: job.failedAt,
-  updatedAt: job.failedAt,
 });
 
 /** `jobs` that one of the global `users` (empty for everyone) has commits in and that pass `scope`. */
@@ -130,11 +125,10 @@ function scopedJobs(
   viewer: string | null,
   scope: FilterNode | null = null,
 ): { job: CiJob; item: FilterItem }[] {
-  const base = usersNode(users);
+  const passes = inScope(users, viewer, scope);
   return jobs.flatMap((job) => {
     const item = jobItem(job);
-    const passes = matchesFilter(base, item, { viewer }) && matchesFilter(scope, item, { viewer });
-    return passes ? [{ job, item }] : [];
+    return passes(item) ? [{ job, item }] : [];
   });
 }
 
@@ -179,9 +173,11 @@ function jobFilter(filters: Filters): (job: CiJob) => boolean {
 function compareBy(by: SortBy, dir: SortDir) {
   const field = by === "created" ? "createdAt" : "updatedAt";
   const sign = dir === "asc" ? 1 : -1;
-  return (a: Card | Epic | Issue, b: Card | Epic | Issue): number => {
-    const left = a[field as keyof typeof a] as string;
-    const right = b[field as keyof typeof b] as string;
+  // A CI job sorts by when it failed, by either field.
+  const at = (x: Card | Issue) => ("failedAt" in x ? x.failedAt : x[field]);
+  return (a: Card | Issue, b: Card | Issue): number => {
+    const left = at(a);
+    const right = at(b);
     return left < right ? -sign : left > right ? sign : 0;
   };
 }
@@ -189,6 +185,16 @@ function compareBy(by: SortBy, dir: SortDir) {
 /** Holds for items one of the global `users` (empty for everyone) authored or is assigned to. */
 const usersNode = (users: string[]): FilterNode | null =>
   users.length > 0 ? { type: "term", key: "user", values: users } : null;
+
+/** Holds for items one of the global `users` (empty for everyone) is in that pass `scope`. */
+function inScope(
+  users: string[],
+  viewer: string | null,
+  scope: FilterNode | null,
+): (item: FilterItem) => boolean {
+  const base = usersNode(users);
+  return (item) => matchesFilter(base, item, { viewer }) && matchesFilter(scope, item, { viewer });
+}
 
 /**
  * `issues` by key, and the open ones that one of the global `users` (empty for everyone)
@@ -203,12 +209,11 @@ function openItemsOf(
   const byKey = new Map(issues.map((issue) => [keyOf(issue), issue]));
   // From all of `issues`, not just the open ones.
   const itemOf = itemsOf(issues, byKey);
-  const base = usersNode(users);
+  const passes = inScope(users, viewer, scope);
   const open = issues.flatMap((issue) => {
     if (issue.state !== "OPEN") return [];
     const item = itemOf(issue);
-    const passes = matchesFilter(base, item, { viewer }) && matchesFilter(scope, item, { viewer });
-    return passes ? [{ issue, item }] : [];
+    return passes(item) ? [{ issue, item }] : [];
   });
   return { byKey, open };
 }

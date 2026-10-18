@@ -199,10 +199,9 @@ export interface FilterItem {
   blocked: boolean;
   /** Blocks an open issue. */
   blocking: boolean;
-  /** A CI job's name and branch, and whether an open PR comes from the branch; null and false otherwise. */
+  /** A CI job's name and branch; null otherwise. */
   name: string | null;
   branch: string | null;
-  hasPr: boolean;
 }
 
 /** What a filter tests besides the item. */
@@ -279,7 +278,6 @@ const KEYS = {
   has: oneOf({
     "parent-issue": (item) => item.parent !== null,
     "sub-issues": (item) => item.subIssues.total > 0,
-    pr: (item) => item.hasPr,
   }),
   name: { holds: (value, item) => item.name !== null && same(item.name, value) },
   branch: { holds: (value, item) => item.branch !== null && same(item.branch, value) },

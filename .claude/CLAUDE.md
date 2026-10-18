@@ -37,9 +37,9 @@ type-checked (`astro check`), not formatted.
 - `src/lib/schema.ts` — zod schemas + types shared by server and client (config, filters).
 - `src/lib/types.ts` — runtime data shapes (Issue, Card, Board, SyncStatus).
 - `src/lib/server/` — Node only: `config.ts` (JSON file, atomic save), `db.ts` (SQLite),
-  `github.ts` (GraphQL sync queries), `sync.ts` (Syncer + scheduler),
-  `board.ts` (**pure** board builder), `app.ts` (process
-  singleton booted by `src/middleware.ts`), `api.ts` (endpoint helpers).
+  `github.ts` (GraphQL sync queries), `ci.ts` (failed CI job queries), `sync.ts` (Syncer +
+  scheduler), `board.ts` (**pure** board builder), `app.ts` (process singleton booted by
+  `src/middleware.ts`), `api.ts` (endpoint helpers).
 - `src/pages/api/**` — JSON endpoints, all wrapped in `route()` from `api.ts`.
 - `src/lib/client/` — fetch wrappers, `useBoard` (polling), URL filters.
 - `src/components/board/` and `src/components/settings/` — React islands mounted with

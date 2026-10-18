@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Config } from "../schema";
-import type { CiBranchNode, GithubClient, IssueNode, PullNode } from "./github";
+import type { CiBranchNode } from "./ci";
+import type { GithubClient, IssueNode, PullNode } from "./github";
 
 import { cachedIssue, makeIssue, REPO } from "./__fixtures__/issues";
 import { Db } from "./db";

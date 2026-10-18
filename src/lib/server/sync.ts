@@ -2,10 +2,8 @@ import type { Config } from "../schema";
 import type { CiJob, SyncStatus } from "../types";
 import type { Db } from "./db";
 
+import { CI_BATCH, fetchCiJobs, fetchFailingBranchesPage } from "./ci";
 import {
-  CI_BATCH,
-  fetchCiJobs,
-  fetchFailingBranchesPage,
   fetchIssuesPage,
   fetchPullStatuses,
   fetchPullsPage,
