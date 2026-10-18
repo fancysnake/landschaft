@@ -15,6 +15,7 @@ const CI_BRANCHES_QUERY = `
 query CiBranches($owner: String!, $name: String!, $after: String) {
   rateLimit { remaining }
   repository(owner: $owner, name: $name) {
+    defaultBranchRef { name }
     refs(refPrefix: "refs/heads/", first: 100, after: $after) {
       pageInfo { hasNextPage endCursor }
       nodes { name target { ... on Commit { statusCheckRollup { state } } } }
@@ -25,6 +26,7 @@ query CiBranches($owner: String!, $name: String!, $after: String) {
 interface CiBranchesData {
   rateLimit: { remaining: number };
   repository: {
+    defaultBranchRef: { name: string } | null;
     refs: {
       pageInfo: PageInfo;
       nodes: { name: string; target: { statusCheckRollup?: { state: StatusState } | null } }[];
@@ -32,26 +34,38 @@ interface CiBranchesData {
   } | null;
 }
 
-export interface FailingBranchesPage {
-  branches: string[];
+/** A branch to read failed jobs of; `suites` also reads its head commit's check suites. */
+export interface CiBranch {
+  name: string;
+  suites: boolean;
+}
+
+export interface CiBranchesPage {
+  branches: CiBranch[];
   hasNextPage: boolean;
   endCursor: string | null;
   rateRemaining: number;
 }
 
-/** Branches whose head commit has the red X; reads no commit history, so a page costs 1 point. */
-export async function fetchFailingBranchesPage(
+/**
+ * Branches whose head commit has the red X, plus the default branch with its check suites, which
+ * hold the scheduled and dispatched runs the red X leaves out; reads no commit history, so a page
+ * costs 1 point.
+ */
+export async function fetchCiBranchesPage(
   gh: GithubClient,
   repo: string,
   after: string | null,
-): Promise<FailingBranchesPage> {
+): Promise<CiBranchesPage> {
   const data = await gh.gql<CiBranchesData>(CI_BRANCHES_QUERY, { ...splitRepo(repo), after });
   if (!data.repository) throw new GithubError(`repository ${repo} not found or not accessible`);
   const { pageInfo, nodes } = data.repository.refs;
+  const defaultBranch = data.repository.defaultBranchRef?.name ?? null;
   return {
-    branches: nodes
-      .filter((ref) => isRed(ref.target.statusCheckRollup?.state))
-      .map((ref) => ref.name),
+    branches: nodes.flatMap(({ name, target }) => {
+      const suites = name === defaultBranch;
+      return suites || isRed(target.statusCheckRollup?.state) ? [{ name, suites }] : [];
+    }),
     hasNextPage: pageInfo.hasNextPage,
     endCursor: pageInfo.endCursor,
     rateRemaining: data.rateLimit.remaining,
@@ -66,17 +80,19 @@ function webUrl(url: string | null): string | null {
 /** A cancelled, skipped or neutral job is no failure. */
 const FAILED_CONCLUSIONS = new Set(["FAILURE", "TIMED_OUT", "STARTUP_FAILURE"]);
 
+export interface CheckRunContext {
+  type: "CheckRun";
+  name: string;
+  conclusion: string | null;
+  detailsUrl: string | null;
+  url: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  checkSuite: { workflowRun: { workflow: { name: string } } | null };
+}
+
 export type CiContext =
-  | {
-      type: "CheckRun";
-      name: string;
-      conclusion: string | null;
-      detailsUrl: string | null;
-      url: string;
-      startedAt: string | null;
-      completedAt: string | null;
-      checkSuite: { workflowRun: { workflow: { name: string } } | null };
-    }
+  | CheckRunContext
   | {
       type: "StatusContext";
       context: string;
@@ -97,6 +113,8 @@ export interface CiBranchNode {
     url: string;
     history: CommitAuthors;
     statusCheckRollup: { contexts: { nodes: CiContext[] } } | null;
+    /** With `suites` alone: the suites of scheduled and dispatched runs, which the rollup lacks. */
+    checkSuites?: { nodes: { checkRuns: { nodes: CheckRunContext[] } }[] };
   };
 }
 
@@ -177,7 +195,8 @@ export function toCiJobs(
   const pr = node.associatedPullRequests.nodes[0] ?? null;
   // Also merges a job an app reports as a check run and as a commit status alike.
   const newest = new Map<string, Run>();
-  for (const check of target.statusCheckRollup?.contexts.nodes ?? []) {
+  const suiteRuns = target.checkSuites?.nodes.flatMap((suite) => suite.checkRuns.nodes) ?? [];
+  for (const check of [...(target.statusCheckRollup?.contexts.nodes ?? []), ...suiteRuns]) {
     const run = runOf(check, target.url);
     if (!run) continue;
     const key = ciJobKey({ repo, branch, ...run.job });
@@ -194,8 +213,18 @@ export const CI_BATCH = 20;
 
 const AUTHORS = "nodes { author { user { login } } }";
 
-/** Branch `index`'s head commit, and the default branch compared with it, as aliased fields. */
-function ciBranchFields(index: number): string {
+const CHECK_RUN = `... on CheckRun { name conclusion detailsUrl url startedAt completedAt
+  checkSuite { workflowRun { workflow { name } } } }`;
+
+/**
+ * Branch `index`'s head commit, and the default branch compared with it, as aliased fields;
+ * with `suites`, also the commit's check suites.
+ * shortcut: the newest 50 suites, 50 runs each; raise if a busy commit pushes a scheduled run out.
+ */
+function ciBranchFields(index: number, suites: boolean): string {
+  const checkSuites = suites
+    ? `checkSuites(last: 50) { nodes { checkRuns(first: 50) { nodes { type: __typename ${CHECK_RUN} } } } }`
+    : "";
   return `b${index}: ref(qualifiedName: $ref${index}) {
     associatedPullRequests(states: OPEN, first: 1) { nodes { number url } }
     mergedPullRequests: associatedPullRequests(
@@ -207,10 +236,10 @@ function ciBranchFields(index: number): string {
       history(first: 3) { ${AUTHORS} }
       statusCheckRollup { contexts(first: 100) { nodes {
         type: __typename
-        ... on CheckRun { name conclusion detailsUrl url startedAt completedAt
-          checkSuite { workflowRun { workflow { name } } } }
+        ${CHECK_RUN}
         ... on StatusContext { context state targetUrl createdAt }
       } } }
+      ${checkSuites}
     } }
   }
   c${index}: defaultBranchRef { name compare(headRef: $branch${index}) {
@@ -231,13 +260,13 @@ export interface CiJobsPage {
 export async function fetchCiJobs(
   gh: GithubClient,
   repo: string,
-  branches: string[],
+  branches: CiBranch[],
 ): Promise<CiJobsPage> {
   const params = branches.map((_, i) => `$ref${i}: String!, $branch${i}: String!`).join(", ");
   const variables = Object.fromEntries(
-    branches.flatMap((branch, i) => [
-      [`ref${i}`, `refs/heads/${branch}`],
-      [`branch${i}`, branch],
+    branches.flatMap(({ name }, i) => [
+      [`ref${i}`, `refs/heads/${name}`],
+      [`branch${i}`, name],
     ]),
   );
   const data = await gh.gql<{
@@ -248,16 +277,16 @@ export async function fetchCiJobs(
   }>(
     `query CiJobs($owner: String!, $name: String!, ${params}) {
       rateLimit { remaining }
-      repository(owner: $owner, name: $name) { ${branches.map((_, i) => ciBranchFields(i)).join("\n")} }
+      repository(owner: $owner, name: $name) { ${branches.map((branch, i) => ciBranchFields(i, branch.suites)).join("\n")} }
     }`,
     { ...splitRepo(repo), ...variables },
     { partial: true },
   );
   if (!data.repository) throw new GithubError(`repository ${repo} not found or not accessible`);
   const fields = data.repository;
-  const jobs = branches.flatMap((branch, i) => {
+  const jobs = branches.flatMap(({ name }, i) => {
     const node = fields[`b${i}`];
-    return node ? toCiJobs(repo, branch, node, fields[`c${i}`] ?? null) : [];
+    return node ? toCiJobs(repo, name, node, fields[`c${i}`] ?? null) : [];
   });
   return { jobs, rateRemaining: data.rateLimit.remaining };
 }
