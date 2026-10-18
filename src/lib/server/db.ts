@@ -3,6 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import type {
   Assignee,
   Blocker,
+  CiJob,
   FetchedIssue,
   Issue,
   IssueKind,
@@ -66,6 +67,17 @@ CREATE TABLE IF NOT EXISTS starred_epics (
   epic TEXT NOT NULL,
   PRIMARY KEY (dashboard, epic)
 );
+CREATE TABLE IF NOT EXISTS ci_jobs (
+  repo TEXT NOT NULL,
+  branch TEXT NOT NULL,
+  workflow TEXT,
+  name TEXT NOT NULL,
+  url TEXT NOT NULL,
+  failed_at TEXT NOT NULL,
+  authors_json TEXT NOT NULL,
+  pr_json TEXT
+);
+CREATE INDEX IF NOT EXISTS ci_jobs_repo ON ci_jobs (repo);
 `;
 
 interface IssueRow {
@@ -106,6 +118,17 @@ interface LabelRow {
   name: string;
   color: string;
   description: string | null;
+}
+
+interface CiJobRow {
+  repo: string;
+  branch: string;
+  workflow: string | null;
+  name: string;
+  url: string;
+  failed_at: string;
+  authors_json: string;
+  pr_json: string | null;
 }
 
 interface SyncStateRow {
@@ -315,6 +338,45 @@ export class Db {
     this.transaction(() => {
       for (const s of statuses) update.run(JSON.stringify(s.statuses), repo, s.number);
     });
+  }
+
+  /** Replaces the failed CI jobs of one repo. */
+  setCiJobs(repo: string, jobs: CiJob[]): void {
+    const insert = this.db.prepare(
+      "INSERT INTO ci_jobs (repo, branch, workflow, name, url, failed_at, authors_json, pr_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    );
+    this.transaction(() => {
+      this.db.prepare("DELETE FROM ci_jobs WHERE repo = ?").run(repo);
+      for (const job of jobs) {
+        insert.run(
+          repo,
+          job.branch,
+          job.workflow,
+          job.name,
+          job.url,
+          job.failedAt,
+          JSON.stringify(job.authors),
+          job.pr && JSON.stringify(job.pr),
+        );
+      }
+    });
+  }
+
+  listCiJobs(repos: string[]): CiJob[] {
+    if (repos.length === 0) return [];
+    const rows = this.db
+      .prepare(`SELECT * FROM ci_jobs WHERE repo IN (${placeholders(repos.length)})`)
+      .all(...repos) as unknown as CiJobRow[];
+    return rows.map((row) => ({
+      repo: row.repo,
+      branch: row.branch,
+      workflow: row.workflow,
+      name: row.name,
+      url: row.url,
+      failedAt: row.failed_at,
+      authors: JSON.parse(row.authors_json) as string[],
+      pr: row.pr_json === null ? null : (JSON.parse(row.pr_json) as CiJob["pr"]),
+    }));
   }
 
   /** Replaces the label catalogue of one repo. */

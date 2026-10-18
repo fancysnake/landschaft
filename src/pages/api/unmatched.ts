@@ -9,6 +9,13 @@ export const GET = route(async (context) => {
   const { hide = [] } = parseQuery(UnmatchedQuerySchema, context.url);
   const { db, syncer } = getApp();
   const viewer = await syncer.viewer().catch(() => null);
-  const items = unmatchedIssues(db.listIssues(repos), dashboards, users, viewer, hide);
+  const items = unmatchedIssues(
+    db.listIssues(repos),
+    dashboards,
+    users,
+    viewer,
+    hide,
+    db.listCiJobs(repos),
+  );
   return json({ items, status: syncer.status() });
 });

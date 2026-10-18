@@ -114,6 +114,8 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
     `is:pr is:conflicting|ci:failed|unanswered` gathers the PRs waiting on their author.
   - `is:has-pr` picks issues an open PR closes (GitHub's "linked pull requests"), whoever
     opened the PR, as long as the PR is in one of the global repos.
+  - Failed CI jobs: `is:ci-job`, `name:` (the job), `branch:` and `has:pr` (an open PR
+    comes from the branch).
 - Labels a filter asks for (outside a `-`), the dashboard's included, are hidden on cards.
 - The term **`other`** holds for issues no swimlane above, or no column to the right,
   matched, so order matters. Alone it makes the bottom swimlane or the leftmost column the

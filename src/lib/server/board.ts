@@ -18,6 +18,9 @@ import {
   type Board,
   type Card,
   cellKey,
+  type CiJob,
+  type CiJobCard,
+  ciJobKey,
   type Epic,
   type Issue,
   issueKey,
@@ -79,9 +82,59 @@ export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Iss
   const blocking = new Set(opened.flatMap((issue) => issue.blockedBy.map(keyOf)));
   return (issue) => ({
     ...issue,
+    authors: issue.author === null ? [] : [issue.author],
     statuses: withPr.has(keyOf(issue)) ? [...issue.statuses, "is:has-pr"] : issue.statuses,
     blocked: isBlocked(issue, byKey),
     blocking: blocking.has(keyOf(issue)),
+    name: null,
+    branch: null,
+    hasPr: false,
+  });
+}
+
+/** A failed CI job as filters see it: no labels, assignees or links, never blocked. */
+const jobItem = (job: CiJob): FilterItem => ({
+  kind: "ci-job",
+  repo: job.repo,
+  authors: job.authors,
+  assignees: [],
+  labels: [],
+  statuses: [],
+  parent: null,
+  subIssues: { total: 0 },
+  blocked: false,
+  blocking: false,
+  name: job.name,
+  branch: job.branch,
+  hasPr: job.pr !== null,
+});
+
+const jobCard = (job: CiJob): CiJobCard => ({
+  key: ciJobKey(job),
+  kind: "ci-job",
+  repo: job.repo,
+  branch: job.branch,
+  workflow: job.workflow,
+  name: job.name,
+  url: job.url,
+  failedAt: job.failedAt,
+  pr: job.pr,
+  createdAt: job.failedAt,
+  updatedAt: job.failedAt,
+});
+
+/** `jobs` that one of the global `users` (empty for everyone) has commits in and that pass `scope`. */
+function scopedJobs(
+  jobs: CiJob[],
+  users: string[],
+  viewer: string | null,
+  scope: FilterNode | null = null,
+): { job: CiJob; item: FilterItem }[] {
+  const base = usersNode(users);
+  return jobs.flatMap((job) => {
+    const item = jobItem(job);
+    const passes = matchesFilter(base, item, { viewer }) && matchesFilter(scope, item, { viewer });
+    return passes ? [{ job, item }] : [];
   });
 }
 
@@ -114,6 +167,13 @@ function issueFilter(filters: Filters, byKey: Map<string, Issue>): (issue: Issue
     (!filters.assignee || issue.assignees.some((a) => a.login === filters.assignee)) &&
     (!wantedLabel || issue.labels.some((l) => labelKey(l.name) === wantedLabel)) &&
     (!related || related.has(keyOf(issue)));
+}
+
+/** The text filter over a job's name and branch; assignee, label and epic filters pass none. */
+function jobFilter(filters: Filters): (job: CiJob) => boolean {
+  if (filters.assignee || filters.label || filters.epic) return () => false;
+  const query = filters.q?.trim().toLowerCase();
+  return (job) => !query || `${job.name} ${job.branch}`.toLowerCase().includes(query);
 }
 
 function compareBy(by: SortBy, dir: SortDir) {
@@ -209,8 +269,8 @@ export function scopedIssues(
 
 /**
  * Cards for the open items of the global `users` in `issues` that no dashboard places in a
- * cell, outside the `hide` repos, most recently updated first. One a swimlane hides as blocked
- * counts as placed.
+ * cell, and of their failed CI `jobs`, outside the `hide` repos, most recently updated first. One
+ * a swimlane hides as blocked counts as placed.
  */
 export function unmatchedIssues(
   issues: Issue[],
@@ -218,22 +278,29 @@ export function unmatchedIssues(
   users: string[] = [],
   viewer: string | null = null,
   hide: readonly string[] = [],
+  jobs: CiJob[] = [],
 ): Card[] {
   const grids = dashboards.map(compileGrid);
-  const placed = (item: Item) =>
+  const placed = (item: FilterItem) =>
     grids.some(
       (grid) =>
         matchesFilter(grid.scope, item, { viewer }) && placeOnGrid(grid, item, viewer) !== null,
     );
+  const missed = ({ item }: { item: FilterItem }) => !hide.includes(item.repo) && !placed(item);
   // Hidden repos are dropped last: their items still count for `is:has-pr` and blockers.
-  return openItemsOf(issues, users, viewer)
-    .open.filter(({ issue, item }) => !hide.includes(issue.repo) && !placed(item))
-    .map(({ item }) => toCard(item, item.labels, false))
-    .toSorted(compareBy("updated", "desc"));
+  return [
+    ...openItemsOf(issues, users, viewer)
+      .open.filter(missed)
+      .map(({ item }) => toCard(item, item.labels, false)),
+    ...scopedJobs(jobs, users, viewer)
+      .filter(missed)
+      .map(({ job }) => jobCard(job)),
+  ].toSorted(compareBy("updated", "desc"));
 }
 
 /**
- * Lays the dashboard's `scopedIssues` out on its grid. `starred` epic keys lead the epic strip.
+ * Lays the dashboard's `scopedIssues`, and the failed CI `jobs` that pass the same scope, out on
+ * its grid. `starred` epic keys lead the epic strip.
  */
 export function buildBoard(
   issues: Issue[],
@@ -242,12 +309,15 @@ export function buildBoard(
   users: string[] = [],
   starred: ReadonlySet<string> = new Set(),
   viewer: string | null = null,
+  jobs: CiJob[] = [],
 ): Board {
   const axes = compileGrid(dashboard);
   const { scope } = axes;
   const { byKey, open } = openItemsOf(issues, users, viewer, scope);
+  const openJobs = scopedJobs(jobs, users, viewer, scope);
   const wanted = issueFilter(filters, byKey);
-  const present = [...new Set(open.map(({ issue }) => issue.repo))].toSorted();
+  const wantedJob = jobFilter(filters);
+  const present = [...new Set([...open, ...openJobs].map(({ item }) => item.repo))].toSorted();
   const repos = new Set(present.filter((repo) => !filters.hide?.includes(repo)));
   const epicLabel = dashboard.epicLabel && labelKey(dashboard.epicLabel);
   // By `labelKey`, like every label comparison here.
@@ -283,6 +353,27 @@ export function buildBoard(
   const labels = new Map<string, string>();
   const epicIssues: Issue[] = [];
 
+  /** Puts `card` in every cell `item` lands in, and counts it once if it shows in any. */
+  const put = (item: FilterItem, card: Card) => {
+    const placed = placeOnGrid(axes, item, viewer);
+    if (!placed) return;
+    const { lanes, columns } = placed;
+    let shownInAny = false;
+    for (const lane of lanes) {
+      if (lane.hideBlocked && item.blocked) {
+        board.hiddenBlocked[lane.id] = (board.hiddenBlocked[lane.id] ?? 0) + 1;
+        continue;
+      }
+      for (const column of columns) board.cells[cellKey(lane.id, column.id)]!.push(card);
+      board.laneTotals[lane.id] = (board.laneTotals[lane.id] ?? 0) + 1;
+      shownInAny = true;
+    }
+    if (!shownInAny) return;
+    board.total += 1;
+    for (const column of columns)
+      board.columnTotals[column.id] = (board.columnTotals[column.id] ?? 0) + 1;
+  };
+
   for (const { issue, item } of open) {
     for (const assignee of issue.assignees) assignees.add(assignee.login);
     for (const label of issue.labels.filter(shown)) {
@@ -297,27 +388,10 @@ export function buildBoard(
       issue.labels.some((label) => labelKey(label.name) === epicLabel);
     if (isEpic) epicIssues.push(issue);
 
-    if (!wanted(issue)) continue;
-
-    const placed = placeOnGrid(axes, item, viewer);
-    if (!placed) continue;
-    const { lanes, columns } = placed;
-    const { blocked } = item;
-    const card = toCard(item, issue.labels.filter(shown), isEpic);
-    let shownInAny = false;
-    for (const lane of lanes) {
-      if (lane.hideBlocked && blocked) {
-        board.hiddenBlocked[lane.id] = (board.hiddenBlocked[lane.id] ?? 0) + 1;
-        continue;
-      }
-      for (const column of columns) board.cells[cellKey(lane.id, column.id)]!.push(card);
-      board.laneTotals[lane.id] = (board.laneTotals[lane.id] ?? 0) + 1;
-      shownInAny = true;
-    }
-    if (!shownInAny) continue;
-    board.total += 1;
-    for (const column of columns)
-      board.columnTotals[column.id] = (board.columnTotals[column.id] ?? 0) + 1;
+    if (wanted(issue)) put(item, toCard(item, issue.labels.filter(shown), isEpic));
+  }
+  for (const { job, item } of openJobs) {
+    if (repos.has(job.repo) && wantedJob(job)) put(item, jobCard(job));
   }
 
   const compare = compareBy(sort.by, sort.dir);

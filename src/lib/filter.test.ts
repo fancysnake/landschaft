@@ -16,7 +16,7 @@ import {
 const item = (extra: Partial<FilterItem> = {}): FilterItem => ({
   kind: "issue",
   repo: "acme/app",
-  author: null,
+  authors: [],
   assignees: [],
   labels: [],
   statuses: [],
@@ -24,6 +24,9 @@ const item = (extra: Partial<FilterItem> = {}): FilterItem => ({
   subIssues: { total: 0 },
   blocked: false,
   blocking: false,
+  name: null,
+  branch: null,
+  hasPr: false,
   ...extra,
 });
 const labels = (...names: string[]) => item({ labels: names.map((name) => ({ name })) });
@@ -135,14 +138,27 @@ describe("matchesFilter", () => {
   });
 
   it("matches repos and people, with @me as the viewer", () => {
-    const ann = item({ author: "Ann", assignees: [{ login: "bob" }] });
+    const ann = item({ authors: ["Ann"], assignees: [{ login: "bob" }] });
     expect(fits("repo:ACME/app", ann)).toBe(true);
     expect(fits("author:ann", ann)).toBe(true);
     expect(fits("assignee:ann", ann)).toBe(false);
     expect(fits("user:bob", ann)).toBe(true);
     expect(fits("user:@me", ann, { viewer: "bob" })).toBe(true);
     expect(fits("user:@me", ann)).toBe(false);
-    expect(fits("author:renovate[bot]", item({ author: "renovate" }))).toBe(true);
+    expect(fits("author:renovate[bot]", item({ authors: ["renovate"] }))).toBe(true);
+  });
+
+  it("matches CI jobs by kind, name, branch and PR", () => {
+    const job = item({ kind: "ci-job", name: "Unit tests", branch: "feat/x", hasPr: true });
+    expect(fits("is:ci-job", job)).toBe(true);
+    expect(fits("is:ci-job", item())).toBe(false);
+    expect(fits('name:"unit tests"|lint', job)).toBe(true);
+    expect(fits("name:lint", job)).toBe(false);
+    expect(fits("branch:FEAT/x", job)).toBe(true);
+    expect(fits("branch:main", item())).toBe(false);
+    expect(fits("has:pr", job)).toBe(true);
+    expect(fits("has:pr", item())).toBe(false);
+    expect(fits("user:bob", item({ authors: ["ann", "bob"] }))).toBe(true);
   });
 
   it("combines with OR and parens", () => {
@@ -202,9 +218,13 @@ describe("suggestFilter", () => {
       'label:"needs review"',
     ]);
     expect(suggestFilter("(label:x|B", offer({ labels: ["bug", "x"] }))).toEqual(["(label:x|bug"]);
-    expect(suggestFilter("is:ci", offer())).toEqual(["is:ci:failed", "is:ci:running"]);
+    expect(suggestFilter("is:ci", offer())).toEqual(["is:ci-job", "is:ci:failed", "is:ci:running"]);
     expect(suggestFilter("constructor:", offer())).toEqual([]);
-    expect(suggestFilter("has:", offer())).toEqual(["has:parent-issue", "has:sub-issues"]);
+    expect(suggestFilter("has:", offer())).toEqual([
+      "has:parent-issue",
+      "has:sub-issues",
+      "has:pr",
+    ]);
   });
 
   it("completes repos and users from the offer", () => {

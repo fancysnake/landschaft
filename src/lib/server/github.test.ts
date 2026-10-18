@@ -4,12 +4,15 @@ import type { PullStatusLabel } from "../status";
 
 import {
   type CheckContext,
+  type CiBranchNode,
+  type CiContext,
   createGithubClient,
   fetchIssuesPage,
   fetchPullStatuses,
   type IssueNode,
   type PullStatusNode,
   type StatusState,
+  toCiJobs,
   toIssue,
   toPull,
   toPullStatus,
@@ -227,6 +230,16 @@ describe("createGithubClient", () => {
     timeout.mockRestore();
   });
 
+  it("keeps the data next to errors only when asked to", async () => {
+    const body = { data: { ok: true }, errors: [{ message: "Could not resolve head ref" }] };
+    const gh = createGithubClient(
+      async () => "tok",
+      async () => jsonResponse(body),
+    );
+    await expect(gh.gql("q", {})).rejects.toThrow("Could not resolve head ref");
+    await expect(gh.gql("q", {}, { partial: true })).resolves.toEqual({ ok: true });
+  });
+
   it("resolves the token once", async () => {
     const tokenSource = vi.fn(async () => "tok");
     const gh = createGithubClient(tokenSource, async () => jsonResponse({ data: { ok: true } }));
@@ -276,5 +289,77 @@ describe("createGithubClient", () => {
     await expect(
       fetchIssuesPage(gh, "acme/gone", { since: null, openOnly: false, after: null }),
     ).rejects.toThrow(/not found/);
+  });
+});
+
+const commits = (...logins: (string | null)[]) => ({
+  nodes: logins.map((login) => ({ author: { user: login === null ? null : { login } } })),
+});
+const checkRun = (name: string, conclusion: string | null, workflow: string | null = "CI") => ({
+  type: "CheckRun" as const,
+  name,
+  conclusion,
+  detailsUrl: `https://ci/${name}`,
+  url: `https://github.com/runs/${name}`,
+  completedAt: "2026-05-01T00:00:00Z",
+  checkSuite: { workflowRun: workflow === null ? null : { workflow: { name: workflow } } },
+});
+const branch = (contexts: CiContext[], history = commits("ann")): CiBranchNode => ({
+  associatedPullRequests: { nodes: [{ number: 4, url: "https://github.com/acme/app/pull/4" }] },
+  target: {
+    url: "https://github.com/acme/app/commit/abc",
+    history,
+    statusCheckRollup: { contexts: { nodes: contexts } },
+  },
+});
+
+describe("toCiJobs", () => {
+  it("keeps the failed check runs and commit statuses, one job per name", () => {
+    const jobs = toCiJobs(
+      "acme/app",
+      "feat/x",
+      branch([
+        checkRun("test", "FAILURE"),
+        checkRun("e2e", "TIMED_OUT", null),
+        checkRun("lint", "SUCCESS"),
+        checkRun("deploy", "CANCELLED"),
+        checkRun("pending", null),
+        {
+          type: "StatusContext",
+          context: "ci/jenkins",
+          state: "ERROR",
+          targetUrl: null,
+          createdAt: "2026-05-02T00:00:00Z",
+        },
+        {
+          type: "StatusContext",
+          context: "e2e",
+          state: "FAILURE",
+          targetUrl: null,
+          createdAt: "2026-05-02T00:00:00Z",
+        },
+      ]),
+      null,
+    );
+    expect(jobs.map(({ workflow, name, url }) => [workflow, name, url])).toEqual([
+      ["CI", "test", "https://ci/test"],
+      [null, "e2e", "https://ci/e2e"],
+      [null, "ci/jenkins", "https://github.com/acme/app/commit/abc"],
+    ]);
+    expect(jobs[0]).toMatchObject({
+      repo: "acme/app",
+      branch: "feat/x",
+      failedAt: "2026-05-01T00:00:00Z",
+      pr: { number: 4 },
+    });
+  });
+
+  it("takes the authors of the commits ahead, else of the last three", () => {
+    const head = branch([checkRun("test", "FAILURE")], commits("ann", "bob"));
+    const ahead = { aheadBy: 1, commits: commits("renovate[bot]", null) };
+    expect(toCiJobs("acme/app", "x", head, ahead)[0]?.authors).toEqual(["renovate"]);
+    const level = { aheadBy: 0, commits: commits() };
+    expect(toCiJobs("acme/app", "x", head, level)[0]?.authors).toEqual(["ann", "bob"]);
+    expect(toCiJobs("acme/app", "x", head, null)[0]?.authors).toEqual(["ann", "bob"]);
   });
 });

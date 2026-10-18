@@ -1,8 +1,11 @@
 import type { Config } from "../schema";
-import type { SyncStatus } from "../types";
+import type { CiJob, SyncStatus } from "../types";
 import type { Db } from "./db";
 
 import {
+  CI_BATCH,
+  fetchCiJobs,
+  fetchFailingBranchesPage,
   fetchIssuesPage,
   fetchPullStatuses,
   fetchPullsPage,
@@ -121,6 +124,7 @@ export class Syncer {
 
       const closed = full ? this.db.closeMissing(repo, seen) : 0;
       await this.refreshPullStatuses(repo);
+      await this.refreshCiJobs(repo);
       this.db.upsertLabels(repo, await fetchRepoLabels(this.gh, repo));
 
       const stamp = startedAt.toISOString();
@@ -176,6 +180,28 @@ export class Syncer {
       this.db.setPullStatuses(repo, page.statuses);
       this.spend(page.rateRemaining, start + STATUS_BATCH < numbers.length);
     }
+  }
+
+  /**
+   * Replaces the cached failed CI jobs: lists the branches whose head commit failed, then reads
+   * jobs and commit authors of those alone, `CI_BATCH` branches per query.
+   */
+  private async refreshCiJobs(repo: string): Promise<void> {
+    const failing: string[] = [];
+    let after: string | null = null;
+    do {
+      const page = await fetchFailingBranchesPage(this.gh, repo, after);
+      failing.push(...page.branches);
+      after = page.hasNextPage ? page.endCursor : null;
+      this.spend(page.rateRemaining, Boolean(after) || failing.length > 0);
+    } while (after);
+    const jobs: CiJob[] = [];
+    for (let start = 0; start < failing.length; start += CI_BATCH) {
+      const page = await fetchCiJobs(this.gh, repo, failing.slice(start, start + CI_BATCH));
+      jobs.push(...page.jobs);
+      this.spend(page.rateRemaining, start + CI_BATCH < failing.length);
+    }
+    this.db.setCiJobs(repo, jobs);
   }
 
   /** Records the rate limit left; aborts the sync when it runs low and `more` requests follow. */

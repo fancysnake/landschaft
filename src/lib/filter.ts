@@ -1,4 +1,4 @@
-import type { IssueKind, IssueRef } from "./types";
+import type { IssueRef, ItemKind } from "./types";
 
 import { STATUS_LABEL_NAMES, type StatusLabel } from "./status";
 
@@ -186,9 +186,10 @@ export function askedLabels(node: FilterNode | null): string[] {
 
 /** What a filter tests an item on. */
 export interface FilterItem {
-  kind: IssueKind;
+  kind: ItemKind;
   repo: string;
-  author: string | null;
+  /** An issue's or PR's author; a CI job's commit authors (see `CiJob`). */
+  authors: string[];
   assignees: { login: string }[];
   labels: { name: string }[];
   statuses: StatusLabel[];
@@ -198,6 +199,10 @@ export interface FilterItem {
   blocked: boolean;
   /** Blocks an open issue. */
   blocking: boolean;
+  /** A CI job's name and branch, and whether an open PR comes from the branch; null and false otherwise. */
+  name: string | null;
+  branch: string | null;
+  hasPr: boolean;
 }
 
 /** What a filter tests besides the item. */
@@ -211,9 +216,9 @@ export interface FilterContext {
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
 /** `login` is `value`, where `@me` stands for `viewer` and a `[bot]` suffix is dropped. */
-function isLogin(value: string, login: string | null, viewer: string | null = null): boolean {
+function isLogin(value: string, login: string, viewer: string | null = null): boolean {
   const wanted = same(value, "@me") ? viewer : value.replace(/\[bot\]$/i, "");
-  return wanted !== null && login !== null && same(wanted, login);
+  return wanted !== null && same(wanted, login);
 }
 
 /** What the filter input completes values from. */
@@ -261,6 +266,7 @@ const KEYS = {
   is: oneOf({
     issue: (item) => item.kind === "issue",
     pr: (item) => item.kind === "pr",
+    "ci-job": (item) => item.kind === "ci-job",
     ...Object.fromEntries(
       STATUS_LABEL_NAMES.map((status) => [
         status.replace(/^is:/, ""),
@@ -273,7 +279,10 @@ const KEYS = {
   has: oneOf({
     "parent-issue": (item) => item.parent !== null,
     "sub-issues": (item) => item.subIssues.total > 0,
+    pr: (item) => item.hasPr,
   }),
+  name: { holds: (value, item) => item.name !== null && same(item.name, value) },
+  branch: { holds: (value, item) => item.branch !== null && same(item.branch, value) },
   "parent-issue": {
     ...matching(ISSUE_REF, "owner/repo#number"),
     holds: (value, item) =>
@@ -284,7 +293,10 @@ const KEYS = {
     suggest: ({ repos }) => repos,
     holds: (value, item) => same(item.repo, value),
   },
-  author: { ...person, holds: (value, item, { viewer }) => isLogin(value, item.author, viewer) },
+  author: {
+    ...person,
+    holds: (value, item, { viewer }) => item.authors.some((login) => isLogin(value, login, viewer)),
+  },
   assignee: {
     ...person,
     holds: (value, item, { viewer }) =>
@@ -293,7 +305,7 @@ const KEYS = {
   user: {
     ...person,
     holds: (value, item, { viewer }) =>
-      isLogin(value, item.author, viewer) ||
+      item.authors.some((login) => isLogin(value, login, viewer)) ||
       item.assignees.some(({ login }) => isLogin(value, login, viewer)),
   },
 } satisfies Record<string, KeySpec>;

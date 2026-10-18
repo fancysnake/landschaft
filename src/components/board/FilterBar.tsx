@@ -29,8 +29,8 @@ export function FilterBar({ filters, board, onChange }: Props) {
         type="search"
         value={text}
         onChange={(event) => setText(event.target.value)}
-        placeholder="Search title or #number"
-        className={`${select} w-56`}
+        placeholder="Search title, #number, job or branch"
+        className={`${select} w-64`}
       />
       <select
         aria-label="Assignee"

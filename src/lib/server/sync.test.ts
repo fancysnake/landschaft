@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Config } from "../schema";
-import type { GithubClient, IssueNode, PullNode } from "./github";
+import type { CiBranchNode, GithubClient, IssueNode, PullNode } from "./github";
 
 import { cachedIssue, makeIssue, REPO } from "./__fixtures__/issues";
 import { Db } from "./db";
@@ -56,11 +56,37 @@ function fakeGithub(
   remaining = 5000,
   pulls: PullNode[][] = [],
   conflicting: number[] = [],
+  /** Branches with a red head commit and what the job query returns for each; null when gone. */
+  failing: Record<string, CiBranchNode | null> = {},
 ): { gh: GithubClient; calls: Call[] } {
   const calls: Call[] = [];
   const gh: GithubClient = {
     async gql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
       calls.push({ query, variables });
+      if (query.includes("query CiBranches")) {
+        const nodes = [
+          { name: "main", target: { statusCheckRollup: { state: "SUCCESS" } } },
+          ...Object.keys(failing).map((name) => ({
+            name,
+            target: { statusCheckRollup: { state: "FAILURE" } },
+          })),
+        ];
+        const refs = { pageInfo: { hasNextPage: false, endCursor: null }, nodes };
+        return { rateLimit: { remaining }, repository: { refs } } as T;
+      }
+      if (query.includes("query CiJobs")) {
+        const branches = Object.entries(variables).filter(([key]) => key.startsWith("branch"));
+        const repository = Object.fromEntries(
+          branches.flatMap(([key, branch]) => {
+            const index = key.slice("branch".length);
+            return [
+              [`b${index}`, failing[branch as string] ?? null],
+              [`c${index}`, { compare: null }],
+            ];
+          }),
+        );
+        return { rateLimit: { remaining }, repository } as T;
+      }
       if (query.includes("query Labels")) {
         return {
           repository: {
@@ -107,6 +133,28 @@ function fakeGithub(
   };
   return { gh, calls };
 }
+
+/** A branch whose head commit has the failed commit status `name`. */
+const redBranch = (name: string): CiBranchNode => ({
+  associatedPullRequests: { nodes: [] },
+  target: {
+    url: "https://github.com/acme/app/commit/abc",
+    history: { nodes: [{ author: { user: { login: "ann" } } }] },
+    statusCheckRollup: {
+      contexts: {
+        nodes: [
+          {
+            type: "StatusContext",
+            context: name,
+            state: "FAILURE",
+            targetUrl: null,
+            createdAt: "2026-05-01T00:00:00Z",
+          },
+        ],
+      },
+    },
+  },
+});
 
 const pageCalls = (calls: Call[]) => calls.filter((c) => c.query.includes("query IssuesPage"));
 const statusCalls = (calls: Call[]) => calls.filter((c) => c.query.includes("query PullStatus"));
@@ -246,6 +294,42 @@ describe("Syncer", () => {
     expect(syncer.rateRemaining).toBe(50);
   });
 
+  it("reads jobs of the red branches alone and replaces the cached ones", async () => {
+    db.setCiJobs(REPO, [
+      {
+        repo: REPO,
+        branch: "old",
+        workflow: null,
+        name: "lint",
+        url: "",
+        failedAt: "",
+        authors: [],
+        pr: null,
+      },
+    ]);
+    const { gh, calls } = fakeGithub([[]], 5000, [], [], {
+      "feat/x": redBranch("lint"),
+      gone: null,
+    });
+    await new Syncer({ db, gh, now: () => now }).syncRepo(REPO);
+    const jobQueries = calls.filter((c) => c.query.includes("query CiJobs"));
+    expect(jobQueries.map((c) => c.variables)).toEqual([
+      expect.objectContaining({ branch0: "feat/x", branch1: "gone", ref0: "refs/heads/feat/x" }),
+    ]);
+    expect(db.listCiJobs([REPO])).toEqual([
+      {
+        repo: REPO,
+        branch: "feat/x",
+        workflow: null,
+        name: "lint",
+        url: "https://github.com/acme/app/commit/abc",
+        failedAt: "2026-05-01T00:00:00Z",
+        authors: ["ann"],
+        pr: null,
+      },
+    ]);
+  });
+
   it("keeps a PR's status when a page upserts it again", async () => {
     db.upsertIssues([makeIssue({ number: 7, kind: "pr" })]);
     db.setPullStatuses(REPO, [{ number: 7, statuses: ["is:conflicting", "is:unanswered"] }]);
@@ -299,7 +383,7 @@ describe("Syncer", () => {
     const empty = { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] };
     gate.resolve({
       rateLimit: { remaining: 5000 },
-      repository: { issues: empty, pullRequests: empty },
+      repository: { issues: empty, pullRequests: empty, refs: empty },
     });
     await expect(running).resolves.toMatchObject({ upserted: 0 });
     expect(syncer.inFlight.size).toBe(0);

@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Added
 
+- Failed CI jobs are board items: one card per job whose newest run on a branch of the global
+  users failed, with filter terms `is:ci-job`, `name:`, `branch:` and `has:pr`.
 - An Unmatched tab in the top bar lists the open items no dashboard places in a cell;
   `GET /api/unmatched` serves it.
 
