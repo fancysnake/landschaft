@@ -7,15 +7,20 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-10-18
+
 ### Changed
 
-- `has:pr` replaces `is:has-pr`, for issues and CI jobs alike; loading a config rewrites
-  filters that use the old term (config version 2).
+- `has:pr` replaces `is:has-pr` for issues and CI jobs; loading a config rewrites its filters
+  (config version 2), but a filter in a URL or an API call needs the new term.
 
 ### Fixed
 
 - A failed scheduled or manually dispatched run on the default branch shows as a CI job card;
   GitHub's commit status leaves those runs out.
+- Merging a branch removes its failed CI jobs.
+- The Unmatched tab leaves out a board's epics, which sit in its epic strip.
+- A dashboard whose only items are failed CI jobs stays undimmed in the top bar.
 
 ## [3.0.0] - 2026-10-18
 
@@ -234,7 +239,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v3.0.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v4.0.0...HEAD
+[4.0.0]: https://github.com/fancysnake/landschaft/compare/v3.0.0...v4.0.0
 [3.0.0]: https://github.com/fancysnake/landschaft/compare/v2.0.0...v3.0.0
 [2.0.0]: https://github.com/fancysnake/landschaft/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/fancysnake/landschaft/compare/v0.10.1...v1.0.0

@@ -126,8 +126,8 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
   not. Issues that fit no lane or no column are left off the board.
 - **Unmatched**, a tab in the top bar, lists the open items of the global users that no
   dashboard places in a cell or inbox group, in the repos switched on. An item a swimlane hides
-  as blocked counts as placed, and so does one that misses one board's grid but lands on
-  another's. Issues, PRs and CI jobs get a column each; a filter, kept in `?filter=`, narrows
+  as blocked counts as placed, and so do a board's epics and an item that misses one board's
+  grid but lands on another's. Issues, PRs and CI jobs get a column each; a filter, kept in `?filter=`, narrows
   them.
 - **Hide blocked** (per swimlane) drops issues that have at least one open blocker
   (GitHub "blocked by" relationships).
