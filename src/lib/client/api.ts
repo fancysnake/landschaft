@@ -1,3 +1,4 @@
+import type { Offer } from "../filter";
 import type {
   BoardDashboard,
   ViewQuery,
@@ -23,6 +24,8 @@ export interface InboxResponse {
 
 export interface UnmatchedResponse {
   items: Card[];
+  /** Filter completions from every unmatched item, filtered out or not. */
+  offer: Offer;
   status: SyncStatus;
 }
 
@@ -87,8 +90,10 @@ export const api = {
     request<BoardResponse>(viewUrl(dashboardId, "board", query)),
   inbox: (dashboardId: string, query: ViewQuery) =>
     request<InboxResponse>(viewUrl(dashboardId, "inbox", query)),
-  unmatched: (hide: string[]) =>
-    request<UnmatchedResponse>(`/api/unmatched?hide=${encodeURIComponent(hide.join(","))}`),
+  unmatched: (hide: string[], filter: string) =>
+    request<UnmatchedResponse>(
+      `/api/unmatched?${new URLSearchParams({ hide: hide.join(","), filter })}`,
+    ),
   version: () => request<SyncStatus>("/api/version"),
   sync: (body: Partial<SyncRequest>) =>
     request<SyncResponse>("/api/sync", { method: "POST", body: JSON.stringify(body) }),

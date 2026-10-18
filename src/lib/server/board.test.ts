@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { InboxDashboard } from "../schema";
 
-import { askedLabels, type FilterNode } from "../filter";
+import { askedLabels, type FilterNode, parseFilter } from "../filter";
 import { type Card, cellKey } from "../types";
 import { DASHBOARD, label, makeIssue, makeJob, REPO } from "./__fixtures__/issues";
 import {
@@ -111,7 +111,7 @@ describe("unmatchedItems", () => {
       }),
       makeIssue({ number: 8, author: "bob" }),
     ];
-    const unmatched = unmatchedItems(issues, [narrow, wide], ["@me"], "me");
+    const unmatched = unmatchedItems(issues, [narrow, wide], ["@me"], "me").items;
     expect(unmatched.map(numberOf)).toEqual([4, 2]);
   });
 
@@ -133,15 +133,75 @@ describe("unmatchedItems", () => {
       makeIssue({ number: 11, ...lib, blockedBy: waitsOn(2), blockedByTotal: 1 }),
     ];
     const unmatched = (hide: string[]) =>
-      unmatchedItems(issues, [dashboard], [], null, hide).map(numberOf);
+      unmatchedItems(issues, [dashboard], [], null, hide).items.map(numberOf);
     expect(unmatched([])).toEqual([11, 10, 3]);
     expect(unmatched(["acme/lib"])).toEqual([3]);
   });
 
   it("lists every open item when no dashboard has a swimlane", () => {
     const dashboard = { ...DASHBOARD, swimlanes: [] };
-    const unmatched = unmatchedItems([makeIssue({ number: 1 })], [dashboard]);
+    const unmatched = unmatchedItems([makeIssue({ number: 1 })], [dashboard]).items;
     expect(unmatched.map(numberOf)).toEqual([1]);
+  });
+
+  it("keeps only the items that pass the filter", () => {
+    const dashboard = { ...DASHBOARD, swimlanes: [] };
+    const issues = [makeIssue({ number: 1 }), makeIssue({ number: 2, kind: "pr" })];
+    const unmatched = unmatchedItems(
+      issues,
+      [dashboard],
+      [],
+      null,
+      [],
+      [],
+      parseFilter("is:pr"),
+    ).items;
+    expect(unmatched.map(numberOf)).toEqual([2]);
+  });
+
+  it("applies the filter to CI jobs", () => {
+    const dashboard = { ...DASHBOARD, swimlanes: [] };
+    const unmatched = (filter: string) =>
+      unmatchedItems(
+        [makeIssue({ number: 1 })],
+        [dashboard],
+        [],
+        null,
+        [],
+        [makeJob({ name: "lint" })],
+        parseFilter(filter),
+      ).items.map(numberOf);
+    expect(unmatched("is:ci-job")).toEqual(["lint"]);
+    expect(unmatched("-is:ci-job")).toEqual([1]);
+  });
+
+  it("resolves `is:has-pr` against PRs the filter drops", () => {
+    const dashboard = { ...DASHBOARD, swimlanes: [] };
+    const issues = [
+      makeIssue({ number: 1 }),
+      makeIssue({ number: 2, kind: "pr", linked: [{ repo: REPO, number: 1 }] }),
+    ];
+    const unmatched = unmatchedItems(
+      issues,
+      [dashboard],
+      [],
+      null,
+      [],
+      [],
+      parseFilter("is:has-pr"),
+    );
+    expect(unmatched.items.map(numberOf)).toEqual([1]);
+  });
+
+  it("offers every unmatched item's labels and repos, filtered out or not, once per label", () => {
+    const dashboard = { ...DASHBOARD, swimlanes: [] };
+    const issues = [
+      makeIssue({ number: 1, repo: "acme/lib", labels: [label("Bug")] }),
+      makeIssue({ number: 2, kind: "pr", labels: [label("bug")] }),
+    ];
+    const { offer } = unmatchedItems(issues, [dashboard], [], null, [], [], parseFilter("is:pr"));
+    expect(offer.labels).toEqual(["Bug"]);
+    expect(offer.repos).toEqual(["acme/app", "acme/lib"]);
   });
 });
 
@@ -216,8 +276,8 @@ describe("buildInbox", () => {
   });
 
   it("counts inbox groups as placing items in the unmatched view", () => {
-    expect(unmatchedItems(issues, [INBOX]).map(numberOf)).toEqual([4]);
-    expect(unmatchedItems(issues, [{ ...INBOX, groups: [] }])).toHaveLength(4);
+    expect(unmatchedItems(issues, [INBOX]).items.map(numberOf)).toEqual([4]);
+    expect(unmatchedItems(issues, [{ ...INBOX, groups: [] }]).items).toHaveLength(4);
   });
 });
 
@@ -730,7 +790,7 @@ describe("CI jobs", () => {
 
   it("lists a job no dashboard places as unmatched", () => {
     const issuesOnly = { ...DASHBOARD, filter: "-is:ci-job" };
-    const unmatched = unmatchedItems([], [issuesOnly], ["bob"], null, [], jobs);
+    const unmatched = unmatchedItems([], [issuesOnly], ["bob"], null, [], jobs).items;
     expect(unmatched.map(numberOf)).toEqual(["lint"]);
   });
 });

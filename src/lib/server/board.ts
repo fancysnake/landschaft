@@ -4,6 +4,7 @@ import {
   type FilterNode,
   labelKey,
   matchesFilter,
+  type Offer,
   parseFilter,
 } from "../filter";
 import {
@@ -340,8 +341,9 @@ export function scopedIssues(
 
 /**
  * Cards for the open items of the global `users` in `issues` that no dashboard places in a
- * cell or group, and of their failed CI `jobs`, outside the `hide` repos, most recently updated
- * first. One a swimlane hides as blocked counts as placed.
+ * cell or group, and of their failed CI `jobs`, outside the `hide` repos and passing `filter`, most
+ * recently updated first. One a swimlane hides as blocked counts as placed. `offer` completes
+ * the filter from all those items, whether they pass `filter` or not.
  */
 export function unmatchedItems(
   issues: Issue[],
@@ -350,19 +352,27 @@ export function unmatchedItems(
   viewer: string | null = null,
   hide: readonly string[] = [],
   jobs: CiJob[] = [],
-): Card[] {
+  filter: FilterNode | null = null,
+): { items: Card[]; offer: Offer } {
   const placers = dashboards.map((dashboard) => placer(dashboard, viewer));
   const placed = (item: FilterItem) => placers.some((places) => places(item));
   const missed = ({ item }: { item: FilterItem }) => !hide.includes(item.repo) && !placed(item);
   // Hidden repos are dropped last: their items still count for `is:has-pr` and blockers.
-  return [
-    ...openItemsOf(issues, users, viewer)
-      .open.filter(missed)
-      .map(({ item }) => toCard(item, item.labels, false)),
-    ...scopedJobs(jobs, users, viewer)
-      .filter(missed)
-      .map(({ job }) => jobCard(job)),
-  ].toSorted(compareBy("updated", "desc"));
+  const unmatched = (scope: FilterNode | null) => ({
+    open: openItemsOf(issues, users, viewer, scope).open.filter(missed),
+    openJobs: scopedJobs(jobs, users, viewer, scope).filter(missed),
+  });
+  const shown = unmatched(filter);
+  const all = filter ? unmatched(null) : shown;
+  const sort = { by: "updated", dir: "desc" } as const;
+  const { repos, assignees, labels } = facetsOf(all.open, all.openJobs, () => true, {}, sort);
+  return {
+    items: [
+      ...shown.open.map(({ item }) => toCard(item, item.labels, false)),
+      ...shown.openJobs.map(({ job }) => jobCard(job)),
+    ].toSorted(compareBy(sort.by, sort.dir)),
+    offer: { labels, repos, users: assignees },
+  };
 }
 
 /**
