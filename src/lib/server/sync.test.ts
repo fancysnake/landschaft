@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Config } from "../schema";
 import type { CiBranchNode } from "./ci";
 import type { GithubClient, IssueNode, PullNode } from "./github";
 
+import { CONFIG_VERSION, type Config } from "../schema";
 import { cachedIssue, makeIssue, REPO } from "./__fixtures__/issues";
 import { Db } from "./db";
 import { startScheduler, SyncBusyError, Syncer } from "./sync";
@@ -428,6 +428,7 @@ describe("startScheduler", () => {
     const { gh, calls } = fakeGithub([[]]);
     const syncer = new Syncer({ db, gh });
     const config: Config = {
+      version: CONFIG_VERSION,
       repos: ["acme/due", "acme/fresh"],
       users: [],
       refreshMinutes: 5,
