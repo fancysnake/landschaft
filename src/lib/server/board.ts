@@ -335,18 +335,21 @@ const toCard = (item: Item, labels: LabelRef[], isEpic: boolean): Card => ({
 });
 
 /**
- * The open items of the global repos' `issues` that one of the global `users` (empty for
- * everyone) authored or is assigned to and that pass the dashboard's filter. `viewer` is what
- * `@me` stands for.
+ * The repos of the open `issues` and failed CI `jobs` that one of the global `users` (empty for
+ * everyone) is in and that pass the dashboard's filter. `viewer` is what `@me` stands for.
  */
-export function scopedIssues(
+export function scopedRepos(
   issues: Issue[],
+  jobs: CiJob[],
   dashboard: Pick<Dashboard, "filter">,
   users: string[] = [],
   viewer: string | null = null,
-): Issue[] {
-  const { open } = openItemsOf(issues, users, viewer, parseFilter(dashboard.filter));
-  return open.map(({ issue }) => issue);
+): Set<string> {
+  const scope = parseFilter(dashboard.filter);
+  return new Set([
+    ...openItemsOf(issues, users, viewer, scope).open.map(({ issue }) => issue.repo),
+    ...scopedJobs(jobs, users, viewer, scope).map(({ job }) => job.repo),
+  ]);
 }
 
 /**

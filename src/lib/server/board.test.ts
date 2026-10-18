@@ -11,7 +11,7 @@ import {
   compile,
   isBlocked,
   placeIn,
-  scopedIssues,
+  scopedRepos,
   unmatchedItems,
 } from "./board";
 
@@ -67,20 +67,24 @@ describe("isBlocked", () => {
 
 const waitsOn = (number: number) => [{ repo: REPO, number, state: "OPEN" as const }];
 
-describe("scopedIssues", () => {
-  it("keeps the open items of the users that pass the dashboard filter", () => {
+describe("scopedRepos", () => {
+  it("takes the repos of the users' open items and jobs that pass the dashboard filter", () => {
+    const team = [label("team")];
     const issues = [
-      makeIssue({ number: 1, author: "ann", labels: [label("team")] }),
-      makeIssue({ number: 2, author: "me", labels: [label("team")] }),
-      makeIssue({ number: 3, author: "me", labels: [label("team")], state: "CLOSED" }),
-      makeIssue({ number: 4, author: "me" }),
-      makeIssue({ number: 5, author: "bob", labels: [label("team")] }),
+      makeIssue({ number: 1, repo: "a/1", author: "ann", labels: team }),
+      makeIssue({ number: 2, repo: "a/2", author: "me", labels: team }),
+      makeIssue({ number: 3, repo: "a/3", author: "me", labels: team, state: "CLOSED" }),
+      makeIssue({ number: 4, repo: "a/4", author: "me" }),
+      makeIssue({ number: 5, repo: "a/5", author: "bob", labels: team }),
     ];
-    const scoped = (filter: string, users: string[]) =>
-      scopedIssues(issues, { filter }, users, "me").map((issue) => issue.number);
-    expect(scoped("label:team", ["@me", "ann"])).toEqual([1, 2]);
-    expect(scoped("label:team", [])).toEqual([1, 2, 5]);
-    expect(scoped("", ["@me"])).toEqual([2, 4]);
+    const jobs = [makeJob({ name: "lint", repo: "a/6", authors: ["me"] })];
+    const scoped = (filter: string, users: string[]) => [
+      ...scopedRepos(issues, jobs, { filter }, users, "me"),
+    ];
+    expect(scoped("label:team", ["@me", "ann"])).toEqual(["a/1", "a/2"]);
+    expect(scoped("label:team", [])).toEqual(["a/1", "a/2", "a/5"]);
+    expect(scoped("", ["@me"])).toEqual(["a/2", "a/4", "a/6"]);
+    expect(scoped("is:ci-job", ["@me"])).toEqual(["a/6"]);
   });
 });
 
