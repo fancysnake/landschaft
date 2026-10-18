@@ -3,7 +3,7 @@ import { useCallback } from "react";
 import { api } from "../lib/client/api";
 import { useHiddenRepos } from "../lib/client/useHiddenRepos";
 import { useSynced } from "../lib/client/useSynced";
-import { IssueCard } from "./board/IssueCard";
+import { CardView } from "./board/IssueCard";
 import { ErrorBanner } from "./ErrorBanner";
 
 /** Open items in the repos switched on that no dashboard places in a cell. */
@@ -33,7 +33,7 @@ export default function Unmatched() {
         <ul className="flex flex-col gap-2">
           {data.items.map((card) => (
             <li key={card.key}>
-              <IssueCard card={card} showRepo />
+              <CardView card={card} showRepo />
             </li>
           ))}
         </ul>

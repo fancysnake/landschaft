@@ -200,10 +200,49 @@ function migrateScope(config: unknown): unknown {
   };
 }
 
+/** The config version this build writes; a config without `version` is version 0. */
+export const CONFIG_VERSION = 1;
+
+/** Puts a swimlane for failed CI jobs on top, under an id no lane there has. */
+function withCiLane(dashboard: unknown): unknown {
+  if (!isRaw(dashboard) || !Array.isArray(dashboard.swimlanes)) return dashboard;
+  const lanes: unknown[] = dashboard.swimlanes;
+  const taken = new Set(lanes.map((lane) => (isRaw(lane) ? lane.id : undefined)));
+  let laneId = "ci-jobs";
+  for (let n = 2; taken.has(laneId); n += 1) laneId = `ci-jobs-${n}`;
+  const lane = { id: laneId, name: "Failed CI", filter: "is:ci-job" };
+  return { ...dashboard, swimlanes: [lane, ...lanes] };
+}
+
+/** Version 1 brought failed CI jobs, which no lane of an older dashboard asks for. */
+function addCiLane(config: Raw): Raw {
+  if (!Array.isArray(config.dashboards)) return config;
+  const dashboards: unknown[] = config.dashboards;
+  return { ...config, dashboards: dashboards.map(withCiLane) };
+}
+
+/** `UPGRADES[n]` takes a version-n config to version n + 1. */
+const UPGRADES: ((config: Raw) => Raw)[] = [addCiLane];
+
+/**
+ * Brings a config up to `CONFIG_VERSION` one step at a time. A version this build does not know
+ * is left for validation to reject.
+ */
+function upgradeConfig(config: unknown): unknown {
+  if (!isRaw(config)) return config;
+  const from = config.version ?? 0;
+  if (typeof from !== "number" || !Number.isInteger(from) || from < 0 || from > CONFIG_VERSION) {
+    return config;
+  }
+  const upgraded = UPGRADES.slice(from).reduce((raw, step) => step(raw), config);
+  return { ...upgraded, version: CONFIG_VERSION };
+}
+
 export const ConfigSchema = z.preprocess(
-  migrateScope,
+  (config: unknown) => upgradeConfig(migrateScope(config)),
   z
     .object({
+      version: z.literal(CONFIG_VERSION),
       /** Every board starts from the open items in these repos… */
       repos: z.array(repoName).default([]),
       /** …that these users authored or are assigned to; empty takes everyone's. */
@@ -236,7 +275,7 @@ export const SyncRequestSchema = z.object({
 export type SyncRequest = z.infer<typeof SyncRequestSchema>;
 
 /** Free-text filters: set from the filter bar, cleared together by "Clear filters". */
-export const TEXT_FILTER_KEYS = ["q", "assignee", "label", "epic"] as const;
+export const TEXT_FILTER_KEYS = ["q", "assignee", "label", "epic", "job"] as const;
 export type TextFilterKey = (typeof TEXT_FILTER_KEYS)[number];
 
 export type Filters = { [K in TextFilterKey]?: string } & {

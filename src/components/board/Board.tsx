@@ -7,7 +7,7 @@ import { cellKey } from "../../lib/types";
 import { ErrorBanner } from "../ErrorBanner";
 import { EpicStrip } from "./EpicStrip";
 import { FilterBar } from "./FilterBar";
-import { IssueCard } from "./IssueCard";
+import { CardView } from "./IssueCard";
 
 interface Props {
   dashboardId: string;
@@ -94,7 +94,7 @@ export default function Board({ dashboardId }: Props) {
                   className="flex min-h-16 flex-col gap-2 rounded-md bg-neutral-100/60 p-2"
                 >
                   {(board.cells[cellKey(lane.id, column.id)] ?? []).map((card) => (
-                    <IssueCard key={card.key} card={card} showRepo={showRepo} />
+                    <CardView key={card.key} card={card} showRepo={showRepo} />
                   ))}
                 </div>
               ))}

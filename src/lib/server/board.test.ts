@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import { askedLabels, type FilterNode } from "../filter";
-import { cellKey } from "../types";
-import { DASHBOARD, label, makeIssue, REPO } from "./__fixtures__/issues";
-import { buildBoard, compile, isBlocked, placeIn, scopedIssues, unmatchedIssues } from "./board";
+import { type Card, cellKey } from "../types";
+import { DASHBOARD, label, makeIssue, makeJob, REPO } from "./__fixtures__/issues";
+import { buildBoard, compile, isBlocked, placeIn, scopedIssues, unmatchedItems } from "./board";
+
+/** An issue card's number, a CI job card's key. */
+const numberOf = (card: Card) => (card.kind === "ci-job" ? card.name : card.number);
+const asIssue = (card: Card | undefined) => (card?.kind === "ci-job" ? undefined : card);
 
 const cell = (laneId: string, colId: string) => cellKey(laneId, colId);
 const numbers = (board: ReturnType<typeof buildBoard>) =>
-  board.cells[cell("rest", "todo")]?.map((c) => c.number);
+  board.cells[cell("rest", "todo")]?.map(numberOf);
 
 /** A filter hits when it asks for one of the labels `hits`. */
 const hitting =
@@ -70,7 +74,7 @@ describe("scopedIssues", () => {
   });
 });
 
-describe("unmatchedIssues", () => {
+describe("unmatchedItems", () => {
   it("lists the users' open items no dashboard places, newest first", () => {
     const narrow = {
       ...DASHBOARD,
@@ -97,8 +101,8 @@ describe("unmatchedIssues", () => {
       }),
       makeIssue({ number: 8, author: "bob" }),
     ];
-    const unmatched = unmatchedIssues(issues, [narrow, wide], ["@me"], "me");
-    expect(unmatched.map((issue) => issue.number)).toEqual([4, 2]);
+    const unmatched = unmatchedItems(issues, [narrow, wide], ["@me"], "me");
+    expect(unmatched.map(numberOf)).toEqual([4, 2]);
   });
 
   it("drops hidden repos after placement, so their items still count", () => {
@@ -119,15 +123,15 @@ describe("unmatchedIssues", () => {
       makeIssue({ number: 11, ...lib, blockedBy: waitsOn(2), blockedByTotal: 1 }),
     ];
     const unmatched = (hide: string[]) =>
-      unmatchedIssues(issues, [dashboard], [], null, hide).map((card) => card.number);
+      unmatchedItems(issues, [dashboard], [], null, hide).map(numberOf);
     expect(unmatched([])).toEqual([11, 10, 3]);
     expect(unmatched(["acme/lib"])).toEqual([3]);
   });
 
   it("lists every open item when no dashboard has a swimlane", () => {
     const dashboard = { ...DASHBOARD, swimlanes: [] };
-    const unmatched = unmatchedIssues([makeIssue({ number: 1 })], [dashboard]);
-    expect(unmatched.map((issue) => issue.number)).toEqual([1]);
+    const unmatched = unmatchedItems([makeIssue({ number: 1 })], [dashboard]);
+    expect(unmatched.map(numberOf)).toEqual([1]);
   });
 });
 
@@ -141,10 +145,10 @@ describe("buildBoard", () => {
       makeIssue({ number: 5, state: "CLOSED", labels: [label("prio:high")] }),
     ];
     const board = buildBoard(issues, DASHBOARD);
-    expect(board.cells[cell("high", "doing")]?.map((c) => c.number)).toEqual([1]);
-    expect(board.cells[cell("low", "todo")]?.map((c) => c.number)).toEqual([2]);
-    expect(board.cells[cell("rest", "done")]?.map((c) => c.number)).toEqual([3]);
-    expect(board.cells[cell("rest", "todo")]?.map((c) => c.number)).toEqual([4]);
+    expect(board.cells[cell("high", "doing")]?.map(numberOf)).toEqual([1]);
+    expect(board.cells[cell("low", "todo")]?.map(numberOf)).toEqual([2]);
+    expect(board.cells[cell("rest", "done")]?.map(numberOf)).toEqual([3]);
+    expect(board.cells[cell("rest", "todo")]?.map(numberOf)).toEqual([4]);
     expect(board.laneTotals).toEqual({ high: 1, low: 1, rest: 2 });
   });
 
@@ -163,9 +167,9 @@ describe("buildBoard", () => {
       makeIssue({ number: 3, labels: [label("wait")] }),
     ];
     const board = buildBoard(issues, dashboard);
-    expect(board.cells[cell("rest", "waiting")]?.map((c) => c.number)).toEqual([1]);
-    expect(board.cells[cell("rest", "doing")]?.map((c) => c.number)).toEqual([2, 1]);
-    expect(board.cells[cell("rest", "todo")]?.map((c) => c.number)).toEqual([3]);
+    expect(board.cells[cell("rest", "waiting")]?.map(numberOf)).toEqual([1]);
+    expect(board.cells[cell("rest", "doing")]?.map(numberOf)).toEqual([2, 1]);
+    expect(board.cells[cell("rest", "todo")]?.map(numberOf)).toEqual([3]);
     expect(board.labels).toEqual([]);
   });
 
@@ -216,7 +220,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 3 }),
     ];
     const board = buildBoard(issues, dashboard);
-    const lane = (id: string) => board.cells[cell(id, "todo")]?.map((c) => c.number);
+    const lane = (id: string) => board.cells[cell(id, "todo")]?.map(numberOf);
     expect(lane("a")).toEqual([1]);
     expect(lane("b")).toEqual([2]);
     expect(lane("rest")).toEqual([3]);
@@ -237,7 +241,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 3 }),
     ];
     const board = buildBoard(issues, dashboard);
-    const column = (id: string) => board.cells[cell("rest", id)]?.map((c) => c.number);
+    const column = (id: string) => board.cells[cell("rest", id)]?.map(numberOf);
     expect(column("a")).toEqual([1]);
     expect(column("b")).toEqual([2]);
     expect(column("rest")).toEqual([3]);
@@ -256,8 +260,8 @@ describe("buildBoard", () => {
       makeIssue({ number: 2, labels: [label("prio:high")] }),
     ];
     const board = buildBoard(issues, dashboard);
-    expect(board.cells[cell("prs", "todo")]?.map((c) => c.number)).toEqual([1]);
-    expect(board.cells[cell("high", "todo")]?.map((c) => c.number)).toEqual([2, 1]);
+    expect(board.cells[cell("prs", "todo")]?.map(numberOf)).toEqual([1]);
+    expect(board.cells[cell("high", "todo")]?.map(numberOf)).toEqual([2, 1]);
   });
 
   it("shows an issue in every lane and column it matches, counting it once", () => {
@@ -270,7 +274,7 @@ describe("buildBoard", () => {
     const board = buildBoard(issues, DASHBOARD);
     for (const lane of ["high", "low"])
       for (const column of ["doing", "done"])
-        expect(board.cells[cell(lane, column)]?.map((c) => c.number)).toEqual([1]);
+        expect(board.cells[cell(lane, column)]?.map(numberOf)).toEqual([1]);
     expect(board.cells[cell("rest", "todo")]).toEqual([]);
     expect(board.laneTotals).toEqual({ high: 1, low: 1, rest: 0 });
     expect(board.columnTotals).toEqual({ todo: 0, doing: 1, done: 1 });
@@ -298,8 +302,8 @@ describe("buildBoard", () => {
       makeIssue({ number: 5, kind: "pr", labels: [label("is:conflicting")] }),
     ];
     const board = buildBoard(issues, dashboard);
-    expect(board.cells[cell("fix", "todo")]?.map((c) => c.number)).toEqual([3, 2, 1]);
-    expect(board.cells[cell("fix", "todo")]?.map((c) => c.statuses)).toEqual([
+    expect(board.cells[cell("fix", "todo")]?.map(numberOf)).toEqual([3, 2, 1]);
+    expect(board.cells[cell("fix", "todo")]?.map((c) => asIssue(c)?.statuses)).toEqual([
       ["is:unanswered"],
       ["is:ci:failed"],
       ["is:conflicting"],
@@ -330,9 +334,9 @@ describe("buildBoard", () => {
       }),
     ];
     const board = buildBoard(issues, dashboard, {}, ["alice"]);
-    expect(board.cells[cell("review", "todo")]?.map((c) => [c.number, c.statuses])).toEqual([
-      [1, ["is:has-pr"]],
-    ]);
+    expect(
+      board.cells[cell("review", "todo")]?.map((c) => [numberOf(c), asIssue(c)?.statuses]),
+    ).toEqual([[1, ["is:has-pr"]]]);
   });
 
   it("leaves out issues that fit no group when an axis has no catch-all", () => {
@@ -379,7 +383,7 @@ describe("buildBoard", () => {
       assignees: [{ login: "ann", avatarUrl: "" }],
     });
     const board = buildBoard([issue], DASHBOARD);
-    const card = board.cells[cell("high", "doing")]?.[0];
+    const card = asIssue(board.cells[cell("high", "doing")]?.[0]);
     expect(card?.labels.map((l) => l.name)).toEqual(["bug"]);
     expect(card?.isEpic).toBe(true);
     expect(board.labels).toEqual(["bug"]);
@@ -394,7 +398,9 @@ describe("buildBoard", () => {
     ];
     const board = buildBoard(issues, DASHBOARD);
     expect(board.epics.map((epic) => epic.number)).toEqual([2, 1]);
-    expect(board.cells[cell("high", "todo")]?.[0]?.labels.map((l) => l.name)).toEqual(["Bug"]);
+    expect(asIssue(board.cells[cell("high", "todo")]?.[0])?.labels.map((l) => l.name)).toEqual([
+      "Bug",
+    ]);
     expect(board.labels).toEqual(["Bug"]);
     expect(numbers(buildBoard(issues, DASHBOARD, { label: "BUG" }))).toEqual([3]);
   });
@@ -416,17 +422,17 @@ describe("buildBoard", () => {
       makeIssue({ number: 5, author: "me" }),
     ];
     const board = buildBoard(issues, dashboard, {}, [], new Set(), "me");
-    expect(board.cells[cell("blocking", "todo")]?.map((c) => c.number)).toEqual([1]);
-    expect(board.cells[cell("mine", "todo")]?.map((c) => c.number)).toEqual([5]);
+    expect(board.cells[cell("blocking", "todo")]?.map(numberOf)).toEqual([1]);
+    expect(board.cells[cell("mine", "todo")]?.map(numberOf)).toEqual([5]);
     expect(numbers(board)).toEqual([3, 2]);
   });
 
   it("sorts cells by the dashboard sort, overridable per request", () => {
     const issues = [makeIssue({ number: 1 }), makeIssue({ number: 3 }), makeIssue({ number: 2 })];
     const byDefault = buildBoard(issues, DASHBOARD);
-    expect(byDefault.cells[cell("rest", "todo")]?.map((c) => c.number)).toEqual([3, 2, 1]);
+    expect(byDefault.cells[cell("rest", "todo")]?.map(numberOf)).toEqual([3, 2, 1]);
     const asc = buildBoard(issues, DASHBOARD, { sort: "created", dir: "asc" });
-    expect(asc.cells[cell("rest", "todo")]?.map((c) => c.number)).toEqual([1, 2, 3]);
+    expect(asc.cells[cell("rest", "todo")]?.map(numberOf)).toEqual([1, 2, 3]);
     expect(asc.sort).toEqual({ by: "created", dir: "asc" });
   });
 
@@ -552,7 +558,7 @@ describe("buildBoard", () => {
     const board = buildBoard(issues, dashboard, {}, [], new Set(), "me");
     expect(numbers(board)).toEqual([3, 2]);
     expect(board.epics.map((epic) => epic.key)).toEqual(["acme/other#3"]);
-    expect(board.cells[cell("rest", "todo")]?.[1]?.labels).toEqual([]);
+    expect(asIssue(board.cells[cell("rest", "todo")]?.[1])?.labels).toEqual([]);
     expect(board.repos).toEqual(["acme/app", "acme/other"]);
   });
 
@@ -576,6 +582,69 @@ describe("buildBoard", () => {
     const dashboard = { ...DASHBOARD, epicLabel: undefined };
     const board = buildBoard([makeIssue({ number: 1, labels: [label("epic")] })], dashboard);
     expect(board.epics).toEqual([]);
-    expect(board.cells[cell("rest", "todo")]?.[0]?.labels.map((l) => l.name)).toEqual(["epic"]);
+    expect(asIssue(board.cells[cell("rest", "todo")]?.[0])?.labels.map((l) => l.name)).toEqual([
+      "epic",
+    ]);
+  });
+});
+
+const jobs = [
+  makeJob({ name: "test" }),
+  makeJob({ name: "lint", branch: "fix/y", authors: ["bob"] }),
+];
+/** Names of the job cards in the catch-all cell under `filters`. */
+const shownJobs = (filters: Parameters<typeof buildBoard>[2]) =>
+  buildBoard([], DASHBOARD, filters, [], new Set(), null, jobs).cells[cell("rest", "todo")]?.map(
+    numberOf,
+  );
+
+describe("CI jobs", () => {
+  it("lands on the grid like an issue, sorted with the issues", () => {
+    const board = buildBoard([makeIssue({ number: 1 })], DASHBOARD, {}, [], new Set(), null, jobs);
+    expect(board.cells[cell("rest", "todo")]?.map(numberOf)).toEqual(["test", "lint", 1]);
+    expect(board.total).toBe(3);
+    expect(board.cells[cell("rest", "todo")]?.[0]).toMatchObject({
+      kind: "ci-job",
+      branch: "feat/x",
+      failedAt: "2026-02-15T00:00:00Z",
+    });
+  });
+
+  it("shows only the jobs of branches the global users have commits in", () => {
+    const mine = buildBoard([], DASHBOARD, {}, ["@me"], new Set(), "bob", jobs);
+    expect(mine.cells[cell("rest", "todo")]?.map(numberOf)).toEqual(["lint"]);
+  });
+
+  it("follows the dashboard filter and the swimlanes", () => {
+    const lanes = [
+      { id: "ci", name: "CI", filter: "is:ci-job job:lint", hideBlocked: false },
+      { id: "rest", name: "Rest", filter: "other", hideBlocked: false },
+    ];
+    const board = buildBoard([], { ...DASHBOARD, swimlanes: lanes }, {}, [], new Set(), null, jobs);
+    expect(board.cells[cell("ci", "todo")]?.map(numberOf)).toEqual(["lint"]);
+    const scoped = { ...DASHBOARD, filter: "-is:ci-job" };
+    expect(buildBoard([], scoped, {}, [], new Set(), null, jobs).total).toBe(0);
+  });
+
+  it("matches the text filter on job and branch names, and no other filter", () => {
+    expect(shownJobs({ q: "FIX/" })).toEqual(["lint"]);
+    expect(shownJobs({ q: "test" })).toEqual(["test"]);
+    expect(shownJobs({ label: "bug" })).toEqual([]);
+    expect(shownJobs({ assignee: "bob" })).toEqual([]);
+    expect(shownJobs({ epic: "acme/app#1" })).toEqual([]);
+    expect(shownJobs({ hide: [REPO] })).toEqual([]);
+  });
+
+  it("filters by job name in any case, which hides every issue, and lists the names", () => {
+    const issues = [makeIssue({ number: 1 })];
+    const board = buildBoard(issues, DASHBOARD, { job: "LINT" }, [], new Set(), null, jobs);
+    expect(board.cells[cell("rest", "todo")]?.map(numberOf)).toEqual(["lint"]);
+    expect(board.jobs).toEqual(["lint", "test"]);
+  });
+
+  it("lists a job no dashboard places as unmatched", () => {
+    const issuesOnly = { ...DASHBOARD, filter: "-is:ci-job" };
+    const unmatched = unmatchedItems([], [issuesOnly], ["bob"], null, [], jobs);
+    expect(unmatched.map(numberOf)).toEqual(["lint"]);
   });
 });

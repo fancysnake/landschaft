@@ -18,6 +18,7 @@ export const GET = route(async ({ params, url }) => {
     config.users,
     db.starredEpics(dashboard.id),
     viewer,
+    db.listCiJobs(config.repos),
   );
   return json({ dashboard, board, status: syncer.status() });
 });
