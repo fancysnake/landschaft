@@ -139,7 +139,7 @@ describe("config schema rules", () => {
     });
     expect(lane({ labels: ["a", "b"], match: "all" })?.filter).toBe("label:a label:b");
     expect(lane({ labels: ["bug", "is:ci:failed", "is:has-pr"] })?.filter).toBe(
-      "label:bug OR is:ci:failed OR is:has-pr",
+      "label:bug OR is:ci:failed OR has:pr",
     );
     expect(lane({ labels: ["a", "is:unanswered"], kind: "pr" })?.filter).toBe(
       "is:pr (label:a OR is:unanswered)",
@@ -336,6 +336,42 @@ describe("config upgrades", () => {
     expect(laneIds({ dashboards: [dashboard("a", { swimlanes: taken })] })).toEqual([
       ["ci-jobs-2", "ci-jobs"],
     ]);
+  });
+
+  it("rewrites is:has-pr as has:pr", () => {
+    const old = {
+      version: 1,
+      dashboards: [
+        dashboard("a", {
+          filter: "-is:has-pr",
+          swimlanes: [
+            { id: "a", name: "A", filter: "is:issue is:has-pr" },
+            { id: "b", name: "B", filter: "label:x (is:conflicting|has-pr)" },
+            { id: "c", name: "C", labels: ["is:has-pr"] },
+            { id: "d", name: "D", filter: "label:is-has-pr has:sub-issues" },
+            { id: "e", name: "E", filter: 'is:"has-pr"' },
+            { id: "f", name: "F", filter: 'is:pr|"HAS-PR"' },
+          ],
+        }),
+        {
+          type: "inbox",
+          id: "i",
+          name: "I",
+          groups: [{ id: "g", name: "G", filter: "is:has-pr" }],
+        },
+      ],
+    };
+    const [board, inbox] = ConfigSchema.parse(old).dashboards;
+    expect(board?.filter).toBe("-has:pr");
+    expect(asBoard(board).swimlanes.map(({ filter }) => filter)).toEqual([
+      "is:issue has:pr",
+      "label:x ((is:conflicting OR has:pr))",
+      "has:pr",
+      "label:is-has-pr has:sub-issues",
+      "has:pr",
+      "(is:pr OR has:pr)",
+    ]);
+    expect(inbox?.type === "inbox" && inbox.groups[0]?.filter).toBe("has:pr");
   });
 
   it("leaves a current config alone and rejects a version it does not know", () => {

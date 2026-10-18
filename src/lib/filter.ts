@@ -1,6 +1,6 @@
 import type { IssueRef, ItemKind } from "./types";
 
-import { STATUS_LABEL_NAMES, type StatusLabel } from "./status";
+import { PULL_STATUS_NAMES, type PullStatusLabel } from "./status";
 
 /**
  * Filter expressions for swimlanes and columns, in GitHub search syntax: `key:value` terms,
@@ -192,7 +192,9 @@ export interface FilterItem {
   authors: string[];
   assignees: { login: string }[];
   labels: { name: string }[];
-  statuses: StatusLabel[];
+  statuses: PullStatusLabel[];
+  /** An issue an open PR closes; a CI job whose branch an open PR comes from. */
+  hasPr: boolean;
   parent: IssueRef | null;
   subIssues: { total: number };
   /** Has an open blocker. */
@@ -267,7 +269,7 @@ const KEYS = {
     pr: (item) => item.kind === "pr",
     "ci-job": (item) => item.kind === "ci-job",
     ...Object.fromEntries(
-      STATUS_LABEL_NAMES.map((status) => [
+      PULL_STATUS_NAMES.map((status) => [
         status.replace(/^is:/, ""),
         (item: FilterItem) => item.statuses.includes(status),
       ]),
@@ -276,6 +278,7 @@ const KEYS = {
     blocking: (item) => item.blocking,
   }),
   has: oneOf({
+    pr: (item) => item.hasPr,
     "parent-issue": (item) => item.parent !== null,
     "sub-issues": (item) => item.subIssues.total > 0,
   }),

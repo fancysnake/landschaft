@@ -4,7 +4,7 @@ import "../styles/global.css";
 import Nav from "../components/Nav";
 
 import { getApp } from "../lib/server/app";
-import { scopedIssues } from "../lib/server/board";
+import { scopedRepos } from "../lib/server/board";
 import { loadConfig } from "../lib/server/config";
 
 interface Props {
@@ -16,10 +16,12 @@ const { dashboards, repos, users } = loadConfig();
 const { db, syncer } = getApp();
 const viewer = await syncer.viewer().catch(() => null);
 const issues = db.listIssues(repos);
-const tabs = dashboards.map(({ id, name, filter }) => {
-  const scoped = scopedIssues(issues, { filter }, users, viewer);
-  return { id, name, repos: [...new Set(scoped.map((issue) => issue.repo))] };
-});
+const jobs = db.listCiJobs(repos);
+const tabs = dashboards.map(({ id, name, filter }) => ({
+  id,
+  name,
+  repos: [...scopedRepos(issues, jobs, { filter }, users, viewer)],
+}));
 ---
 
 <!doctype html>

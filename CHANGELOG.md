@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- `has:pr` replaces `is:has-pr`, for issues and CI jobs alike; loading a config rewrites
+  filters that use the old term (config version 2).
+
 ## [3.0.0] - 2026-10-18
 
 ### Added
