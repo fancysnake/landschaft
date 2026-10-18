@@ -227,6 +227,16 @@ describe("createGithubClient", () => {
     timeout.mockRestore();
   });
 
+  it("keeps the data next to errors only when asked to", async () => {
+    const body = { data: { ok: true }, errors: [{ message: "Could not resolve head ref" }] };
+    const gh = createGithubClient(
+      async () => "tok",
+      async () => jsonResponse(body),
+    );
+    await expect(gh.gql("q", {})).rejects.toThrow("Could not resolve head ref");
+    await expect(gh.gql("q", {}, { partial: true })).resolves.toEqual({ ok: true });
+  });
+
   it("resolves the token once", async () => {
     const tokenSource = vi.fn(async () => "tok");
     const gh = createGithubClient(tokenSource, async () => jsonResponse({ data: { ok: true } }));

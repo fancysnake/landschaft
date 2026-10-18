@@ -4,7 +4,7 @@ import { useBoard } from "../../lib/client/useBoard";
 import { useViewRequest } from "../../lib/client/useViewRequest";
 import { cellKey } from "../../lib/types";
 import { EpicStrip } from "./EpicStrip";
-import { IssueCard } from "./IssueCard";
+import { CardView } from "./IssueCard";
 import { ViewShell } from "./ViewShell";
 
 interface Props {
@@ -79,7 +79,7 @@ export default function Board({ dashboardId }: Props) {
                   className="flex min-h-16 flex-col gap-2 rounded-md bg-neutral-100/60 p-2"
                 >
                   {(board.cells[cellKey(lane.id, column.id)] ?? []).map((card) => (
-                    <IssueCard key={card.key} card={card} showRepo={showRepo} />
+                    <CardView key={card.key} card={card} showRepo={showRepo} />
                   ))}
                 </div>
               ))}

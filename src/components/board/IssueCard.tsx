@@ -1,7 +1,7 @@
 import type { StatusLabel } from "../../lib/status";
-import type { Card } from "../../lib/types";
+import type { Card, CiJobCard, IssueItemCard } from "../../lib/types";
 
-import { labelStyle, repoShortName } from "../../lib/client/labels";
+import { labelStyle, relativeTime, repoShortName } from "../../lib/client/labels";
 
 const STATUS_PILLS: Record<StatusLabel, { text: string; title: string; className: string }> = {
   "is:conflicting": {
@@ -27,12 +27,51 @@ const STATUS_PILLS: Record<StatusLabel, { text: string; title: string; className
   },
 };
 
-interface Props {
-  card: Card;
-  showRepo: boolean;
+function CiJobItem({ card, showRepo }: { card: CiJobCard; showRepo: boolean }) {
+  return (
+    <article className="rounded-md border border-l-4 border-orange-300 border-l-orange-500 bg-orange-50 p-2 text-sm shadow-xs">
+      <div className="mb-1 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">
+        <span className="rounded bg-red-100 px-1 text-red-800">CI ✗</span>
+        <span className="font-mono">
+          {showRepo && `${repoShortName(card.repo)}:`}
+          {card.branch}
+        </span>
+        {card.pr && (
+          <a
+            href={card.pr.url}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded bg-sky-100 px-1 text-sky-800 hover:underline"
+          >
+            PR #{card.pr.number}
+          </a>
+        )}
+        <span className="ml-auto" title={card.failedAt}>
+          failed {relativeTime(card.failedAt)}
+        </span>
+      </div>
+      <a
+        href={card.url}
+        target="_blank"
+        rel="noreferrer"
+        className="font-medium text-neutral-900 hover:underline"
+      >
+        {card.workflow ? `${card.workflow} / ${card.name}` : card.name}
+      </a>
+    </article>
+  );
 }
 
-export function IssueCard({ card, showRepo }: Props) {
+/** `card` as its kind shows. */
+export function CardView({ card, showRepo }: { card: Card; showRepo: boolean }) {
+  return card.kind === "ci-job" ? (
+    <CiJobItem card={card} showRepo={showRepo} />
+  ) : (
+    <IssueCard card={card} showRepo={showRepo} />
+  );
+}
+
+function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean }) {
   return (
     <article
       className={`rounded-md border border-l-4 p-2 text-sm shadow-xs ${

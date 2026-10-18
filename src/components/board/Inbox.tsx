@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import { api } from "../../lib/client/api";
 import { useSynced } from "../../lib/client/useSynced";
 import { useViewRequest } from "../../lib/client/useViewRequest";
-import { IssueCard } from "./IssueCard";
+import { CardView } from "./IssueCard";
 import { ViewShell } from "./ViewShell";
 
 interface Props {
@@ -63,7 +63,7 @@ export default function Inbox({ dashboardId }: Props) {
                 <ul className="mt-2 flex flex-col gap-2">
                   {cards.map((card) => (
                     <li key={card.key}>
-                      <IssueCard card={card} showRepo={showRepo} />
+                      <CardView card={card} showRepo={showRepo} />
                     </li>
                   ))}
                 </ul>

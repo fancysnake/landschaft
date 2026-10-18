@@ -11,7 +11,7 @@ Astro 7 in SSR mode (`@astrojs/node`, standalone) with React 19 islands, Tailwin
 - `src/lib/schema.ts` — zod schemas shared by server and client: config, filters and sync
   requests. The types are inferred from them.
 - `src/lib/server/config.ts` — load and atomic save of `landschaft.config.json`.
-- `src/lib/server/db.ts` — SQLite schema and queries (issues, blockers, labels, sync state).
+- `src/lib/server/db.ts` — SQLite schema and queries (issues, blockers, labels, failed CI jobs, sync state).
 - `src/lib/server/github.ts` — GraphQL sync queries; token from
   `GITHUB_TOKEN` or `gh auth token`.
 - `src/lib/server/sync.ts` — the `Syncer` (sequential, incremental and full passes) and the

@@ -46,12 +46,35 @@ A PR card shows a pill for each status that holds, whatever lane it is in: `conf
 opened the PR, as long as the PR is in one of the global repos; such an issue card shows a
 `PR open` pill. It drops once the PR is merged or closed.
 
+## Failed CI jobs
+
+A job whose newest run on a branch failed shows as a card of its own: a GitHub Actions job, a
+check run from another app, or a commit status. The card links to the run and names the
+branch, when the job failed and the open PR from the branch, if any. A passing run on the
+branch removes it; an old failure stays however long the branch sits untouched.
+
+Every branch counts, but a board shows its jobs only when the branch is one of the global
+users': one of them authored a commit the branch has on top of the default branch, or, with
+nothing on top, one of its last three commits. A branch with nothing but a bot's commit on
+top of main stays off. `author:` and `user:` match those commit authors.
+
+`is:ci-job` picks the jobs, `job:` and `branch:` match job and branch names (any case,
+`a|b` for either), and `is:has-pr` holds when an open PR comes from the branch. A catch-all
+swimlane, column or inbox group takes jobs like any other item; `-is:ci-job` in a dashboard's
+filter keeps them off it. The search box matches job and branch names, and the CI job filter
+picks jobs by name and hides issues; the assignee, label and epic filters hide jobs.
+
+Each sync first reads the head commit status of every branch, then fetches jobs and commit
+authors for the failing ones alone. It looks at the head commit only, so a job that skipped
+it (a path filter, say) hides an older failure.
+
 ## Inbox
 
 An inbox dashboard lists its items instead of laying them out on a grid. Each group has a
 filter in the same language; an item lands in the **first** group it matches, so `other` (or an
 empty filter) in the last group catches the rest. An item no group takes is left out and shows
-on the Unmatched page. PRs and issues render the same way, in the dashboard's sort.
+on the Unmatched page. PRs, issues and failed CI jobs render as on a board, in the dashboard's
+sort.
 
 Each group header shows its count and folds the group away on click; `collapsed` in the config
 sets how a group starts on every page load. An inbox has no epic strip.

@@ -32,8 +32,8 @@ export function FilterBar({ filters, facets, epics, onChange }: Props) {
         type="search"
         value={text}
         onChange={(event) => setText(event.target.value)}
-        placeholder="Search title or #number"
-        className={`${select} w-56`}
+        placeholder="Search title, #number, job or branch"
+        className={`${select} w-64`}
       />
       <select
         aria-label="Assignee"
@@ -72,6 +72,21 @@ export function FilterBar({ filters, facets, epics, onChange }: Props) {
           {epics.map((epic) => (
             <option key={epic.key} value={epic.key}>
               {epic.title}
+            </option>
+          ))}
+        </select>
+      )}
+      {facets.jobs.length > 0 && (
+        <select
+          aria-label="CI job"
+          value={filters.job ?? ""}
+          onChange={(event) => onChange({ job: event.target.value || undefined })}
+          className={select}
+        >
+          <option value="">Any CI job</option>
+          {facets.jobs.map((name) => (
+            <option key={name} value={name}>
+              {name}
             </option>
           ))}
         </select>

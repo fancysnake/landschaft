@@ -28,7 +28,12 @@ export async function getToken(): Promise<string> {
 }
 
 export interface GithubClient {
-  gql<T>(query: string, variables: Record<string, unknown>): Promise<T>;
+  /** With `partial`, errors next to data are dropped; the fields they hit come back null. */
+  gql<T>(
+    query: string,
+    variables: Record<string, unknown>,
+    options?: { partial?: boolean },
+  ): Promise<T>;
 }
 
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
@@ -49,7 +54,11 @@ export function createGithubClient(
     return cached;
   };
   return {
-    async gql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
+    async gql<T>(
+      query: string,
+      variables: Record<string, unknown>,
+      options: { partial?: boolean } = {},
+    ): Promise<T> {
       const response = await fetchImpl("https://api.github.com/graphql", {
         method: "POST",
         headers: {
@@ -63,7 +72,7 @@ export function createGithubClient(
         throw new GithubError(`GraphQL HTTP ${response.status}: ${await response.text()}`);
       }
       const payload = (await response.json()) as { data?: T; errors?: { message: string }[] };
-      if (payload.errors?.length) {
+      if (payload.errors?.length && !(options.partial && payload.data)) {
         throw new GithubError(payload.errors.map((e) => e.message).join("; "));
       }
       if (!payload.data) throw new GithubError("GraphQL response without data");
@@ -171,7 +180,7 @@ export interface PullNode {
   };
 }
 
-interface PageInfo {
+export interface PageInfo {
   hasNextPage: boolean;
   endCursor: string | null;
 }
@@ -254,7 +263,7 @@ export function toPull(repo: string, node: PullNode): FetchedIssue {
   };
 }
 
-function splitRepo(repo: string): { owner: string; name: string } {
+export function splitRepo(repo: string): { owner: string; name: string } {
   const [owner, name] = repo.split("/");
   if (!owner || !name) throw new GithubError(`invalid repo "${repo}", expected owner/repo`);
   return { owner, name };
@@ -332,7 +341,7 @@ function isRunning(check: CheckContext): boolean {
     : check.status !== "COMPLETED";
 }
 
-interface Login {
+export interface Login {
   login: string;
 }
 
@@ -352,6 +361,8 @@ export interface PullStatusNode {
   };
 }
 
+export const isRed = (state: StatusState | undefined) => state === "FAILURE" || state === "ERROR";
+
 /** Unanswered: an unresolved review thread whose last comment is not the PR author's. */
 export function toPullStatus(node: PullStatusNode): PullStatus {
   const author = node.author?.login;
@@ -359,7 +370,7 @@ export function toPullStatus(node: PullStatusNode): PullStatus {
   const holds: Record<PullStatusLabel, boolean> = {
     "is:conflicting": node.mergeable === "CONFLICTING",
     // The commit's red X; it stays red while other checks still run.
-    "is:ci:failed": rollup?.state === "FAILURE" || rollup?.state === "ERROR",
+    "is:ci:failed": isRed(rollup?.state),
     "is:ci:running": rollup?.contexts.nodes.some(isRunning) ?? false,
     "is:unanswered": node.reviewThreads.nodes.some(
       (thread) => !thread.isResolved && thread.comments.nodes[0]?.author?.login !== author,

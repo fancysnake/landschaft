@@ -14,6 +14,7 @@ dashboard filters.
 
 | Field            | Type                 | Default | Meaning                                                              |
 | ---------------- | -------------------- | ------- | -------------------------------------------------------------------- |
+| `version`        | integer              | `0`     | Config format; landschaft upgrades older ones on load                |
 | `repos`          | `owner/repo[]`       | `[]`    | Repositories to sync                                                 |
 | `users`          | `(login \| "@me")[]` | `[]`    | Only items these users created or are assigned to; `[]` = everyone's |
 | `refreshMinutes` | 1–1440               | `5`     | Background sync interval for every repository                        |
@@ -72,6 +73,11 @@ Configs from before global repos keep loading too. The global repos and users be
 unions of the dashboards' (users stay empty if any dashboard showed everyone's), the refresh
 interval the shortest any dashboard had, and a dashboard narrower than that gets a matching
 `repo:`/`user:` filter.
+
+Each format change bumps `version`, and loading upgrades an older config step by step; the
+next save writes the result. Version 1 brought failed CI jobs: every dashboard gets a top
+`Failed CI` swimlane with the filter `is:ci-job`, so the jobs land somewhere. A config with a
+version newer than the running landschaft fails validation.
 
 ## Files and environment
 

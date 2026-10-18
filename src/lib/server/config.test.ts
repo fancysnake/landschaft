@@ -3,10 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { type BoardDashboard, ConfigSchema, type Dashboard } from "../schema";
+import { type BoardDashboard, CONFIG_VERSION, ConfigSchema, type Dashboard } from "../schema";
 import { findDashboard, loadConfig, saveConfig } from "./config";
 
 const minimal = {
+  version: CONFIG_VERSION,
   dashboards: [
     {
       id: "main",
@@ -44,7 +45,13 @@ describe("config file", () => {
   });
 
   it("returns an empty config when the file is missing", () => {
-    expect(loadConfig(file)).toEqual({ repos: [], users: [], refreshMinutes: 5, dashboards: [] });
+    expect(loadConfig(file)).toEqual({
+      version: CONFIG_VERSION,
+      repos: [],
+      users: [],
+      refreshMinutes: 5,
+      dashboards: [],
+    });
   });
 
   it("round-trips through save and load with defaults filled in", () => {
@@ -78,16 +85,20 @@ function asBoard(dashboard: Dashboard | undefined): BoardDashboard {
 
 const parseDashboard = (extra: object) =>
   asBoard(
-    ConfigSchema.parse({ dashboards: [{ ...minimal.dashboards[0]!, ...extra }] }).dashboards[0],
+    ConfigSchema.parse({ ...minimal, dashboards: [{ ...minimal.dashboards[0]!, ...extra }] })
+      .dashboards[0],
   );
 
 const lane = (group: object) =>
   parseDashboard({ swimlanes: [{ id: "a", name: "A", ...group }] }).swimlanes[0];
 
 const usersOf = (extra: object) =>
-  ConfigSchema.parse({ dashboards: [{ ...minimal.dashboards[0]!, ...extra }] }).users;
+  ConfigSchema.parse({ ...minimal, dashboards: [{ ...minimal.dashboards[0]!, ...extra }] }).users;
 
 const dashboard = (id: string, extra: object) => ({ ...minimal.dashboards[0]!, id, ...extra });
+
+const laneIds = (config: unknown) =>
+  ConfigSchema.parse(config).dashboards.map((d) => asBoard(d).swimlanes.map((group) => group.id));
 
 describe("config schema rules", () => {
   const base = minimal.dashboards[0]!;
@@ -157,7 +168,10 @@ describe("config schema rules", () => {
       { id: "b", name: "B", labels: ["b"], kind: "pr" },
       { id: "c", name: "C", filter: "" },
     ];
-    const parsed = ConfigSchema.parse({ dashboards: [{ ...base, swimlanes, columns }] });
+    const parsed = ConfigSchema.parse({
+      ...minimal,
+      dashboards: [{ ...base, swimlanes, columns }],
+    });
     expect(asBoard(parsed.dashboards[0]).swimlanes.map((group) => group.filter)).toEqual([
       "label:a",
       "other -(label:b)",
@@ -305,6 +319,32 @@ describe("dashboard type", () => {
     const twice = { ...inbox, groups: [inbox.groups[0], inbox.groups[0]] };
     expect(() => ConfigSchema.parse({ dashboards: [twice] })).toThrow("ids must be unique");
     expect(() => ConfigSchema.parse({ dashboards: [{ ...inbox, type: "heatmap" }] })).toThrow();
+  });
+});
+
+describe("config upgrades", () => {
+  const { version: _, ...unversioned } = minimal;
+
+  it("gives each dashboard from before CI jobs a top lane for them", () => {
+    const config = ConfigSchema.parse(unversioned);
+    expect(config.version).toBe(CONFIG_VERSION);
+    expect(asBoard(config.dashboards[0]).swimlanes).toEqual([
+      { id: "ci-jobs", name: "Failed CI", filter: "is:ci-job", hideBlocked: false },
+      { id: "all", name: "All", filter: "other", hideBlocked: false },
+    ]);
+    const taken = [{ id: "ci-jobs", name: "Mine", filter: "label:ci" }];
+    expect(laneIds({ dashboards: [dashboard("a", { swimlanes: taken })] })).toEqual([
+      ["ci-jobs-2", "ci-jobs"],
+    ]);
+  });
+
+  it("leaves a current config alone and rejects a version it does not know", () => {
+    expect(laneIds(minimal)).toEqual([["all"], ["all"]]);
+    expect(laneIds(ConfigSchema.parse(unversioned))).toEqual([
+      ["ci-jobs", "all"],
+      ["ci-jobs", "all"],
+    ]);
+    expect(() => ConfigSchema.parse({ ...minimal, version: CONFIG_VERSION + 1 })).toThrow();
   });
 });
 

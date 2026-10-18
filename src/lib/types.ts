@@ -3,6 +3,8 @@ import type { PullStatusLabel, StatusLabel } from "./status";
 
 export type IssueState = "OPEN" | "CLOSED";
 export type IssueKind = "issue" | "pr";
+/** What a board shows: issues, PRs and failed CI jobs. */
+export type ItemKind = IssueKind | "ci-job";
 
 export interface IssueRef {
   repo: string;
@@ -82,7 +84,37 @@ export function parseIssueKey(key: string): { repo: string; number: number } | n
   return { repo: match[1]!, number: Number(match[2]) };
 }
 
-export interface Card {
+/**
+ * A check run or commit status that failed on a branch's head commit. `authors` are those of the
+ * branch's commits ahead of the default branch, or of its last three when none are ahead; a board
+ * shows the job when one of them is one of the global users.
+ */
+export interface CiJob {
+  repo: string;
+  branch: string;
+  /** The Actions workflow of the job; null for other check runs and for commit statuses. */
+  workflow: string | null;
+  name: string;
+  url: string;
+  failedAt: string;
+  authors: string[];
+  /** The open PR from the branch. */
+  pr: { number: number; url: string } | null;
+}
+
+export function ciJobKey(job: Pick<CiJob, "repo" | "branch" | "workflow" | "name">): string {
+  // Fields apart, since a workflow or job name may hold any separator.
+  return JSON.stringify([job.repo, job.branch, job.workflow, job.name]);
+}
+
+export type Card = IssueItemCard | CiJobCard;
+
+export interface CiJobCard extends Omit<CiJob, "authors"> {
+  key: string;
+  kind: "ci-job";
+}
+
+export interface IssueItemCard {
   key: string;
   kind: IssueKind;
   repo: string;
@@ -117,6 +149,8 @@ export interface Facets {
   repos: string[];
   assignees: string[];
   labels: string[];
+  /** Names of the failed CI jobs among the dashboard's items. */
+  jobs: string[];
   sort: { by: SortBy; dir: SortDir };
 }
 

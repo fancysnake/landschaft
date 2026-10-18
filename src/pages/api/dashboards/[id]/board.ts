@@ -10,6 +10,7 @@ export const GET = route(async (context) => {
     config.users,
     db.starredEpics(dashboard.id),
     viewer,
+    db.listCiJobs(config.repos),
   );
   return json({ dashboard, board, status: syncer.status() });
 });

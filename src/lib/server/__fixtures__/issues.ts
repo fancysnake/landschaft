@@ -1,5 +1,5 @@
 import type { BoardDashboard } from "../../schema";
-import type { Issue } from "../../types";
+import type { CiJob, Issue } from "../../types";
 import type { Db } from "../db";
 
 export const REPO = "acme/app";
@@ -56,4 +56,17 @@ export const DASHBOARD: BoardDashboard = {
 /** The cached item `repo#number`, or null. */
 export function cachedIssue(db: Db, repo: string, number: number): Issue | null {
   return db.listIssues([repo]).find((issue) => issue.number === number) ?? null;
+}
+
+export function makeJob(overrides: Partial<CiJob> & { name: string }): CiJob {
+  return {
+    repo: REPO,
+    branch: "feat/x",
+    workflow: "CI",
+    url: `https://github.com/${REPO}/actions/runs/1`,
+    failedAt: "2026-02-15T00:00:00Z",
+    authors: ["ann"],
+    pr: null,
+    ...overrides,
+  };
 }
