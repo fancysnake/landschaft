@@ -30,7 +30,7 @@ const tabs = dashboards.map(({ id, name, filter }) => {
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title} · landschaft</title>
   </head>
-  <body class="flex h-full flex-col bg-neutral-100 text-neutral-900">
+  <body class="flex h-full flex-col bg-neutral-100 font-sans text-neutral-800 antialiased">
     <Nav client:load path={Astro.url.pathname} dashboards={tabs} repos={repos} />
     <main class="min-h-0 flex-1">
       <slot />

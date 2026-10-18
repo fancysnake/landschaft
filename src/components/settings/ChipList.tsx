@@ -38,7 +38,7 @@ export function ChipList({ items, onChange, schema, placeholder }: Props) {
         {items.map((item) => (
           <li
             key={item}
-            className="flex items-center gap-1 rounded-full bg-neutral-200 px-2 text-sm leading-6"
+            className="flex items-center gap-1 rounded-full bg-neutral-100 px-2.5 text-sm leading-6 ring-1 ring-neutral-200 ring-inset"
           >
             {item}
             <button
@@ -58,15 +58,10 @@ export function ChipList({ items, onChange, schema, placeholder }: Props) {
           onChange={(event) => setText(event.target.value)}
           onKeyDown={keyDown}
           placeholder={placeholder}
-          className={`w-64 rounded-md border px-2 py-1 text-sm ${
-            invalid ? "border-red-400" : "border-neutral-300"
-          }`}
+          aria-invalid={Boolean(invalid)}
+          className="field w-64 aria-invalid:border-red-400"
         />
-        <button
-          type="button"
-          onClick={add}
-          className="rounded-md border border-neutral-300 bg-white px-3 py-1 text-sm hover:bg-neutral-50"
-        >
+        <button type="button" onClick={add} className="btn">
           Add
         </button>
         {invalid && <span className="self-center text-xs text-red-700">{invalid}</span>}

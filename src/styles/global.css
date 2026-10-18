@@ -1,1 +1,68 @@
 @import "tailwindcss";
+@import "@fontsource-variable/source-sans-3";
+@import "@fontsource-variable/jetbrains-mono";
+
+@theme {
+  --font-sans: "Source Sans 3 Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+}
+
+@layer base {
+  /* Scales every rem-based size, like a 125% browser zoom. */
+  html {
+    font-size: 125%;
+  }
+
+  :where(a, button, input, select, textarea, summary):focus-visible {
+    outline: 2px solid var(--color-sky-500);
+    outline-offset: 1px;
+  }
+}
+
+/* Shape only: the colour comes from a `TONE` next to it. */
+@utility pill {
+  @apply inline-flex items-center rounded px-1.5 text-[0.6875rem] leading-[1.125rem] font-medium ring-1 ring-inset;
+}
+
+/* `btn`, `field` and `panel` carry a default look; variants below override it. */
+@utility btn {
+  @apply inline-flex items-center gap-1 rounded-md border border-neutral-300 bg-white px-3 py-1 text-sm font-medium text-neutral-800 shadow-xs transition-colors enabled:hover:bg-neutral-50 disabled:opacity-40;
+}
+
+@utility btn-primary {
+  @apply border-neutral-900 bg-neutral-900 text-white enabled:hover:bg-neutral-700;
+}
+
+@utility btn-danger {
+  @apply border-red-300 text-red-700 enabled:hover:bg-red-50;
+}
+
+@utility btn-sm {
+  @apply px-2 py-0.5 text-xs;
+}
+
+@utility field {
+  @apply rounded-md border border-neutral-300 bg-white px-2.5 py-1 text-sm text-neutral-800 shadow-xs placeholder:text-neutral-400;
+}
+
+@utility panel {
+  @apply rounded-lg border border-neutral-200 bg-white shadow-xs;
+}
+
+@utility page-title {
+  @apply text-2xl font-semibold tracking-tight text-neutral-900;
+}
+
+/* Label over a section. */
+@utility eyebrow {
+  @apply text-sm font-semibold text-neutral-700;
+}
+
+/* The active look outranks a hover class next to it: the attribute selectors add specificity. */
+@utility nav-item {
+  @apply rounded-md text-sm transition-colors;
+
+  &[aria-current]:not([aria-current="false"]) {
+    @apply bg-neutral-900 font-medium text-white;
+  }
+}

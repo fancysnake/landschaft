@@ -48,19 +48,19 @@ export default function Inbox({ dashboardId }: Props) {
           const cards = inbox.groups[group.id] ?? [];
           const collapsed = overrides[group.id] ?? group.collapsed;
           return (
-            <section key={group.id}>
+            <section key={group.id} className="panel overflow-hidden">
               <button
                 type="button"
                 aria-expanded={!collapsed}
                 onClick={() => setOverrides({ ...overrides, [group.id]: !collapsed })}
-                className="flex w-full items-baseline gap-2 rounded-md bg-neutral-200/90 px-2 py-1 text-left text-sm font-medium"
+                className="flex w-full items-baseline gap-2 px-3 py-2 text-left font-semibold text-neutral-900 hover:bg-neutral-50"
               >
-                <span className="text-neutral-500">{collapsed ? "▸" : "▾"}</span>
+                <span className="w-3 text-xs text-neutral-400">{collapsed ? "▸" : "▾"}</span>
                 {group.name}
-                <span className="text-neutral-500">{cards.length}</span>
+                <span className="font-normal text-neutral-500 tabular-nums">{cards.length}</span>
               </button>
-              {!collapsed && (
-                <ul className="mt-2 flex flex-col gap-2">
+              {!collapsed && cards.length > 0 && (
+                <ul className="flex flex-col gap-2 border-t border-neutral-100 bg-neutral-50 p-2">
                   {cards.map((card) => (
                     <li key={card.key}>
                       <CardView card={card} showRepo={showRepo} />

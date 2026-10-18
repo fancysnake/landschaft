@@ -38,9 +38,6 @@ function slug(name: string, taken: Set<string>): string {
   return candidate;
 }
 
-const button =
-  "rounded border border-neutral-300 bg-white px-1.5 text-xs leading-5 hover:bg-neutral-50 disabled:opacity-40";
-
 export function LaneColumnEditor<T extends Group>({
   title,
   items,
@@ -73,9 +70,9 @@ export function LaneColumnEditor<T extends Group>({
               <input
                 value={item.name}
                 onChange={(event) => replace(index, { ...item, name: event.target.value })}
-                className="w-full rounded-md border border-neutral-300 px-2 py-1 text-sm"
+                className="field w-full"
               />
-              <div className="mt-0.5 font-mono text-[10px] text-neutral-400">{item.id}</div>
+              <div className="mt-0.5 font-mono text-[0.625rem] text-neutral-400">{item.id}</div>
               {flag && (
                 <label className="mt-1 flex items-center gap-1 text-xs text-neutral-700">
                   <input
@@ -99,7 +96,7 @@ export function LaneColumnEditor<T extends Group>({
             <div className="flex gap-1">
               <button
                 type="button"
-                className={button}
+                className="btn btn-sm"
                 disabled={index === 0}
                 onClick={() => swap(index, index - 1)}
               >
@@ -107,7 +104,7 @@ export function LaneColumnEditor<T extends Group>({
               </button>
               <button
                 type="button"
-                className={button}
+                className="btn btn-sm"
                 disabled={index === items.length - 1}
                 onClick={() => swap(index, index + 1)}
               >
@@ -115,7 +112,7 @@ export function LaneColumnEditor<T extends Group>({
               </button>
               <button
                 type="button"
-                className={button}
+                className="btn btn-sm"
                 disabled={items.length <= minItems}
                 onClick={() => onChange(items.filter((_, i) => i !== index))}
               >

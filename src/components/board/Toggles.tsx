@@ -15,7 +15,7 @@ export function Toggles({ label, options, selected, onChange }: Props) {
   const allOn = options.every((option) => selected.includes(option.value));
 
   return (
-    <div role="group" aria-label={label} className="flex flex-wrap items-center gap-1">
+    <div role="group" aria-label={label} className="flex flex-wrap items-center gap-1.5">
       {options.map((option) => {
         const on = selected.includes(option.value);
         return (
@@ -29,10 +29,10 @@ export function Toggles({ label, options, selected, onChange }: Props) {
                 on ? selected.filter((v) => v !== option.value) : [...selected, option.value],
               )
             }
-            className={`rounded-full border px-2.5 py-0.5 text-sm ${
+            className={`rounded-full border px-2.5 text-sm leading-6 transition-colors ${
               on
-                ? "border-sky-500 bg-sky-50 text-sky-900"
-                : "border-neutral-200 bg-white text-neutral-400 hover:border-sky-300"
+                ? "border-neutral-400 bg-neutral-100 text-neutral-900 hover:bg-neutral-200"
+                : "border-dashed border-neutral-300 bg-white text-neutral-500 line-through hover:border-neutral-500 hover:text-neutral-800"
             }`}
           >
             {option.label}
@@ -42,7 +42,7 @@ export function Toggles({ label, options, selected, onChange }: Props) {
       <button
         type="button"
         onClick={() => onChange(allOn ? [] : options.map((option) => option.value))}
-        className="px-1.5 text-xs text-neutral-500 hover:text-neutral-900 hover:underline"
+        className="rounded-full px-2 text-xs font-medium text-neutral-500 hover:text-neutral-900"
       >
         {allOn ? "none" : "all"}
       </button>

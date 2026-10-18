@@ -1,6 +1,6 @@
 import { type Config, repoName, userName } from "../../lib/schema";
 import { ChipList } from "./ChipList";
-import { Field, input } from "./Field";
+import { Field } from "./Field";
 
 type Scope = Pick<Config, "repos" | "users" | "refreshMinutes">;
 
@@ -48,7 +48,7 @@ export function ScopeEditor({ scope, onChange }: Props) {
           max={1440}
           value={scope.refreshMinutes}
           onChange={(event) => patch({ refreshMinutes: Number(event.target.value) || 1 })}
-          className={`${input} w-32`}
+          className="field w-32"
         />
       </Field>
     </div>

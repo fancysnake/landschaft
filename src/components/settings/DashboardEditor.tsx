@@ -11,7 +11,7 @@ import {
   type SortDir,
   withType,
 } from "../../lib/schema";
-import { Field, input } from "./Field";
+import { Field } from "./Field";
 import { FilterInput } from "./FilterInput";
 import { LabelPicker } from "./LabelPicker";
 import { LaneColumnEditor } from "./LaneColumnEditor";
@@ -36,7 +36,7 @@ export function DashboardEditor({ dashboard, onChange, catalog, offer }: Props) 
           <input
             value={dashboard.name}
             onChange={(event) => patch({ name: event.target.value })}
-            className={`${input} w-full`}
+            className="field w-full"
           />
         </Field>
         <Field
@@ -46,7 +46,7 @@ export function DashboardEditor({ dashboard, onChange, catalog, offer }: Props) 
           <select
             value={dashboard.type}
             onChange={(event) => onChange(withType(event.target.value as DashboardType, dashboard))}
-            className={input}
+            className="field"
           >
             <option value="board">board</option>
             <option value="inbox">inbox</option>
@@ -74,7 +74,7 @@ export function DashboardEditor({ dashboard, onChange, catalog, offer }: Props) 
             onChange={(event) =>
               patch({ sort: { ...dashboard.sort, by: event.target.value as SortBy } })
             }
-            className={input}
+            className="field"
           >
             <option value="updated">updated</option>
             <option value="created">created</option>
@@ -84,7 +84,7 @@ export function DashboardEditor({ dashboard, onChange, catalog, offer }: Props) 
             onChange={(event) =>
               patch({ sort: { ...dashboard.sort, dir: event.target.value as SortDir } })
             }
-            className={input}
+            className="field"
           >
             <option value="desc">newest first</option>
             <option value="asc">oldest first</option>

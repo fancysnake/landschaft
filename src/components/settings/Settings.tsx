@@ -22,12 +22,8 @@ function newDashboard(): Dashboard {
 
 type Notice = { kind: "ok" | "error"; text: string } | null;
 
-const button = "rounded-md border px-3 py-1 text-sm";
-
-const entry = (active: boolean) =>
-  `block w-full truncate rounded-md px-2 py-1 text-left text-sm ${
-    active ? "bg-neutral-800 text-white" : "hover:bg-neutral-200"
-  }`;
+const entry =
+  "nav-item block w-full truncate px-2 py-1 text-left text-neutral-700 hover:bg-neutral-200/70";
 
 export default function Settings() {
   const [config, setConfig] = useState<Config | null>(null);
@@ -121,9 +117,9 @@ export default function Settings() {
   };
 
   return (
-    <div className="mx-auto flex h-full max-w-6xl flex-col p-4">
-      <div className="mb-3 flex items-center gap-3">
-        <h1 className="text-lg font-semibold">Settings</h1>
+    <div className="mx-auto flex h-full max-w-6xl flex-col p-5">
+      <div className="mb-4 flex items-center gap-3">
+        <h1 className="page-title">Settings</h1>
         <button
           type="button"
           onClick={() => setJsonText(jsonText === null ? JSON.stringify(config, null, 2) : null)}
@@ -142,7 +138,7 @@ export default function Settings() {
           type="button"
           onClick={() => void save()}
           disabled={saving || (!dirty && jsonText === null)}
-          className={`${button} border-neutral-800 bg-neutral-800 text-white disabled:opacity-40`}
+          className="btn btn-primary"
         >
           {saving ? "Saving…" : "Save"}
         </button>
@@ -156,23 +152,24 @@ export default function Settings() {
             setDirty(true);
           }}
           spellCheck={false}
-          className="min-h-0 flex-1 rounded-md border border-neutral-300 bg-white p-3 font-mono text-xs"
+          className="field min-h-0 flex-1 p-3 font-mono text-xs"
         />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto">
-          <section className="rounded-md border border-neutral-200 bg-white p-4">
-            <h2 className="mb-3 text-sm font-semibold">Shared by every dashboard</h2>
+          <section className="panel p-5">
+            <h2 className="mb-4 eyebrow">Shared by every dashboard</h2>
             <ScopeEditor scope={config} onChange={(scope) => update({ ...config, ...scope })} />
           </section>
           <div className="grid gap-4 sm:grid-cols-[14rem_1fr]">
             <aside className="space-y-1">
-              <h2 className="px-2 pb-1 text-sm font-semibold">Dashboards</h2>
+              <h2 className="px-2 pb-1 eyebrow">Dashboards</h2>
               {config.dashboards.map((dashboard) => (
                 <button
                   key={dashboard.id}
                   type="button"
                   onClick={() => setSelected(dashboard.id)}
-                  className={entry(dashboard.id === selected)}
+                  aria-current={dashboard.id === selected ? "true" : undefined}
+                  className={entry}
                 >
                   {dashboard.name}
                 </button>
@@ -185,21 +182,17 @@ export default function Settings() {
                 + new dashboard
               </button>
             </aside>
-            <div className="rounded-md border border-neutral-200 bg-white p-4">
+            <div className="panel p-5">
               {current ? (
                 <>
                   <div className="mb-4 flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => addDashboard(current)}
-                      className={`${button} border-neutral-300 bg-white hover:bg-neutral-50`}
-                    >
+                    <button type="button" onClick={() => addDashboard(current)} className="btn">
                       Duplicate
                     </button>
                     <button
                       type="button"
                       onClick={() => removeDashboard(current.id)}
-                      className={`${button} border-red-300 bg-white text-red-700 hover:bg-red-50`}
+                      className="btn btn-danger"
                     >
                       Delete
                     </button>

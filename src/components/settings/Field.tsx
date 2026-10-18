@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
 
-export const input = "rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm";
-
 export function Field({
   label,
   hint,

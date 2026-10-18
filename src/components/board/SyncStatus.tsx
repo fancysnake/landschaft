@@ -22,7 +22,7 @@ export function SyncStatus({ status, syncing, error, onSync, onDismissError }: P
 
   const busy = syncing || status.inFlight.length > 0;
   return (
-    <div className="flex items-center gap-2 text-xs text-neutral-600">
+    <div className="flex items-center gap-2 text-sm text-neutral-600">
       <span
         className={`inline-block h-2 w-2 rounded-full ${
           busy ? "animate-pulse bg-sky-500" : status.lastError ? "bg-red-500" : "bg-emerald-500"
@@ -34,7 +34,7 @@ export function SyncStatus({ status, syncing, error, onSync, onDismissError }: P
           : `Synced ${relativeTime(status.lastSyncAt, now)}`}
       </span>
       {error && (
-        <span className="text-red-700">
+        <span role="alert" className="text-red-700">
           {error}{" "}
           <button type="button" onClick={onDismissError} className="font-medium hover:underline">
             dismiss
@@ -42,16 +42,14 @@ export function SyncStatus({ status, syncing, error, onSync, onDismissError }: P
         </span>
       )}
       {status.rateRemaining !== null && (
-        <span className="text-neutral-400" title="GitHub API points left this hour">
+        <span
+          className="text-xs text-neutral-500 tabular-nums"
+          title="GitHub API points left this hour"
+        >
           · {status.rateRemaining} left
         </span>
       )}
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => onSync(false)}
-        className="rounded-md border border-neutral-300 bg-white px-2 py-0.5 hover:bg-neutral-50 disabled:opacity-50"
-      >
+      <button type="button" disabled={busy} onClick={() => onSync(false)} className="btn btn-sm">
         Refresh
       </button>
       <button
@@ -59,7 +57,7 @@ export function SyncStatus({ status, syncing, error, onSync, onDismissError }: P
         disabled={busy}
         onClick={() => onSync(true)}
         title="Re-fetch every open issue"
-        className="text-neutral-500 hover:underline disabled:opacity-50"
+        className="text-xs text-neutral-500 hover:underline disabled:text-neutral-300"
       >
         full resync
       </button>
