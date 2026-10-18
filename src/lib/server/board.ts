@@ -124,20 +124,6 @@ const jobCard = (job: CiJob): CiJobCard => ({
   pr: job.pr,
 });
 
-/** `jobs` that one of the global `users` (empty for everyone) has commits in and that pass `scope`. */
-function scopedJobs(
-  jobs: CiJob[],
-  users: string[],
-  viewer: string | null,
-  scope: FilterNode | null = null,
-): { job: CiJob; item: FilterItem }[] {
-  const passes = inScope(users, viewer, scope);
-  return jobs.flatMap((job) => {
-    const item = jobItem(job);
-    return passes(item) ? [{ job, item }] : [];
-  });
-}
-
 /**
  * Keys of the epic's blockers, its sub-issues and the issues it blocks, plus the PRs
  * linked to the epic or to any of those.
@@ -201,15 +187,20 @@ function inScope(
 }
 
 /**
- * `issues` by key, and the open ones that one of the global `users` (empty for everyone)
- * authored or is assigned to and that pass `scope`, each with its item.
+ * `issues` by key, plus the open ones and the failed CI `jobs` that one of the global `users`
+ * (empty for everyone) is in and that pass `scope`, each with its item.
  */
-function openItemsOf(
+function scopedItems(
   issues: Issue[],
+  jobs: CiJob[],
   users: string[],
   viewer: string | null,
   scope: FilterNode | null = null,
-): { byKey: Map<string, Issue>; open: { issue: Issue; item: Item }[] } {
+): {
+  byKey: Map<string, Issue>;
+  open: { issue: Issue; item: Item }[];
+  openJobs: { job: CiJob; item: FilterItem }[];
+} {
   const byKey = new Map(issues.map((issue) => [keyOf(issue), issue]));
   // From all of `issues`, not just the open ones.
   const itemOf = itemsOf(issues, byKey);
@@ -219,15 +210,26 @@ function openItemsOf(
     const item = itemOf(issue);
     return passes(item) ? [{ issue, item }] : [];
   });
-  return { byKey, open };
+  const openJobs = jobs.flatMap((job) => {
+    const item = jobItem(job);
+    return passes(item) ? [{ job, item }] : [];
+  });
+  return { byKey, open, openJobs };
 }
 
-/** The dashboard's filter, swimlanes and columns, parsed. */
+/** The dashboard's filter, swimlanes, columns and `epicLabel` (as a `labelKey`), parsed. */
 function compileGrid(dashboard: BoardDashboard) {
+  const epicLabel = dashboard.epicLabel && labelKey(dashboard.epicLabel);
   return {
     scope: parseFilter(dashboard.filter),
     swimlanes: compile(dashboard.swimlanes),
     columns: compile(dashboard.columns),
+    epicLabel,
+    /** An issue with the board's `epicLabel`. */
+    isEpic: (item: FilterItem): boolean =>
+      item.kind === "issue" &&
+      epicLabel !== undefined &&
+      item.labels.some((label) => labelKey(label.name) === epicLabel),
   };
 }
 
@@ -252,12 +254,6 @@ function firstGroup<G extends Group>(
   return groups.find((group) => matchesFilter(group.node, item, { viewer, other: true }));
 }
 
-/** An issue with the board's `epicLabel`, a `labelKey`. */
-const isEpicOf = (item: FilterItem, epicLabel: string | undefined): boolean =>
-  item.kind === "issue" &&
-  epicLabel !== undefined &&
-  item.labels.some((label) => labelKey(label.name) === epicLabel);
-
 /** Whether the dashboard shows `item` in a cell, group or epic strip, blocked-hiding aside. */
 function placer(dashboard: Dashboard, viewer: string | null): (item: FilterItem) => boolean {
   const passes = inScope([], viewer, parseFilter(dashboard.filter));
@@ -266,9 +262,7 @@ function placer(dashboard: Dashboard, viewer: string | null): (item: FilterItem)
     return (item) => passes(item) && firstGroup(groups, item, viewer) !== undefined;
   }
   const grid = compileGrid(dashboard);
-  const epicLabel = dashboard.epicLabel && labelKey(dashboard.epicLabel);
-  return (item) =>
-    passes(item) && (isEpicOf(item, epicLabel) || placeOnGrid(grid, item, viewer) !== null);
+  return (item) => passes(item) && (grid.isEpic(item) || placeOnGrid(grid, item, viewer) !== null);
 }
 
 /**
@@ -346,10 +340,8 @@ export function scopedRepos(
   viewer: string | null = null,
 ): Set<string> {
   const scope = parseFilter(dashboard.filter);
-  return new Set([
-    ...openItemsOf(issues, users, viewer, scope).open.map(({ issue }) => issue.repo),
-    ...scopedJobs(jobs, users, viewer, scope).map(({ job }) => job.repo),
-  ]);
+  const { open, openJobs } = scopedItems(issues, jobs, users, viewer, scope);
+  return new Set([...open.map(({ issue }) => issue.repo), ...openJobs.map(({ job }) => job.repo)]);
 }
 
 /**
@@ -371,10 +363,10 @@ export function unmatchedItems(
   const placed = (item: FilterItem) => placers.some((places) => places(item));
   const missed = ({ item }: { item: FilterItem }) => !hide.includes(item.repo) && !placed(item);
   // Hidden repos are dropped last: their items still count for `has:pr` and blockers.
-  const unmatched = (scope: FilterNode | null) => ({
-    open: openItemsOf(issues, users, viewer, scope).open.filter(missed),
-    openJobs: scopedJobs(jobs, users, viewer, scope).filter(missed),
-  });
+  const unmatched = (scope: FilterNode | null) => {
+    const { open, openJobs } = scopedItems(issues, jobs, users, viewer, scope);
+    return { open: open.filter(missed), openJobs: openJobs.filter(missed) };
+  };
   const shown = unmatched(filter);
   const all = filter ? unmatched(null) : shown;
   const sort = { by: "updated", dir: "desc" } as const;
@@ -403,13 +395,11 @@ export function buildBoard(
 ): Board {
   const axes = compileGrid(dashboard);
   const { scope } = axes;
-  const { byKey, open } = openItemsOf(issues, users, viewer, scope);
-  const openJobs = scopedJobs(jobs, users, viewer, scope);
+  const { byKey, open, openJobs } = scopedItems(issues, jobs, users, viewer, scope);
   const wanted = barFilter(filters, byKey);
-  const epicLabel = dashboard.epicLabel && labelKey(dashboard.epicLabel);
   const shown = labelShown(
     [scope, ...[...axes.swimlanes, ...axes.columns].map((group) => group.node)],
-    epicLabel,
+    axes.epicLabel,
   );
   const facets = facetsOf(open, openJobs, shown, filters, dashboard.sort);
   const { sort } = facets;
@@ -456,7 +446,7 @@ export function buildBoard(
   for (const { issue, item } of open) {
     if (filters.hide?.includes(issue.repo)) continue;
 
-    const isEpic = isEpicOf(item, epicLabel);
+    const isEpic = axes.isEpic(item);
     if (isEpic) epicIssues.push(issue);
 
     if (wanted(item, keyOf(issue), `${issue.number} ${issue.title}`))
@@ -502,8 +492,7 @@ export function buildInbox(
 ): Inbox {
   const scope = parseFilter(dashboard.filter);
   const groups = compile(dashboard.groups);
-  const { byKey, open } = openItemsOf(issues, users, viewer, scope);
-  const openJobs = scopedJobs(jobs, users, viewer, scope);
+  const { byKey, open, openJobs } = scopedItems(issues, jobs, users, viewer, scope);
   const wanted = barFilter(filters, byKey);
   const shown = labelShown([scope, ...groups.map((group) => group.node)]);
   const facets = facetsOf(open, openJobs, shown, filters, dashboard.sort);

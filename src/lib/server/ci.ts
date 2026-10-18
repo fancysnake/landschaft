@@ -155,12 +155,6 @@ function runOf(check: CiContext, commitUrl: string): Run | null {
   };
 }
 
-/** Merged: its head is the newest merged PR's, or the default branch holds all of it. */
-function isMerged(branch: string, node: CiBranchNode, base: DefaultBranchNode | null): boolean {
-  if (node.mergedPullRequests.nodes[0]?.headRefOid === node.target.oid) return true;
-  return base !== null && base.name !== branch && base.compare?.aheadBy === 0;
-}
-
 /**
  * The failed jobs on `branch`'s head commit, none once it is merged. The rollup holds a run per
  * check suite, so a job re-run in another suite appears more than once; only its newest finished
@@ -174,11 +168,12 @@ export function toCiJobs(
   node: CiBranchNode,
   base: DefaultBranchNode | null,
 ): CiJob[] {
-  if (isMerged(branch, node, base)) return [];
   const { target } = node;
-  const compare = base?.compare ?? null;
-  const ahead = compare !== null && compare.aheadBy > 0;
-  const authors = loginsOf(ahead ? compare.commits : target.history);
+  const compare = base?.name === branch ? null : (base?.compare ?? null);
+  // Merged: its head is the newest merged PR's, or the default branch holds all of it.
+  if (node.mergedPullRequests.nodes[0]?.headRefOid === target.oid || compare?.aheadBy === 0)
+    return [];
+  const authors = loginsOf(compare ? compare.commits : target.history);
   const pr = node.associatedPullRequests.nodes[0] ?? null;
   // Also merges a job an app reports as a check run and as a commit status alike.
   const newest = new Map<string, Run>();
