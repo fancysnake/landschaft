@@ -26,7 +26,7 @@ function CiJobItem({ card, showRepo }: { card: CiJobCard; showRepo: boolean }) {
     <article className={cardClass("border-l-orange-500")}>
       <div className={metaRow}>
         <span className={`pill ${TONE.red}`}>CI ✗</span>
-        <span className="font-mono text-[11px]">
+        <span className="font-mono text-[0.6875rem]">
           {showRepo && `${repoShortName(card.repo)}:`}
           {card.branch}
         </span>
@@ -76,7 +76,7 @@ function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean 
       }
     >
       <div className={metaRow}>
-        <span className="font-mono text-[11px]">
+        <span className="font-mono text-[0.6875rem]">
           {showRepo ? `${repoShortName(card.repo)}#` : "#"}
           {card.number}
         </span>
@@ -115,7 +115,7 @@ function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean 
             <span
               key={label.name}
               style={labelStyle(label.color)}
-              className="rounded-full px-1.5 text-[11px] leading-4"
+              className="rounded-full px-1.5 text-[0.6875rem] leading-4"
             >
               {label.name}
             </span>
@@ -128,7 +128,7 @@ function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean 
           title={`${card.progress.completed} of ${card.progress.total} sub-issues done`}
         >
           <ProgressBar percent={card.progress.percent} />
-          <span className="text-[11px] text-neutral-500 tabular-nums">
+          <span className="text-[0.6875rem] text-neutral-500 tabular-nums">
             {card.progress.completed}/{card.progress.total}
           </span>
         </div>

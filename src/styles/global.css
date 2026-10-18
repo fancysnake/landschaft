@@ -8,6 +8,11 @@
 }
 
 @layer base {
+  /* Scales every rem-based size, like a 125% browser zoom. */
+  html {
+    font-size: 125%;
+  }
+
   :where(a, button, input, select, textarea, summary):focus-visible {
     outline: 2px solid var(--color-sky-500);
     outline-offset: 1px;
@@ -16,7 +21,7 @@
 
 /* Shape only: the colour comes from a `TONE` next to it. */
 @utility pill {
-  @apply inline-flex items-center rounded px-1.5 text-[11px] leading-[18px] font-medium ring-1 ring-inset;
+  @apply inline-flex items-center rounded px-1.5 text-[0.6875rem] leading-[1.125rem] font-medium ring-1 ring-inset;
 }
 
 /* `btn`, `field` and `panel` carry a default look; variants below override it. */

@@ -72,7 +72,7 @@ export function LaneColumnEditor<T extends Group>({
                 onChange={(event) => replace(index, { ...item, name: event.target.value })}
                 className="field w-full"
               />
-              <div className="mt-0.5 font-mono text-[10px] text-neutral-400">{item.id}</div>
+              <div className="mt-0.5 font-mono text-[0.625rem] text-neutral-400">{item.id}</div>
               {flag && (
                 <label className="mt-1 flex items-center gap-1 text-xs text-neutral-700">
                   <input

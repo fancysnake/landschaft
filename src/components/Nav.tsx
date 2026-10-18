@@ -31,7 +31,7 @@ export default function Nav({ path, dashboards, repos }: Props) {
   return (
     <nav className="border-b border-neutral-200 bg-white">
       <div className="flex flex-wrap items-center gap-1 px-4 py-2">
-        <a href="/" className="mr-4 text-[17px] font-semibold tracking-tight">
+        <a href="/" className="mr-4 text-[1.0625rem] font-semibold tracking-tight">
           landschaft
         </a>
         {dashboards.map((dashboard) => (
