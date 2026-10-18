@@ -11,7 +11,7 @@ import {
   compile,
   isBlocked,
   placeIn,
-  scopedIssues,
+  scopedRepos,
   unmatchedItems,
 } from "./board";
 
@@ -67,20 +67,24 @@ describe("isBlocked", () => {
 
 const waitsOn = (number: number) => [{ repo: REPO, number, state: "OPEN" as const }];
 
-describe("scopedIssues", () => {
-  it("keeps the open items of the users that pass the dashboard filter", () => {
+describe("scopedRepos", () => {
+  it("takes the repos of the users' open items and jobs that pass the dashboard filter", () => {
+    const team = [label("team")];
     const issues = [
-      makeIssue({ number: 1, author: "ann", labels: [label("team")] }),
-      makeIssue({ number: 2, author: "me", labels: [label("team")] }),
-      makeIssue({ number: 3, author: "me", labels: [label("team")], state: "CLOSED" }),
-      makeIssue({ number: 4, author: "me" }),
-      makeIssue({ number: 5, author: "bob", labels: [label("team")] }),
+      makeIssue({ number: 1, repo: "a/1", author: "ann", labels: team }),
+      makeIssue({ number: 2, repo: "a/2", author: "me", labels: team }),
+      makeIssue({ number: 3, repo: "a/3", author: "me", labels: team, state: "CLOSED" }),
+      makeIssue({ number: 4, repo: "a/4", author: "me" }),
+      makeIssue({ number: 5, repo: "a/5", author: "bob", labels: team }),
     ];
-    const scoped = (filter: string, users: string[]) =>
-      scopedIssues(issues, { filter }, users, "me").map((issue) => issue.number);
-    expect(scoped("label:team", ["@me", "ann"])).toEqual([1, 2]);
-    expect(scoped("label:team", [])).toEqual([1, 2, 5]);
-    expect(scoped("", ["@me"])).toEqual([2, 4]);
+    const jobs = [makeJob({ name: "lint", repo: "a/6", authors: ["me"] })];
+    const scoped = (filter: string, users: string[]) => [
+      ...scopedRepos(issues, jobs, { filter }, users, "me"),
+    ];
+    expect(scoped("label:team", ["@me", "ann"])).toEqual(["a/1", "a/2"]);
+    expect(scoped("label:team", [])).toEqual(["a/1", "a/2", "a/5"]);
+    expect(scoped("", ["@me"])).toEqual(["a/2", "a/4", "a/6"]);
+    expect(scoped("is:ci-job", ["@me"])).toEqual(["a/6"]);
   });
 });
 
@@ -115,12 +119,22 @@ describe("unmatchedItems", () => {
     expect(unmatched.map(numberOf)).toEqual([4, 2]);
   });
 
+  it("counts an epic in a board's strip as placed", () => {
+    const board = { ...DASHBOARD, columns: [{ id: "doing", name: "Doing", filter: "label:x" }] };
+    const issues = [
+      makeIssue({ number: 1, labels: [label("Epic")] }),
+      makeIssue({ number: 2, kind: "pr", labels: [label("epic")] }),
+      makeIssue({ number: 3 }),
+    ];
+    expect(unmatchedItems(issues, [board]).items.map(numberOf)).toEqual([3, 2]);
+  });
+
   it("drops hidden repos after placement, so their items still count", () => {
     const dashboard = {
       ...DASHBOARD,
       swimlanes: [{ id: "all", name: "All", filter: "", hideBlocked: false }],
       columns: [
-        { id: "review", name: "Review", filter: "is:has-pr" },
+        { id: "review", name: "Review", filter: "has:pr" },
         { id: "blocking", name: "Blocking", filter: "is:blocking" },
       ],
     };
@@ -175,21 +189,13 @@ describe("unmatchedItems", () => {
     expect(unmatched("-is:ci-job")).toEqual([1]);
   });
 
-  it("resolves `is:has-pr` against PRs the filter drops", () => {
+  it("resolves `has:pr` against PRs the filter drops", () => {
     const dashboard = { ...DASHBOARD, swimlanes: [] };
     const issues = [
       makeIssue({ number: 1 }),
       makeIssue({ number: 2, kind: "pr", linked: [{ repo: REPO, number: 1 }] }),
     ];
-    const unmatched = unmatchedItems(
-      issues,
-      [dashboard],
-      [],
-      null,
-      [],
-      [],
-      parseFilter("is:has-pr"),
-    );
+    const unmatched = unmatchedItems(issues, [dashboard], [], null, [], [], parseFilter("has:pr"));
     expect(unmatched.items.map(numberOf)).toEqual([1]);
   });
 
@@ -457,11 +463,11 @@ describe("buildBoard", () => {
     expect(numbers(board)).toEqual([5, 4]);
   });
 
-  it("matches is:has-pr on issues an open PR closes, whoever's the PR", () => {
+  it("matches has:pr on issues an open PR closes, whoever's the PR", () => {
     const dashboard = {
       ...DASHBOARD,
       swimlanes: [
-        { id: "review", name: "In review", filter: "is:issue is:has-pr", hideBlocked: false },
+        { id: "review", name: "In review", filter: "is:issue has:pr", hideBlocked: false },
         ...DASHBOARD.swimlanes,
       ],
     };
@@ -470,7 +476,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 1, ...alice }),
       makeIssue({ number: 2, ...alice }),
       makeIssue({ number: 3, ...alice }),
-      makeIssue({ number: 4, ...alice, labels: [label("is:has-pr")] }),
+      makeIssue({ number: 4, ...alice, labels: [label("has:pr")] }),
       makeIssue({ number: 10, kind: "pr", author: "bob", linked: [{ repo: REPO, number: 1 }] }),
       makeIssue({
         number: 11,
@@ -481,8 +487,8 @@ describe("buildBoard", () => {
     ];
     const board = buildBoard(issues, dashboard, {}, ["alice"]);
     expect(
-      board.cells[cell("review", "todo")]?.map((c) => [numberOf(c), asIssue(c)?.statuses]),
-    ).toEqual([[1, ["is:has-pr"]]]);
+      board.cells[cell("review", "todo")]?.map((c) => [numberOf(c), asIssue(c)?.hasPr]),
+    ).toEqual([[1, true]]);
   });
 
   it("leaves out issues that fit no group when an axis has no catch-all", () => {

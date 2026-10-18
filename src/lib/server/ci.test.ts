@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { type CiBranchNode, type CiContext, toCiJobs } from "./ci";
+import { type CiBranchNode, type CiContext, type DefaultBranchNode, toCiJobs } from "./ci";
 
 const commits = (...logins: (string | null)[]) => ({
   nodes: logins.map((login) => ({ author: { user: login === null ? null : { login } } })),
@@ -22,11 +22,17 @@ const checkRun = (
 });
 const branch = (contexts: CiContext[], history = commits("ann")): CiBranchNode => ({
   associatedPullRequests: { nodes: [{ number: 4, url: "https://github.com/acme/app/pull/4" }] },
+  mergedPullRequests: { nodes: [] },
   target: {
+    oid: "abc",
     url: "https://github.com/acme/app/commit/abc",
     history,
     statusCheckRollup: { contexts: { nodes: contexts } },
   },
+});
+const base = (aheadBy: number, ahead = commits()): DefaultBranchNode => ({
+  name: "main",
+  compare: { aheadBy, commits: ahead },
 });
 
 describe("toCiJobs", () => {
@@ -133,10 +139,19 @@ describe("toCiJobs", () => {
 
   it("takes the authors of the commits ahead, else of the last three", () => {
     const head = branch([checkRun("test", "FAILURE")], commits("ann", "bob"));
-    const ahead = { aheadBy: 1, commits: commits("renovate[bot]", null) };
+    const ahead = base(1, commits("renovate[bot]", null));
     expect(toCiJobs("acme/app", "x", head, ahead)[0]?.authors).toEqual(["renovate"]);
-    const level = { aheadBy: 0, commits: commits() };
-    expect(toCiJobs("acme/app", "x", head, level)[0]?.authors).toEqual(["ann", "bob"]);
+    expect(toCiJobs("acme/app", "main", head, base(0))[0]?.authors).toEqual(["ann", "bob"]);
     expect(toCiJobs("acme/app", "x", head, null)[0]?.authors).toEqual(["ann", "bob"]);
+  });
+
+  it("drops a branch merged by its PR or held whole by the default branch", () => {
+    const head = branch([checkRun("test", "FAILURE")]);
+    const squashed = { ...head, mergedPullRequests: { nodes: [{ headRefOid: "abc" }] } };
+    expect(toCiJobs("acme/app", "x", squashed, base(2))).toEqual([]);
+    expect(toCiJobs("acme/app", "x", head, base(0))).toEqual([]);
+    const pushedSince = { ...head, mergedPullRequests: { nodes: [{ headRefOid: "old" }] } };
+    expect(toCiJobs("acme/app", "x", pushedSince, base(2))).toHaveLength(1);
+    expect(toCiJobs("acme/app", "x", head, { name: "main", compare: null })).toHaveLength(1);
   });
 });

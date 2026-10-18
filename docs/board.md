@@ -42,7 +42,7 @@ threads awaiting the author; each sync refreshes them for every open PR.
 A PR card shows a pill for each status that holds, whatever lane it is in: `conflict`, `CI ✗`,
 `CI …` or `comments`.
 
-`is:has-pr` picks issues that an open PR closes (GitHub's "linked pull requests"), whoever
+`has:pr` picks issues that an open PR closes (GitHub's "linked pull requests"), whoever
 opened the PR, as long as the PR is in one of the global repos; such an issue card shows a
 `PR open` pill. It drops once the PR is merged or closed.
 
@@ -51,7 +51,8 @@ opened the PR, as long as the PR is in one of the global repos; such an issue ca
 A job whose newest run on a branch failed shows as a card of its own: a GitHub Actions job, a
 check run from another app, or a commit status. The card links to the run and names the
 branch, when the job failed and the open PR from the branch, if any. A passing run on the
-branch removes it; an old failure stays however long the branch sits untouched.
+branch removes it, and so does merging the branch; an old failure stays however long the
+branch sits untouched.
 
 Every branch counts, but a board shows its jobs only when the branch is one of the global
 users': one of them authored a commit the branch has on top of the default branch, or, with
@@ -59,7 +60,7 @@ nothing on top, one of its last three commits. A branch with nothing but a bot's
 top of main stays off. `author:` and `user:` match those commit authors.
 
 `is:ci-job` picks the jobs, `job:` and `branch:` match job and branch names (any case,
-`a|b` for either), and `is:has-pr` holds when an open PR comes from the branch. A catch-all
+`a|b` for either), and `has:pr` holds when an open PR comes from the branch. A catch-all
 swimlane, column or inbox group takes jobs like any other item; `-is:ci-job` in a dashboard's
 filter keeps them off it. The search box matches job and branch names, and the CI job filter
 picks jobs by name and hides issues; the assignee, label and epic filters hide jobs.

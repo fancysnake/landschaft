@@ -99,7 +99,9 @@ interface CommitAuthors {
 
 export interface CiBranchNode {
   associatedPullRequests: { nodes: { number: number; url: string }[] };
+  mergedPullRequests: { nodes: { headRefOid: string }[] };
   target: {
+    oid: string;
     url: string;
     history: CommitAuthors;
     statusCheckRollup: { contexts: { nodes: CiContext[] } } | null;
@@ -112,6 +114,11 @@ export interface CiBranchNode {
 export interface CompareNode {
   aheadBy: number;
   commits: CommitAuthors;
+}
+
+export interface DefaultBranchNode {
+  name: string;
+  compare: CompareNode | null;
 }
 
 /** Logins behind `commits`, without the `[bot]` suffix that issue authors lack too. */
@@ -159,8 +166,9 @@ function runOf(check: CiContext, commitUrl: string): Run | null {
 }
 
 /**
- * The failed jobs on `branch`'s head commit. The rollup holds a run per check suite, so a job
- * re-run in another suite appears more than once; only its newest finished run counts.
+ * The failed jobs on `branch`'s head commit, none once it is merged. The rollup holds a run per
+ * check suite, so a job re-run in another suite appears more than once; only its newest finished
+ * run counts.
  * shortcut: a job that skipped the head commit (path filters) hides its failure on an earlier
  * one; query each job's run history if that bites.
  */
@@ -168,11 +176,14 @@ export function toCiJobs(
   repo: string,
   branch: string,
   node: CiBranchNode,
-  compare: CompareNode | null,
+  base: DefaultBranchNode | null,
 ): CiJob[] {
   const { target } = node;
-  const ahead = compare !== null && compare.aheadBy > 0;
-  const authors = loginsOf(ahead ? compare.commits : target.history);
+  const compare = base?.name === branch ? null : (base?.compare ?? null);
+  // Merged: its head is the newest merged PR's, or the default branch holds all of it.
+  if (node.mergedPullRequests.nodes[0]?.headRefOid === target.oid || compare?.aheadBy === 0)
+    return [];
+  const authors = loginsOf(compare ? compare.commits : target.history);
   const pr = node.associatedPullRequests.nodes[0] ?? null;
   // Also merges a job an app reports as a check run and as a commit status alike.
   const newest = new Map<string, Run>();
@@ -208,7 +219,11 @@ function ciBranchFields(index: number, suites: boolean): string {
     : "";
   return `b${index}: ref(qualifiedName: $ref${index}) {
     associatedPullRequests(states: OPEN, first: 1) { nodes { number url } }
+    mergedPullRequests: associatedPullRequests(
+      states: MERGED, first: 1, orderBy: { field: CREATED_AT, direction: DESC }
+    ) { nodes { headRefOid } }
     target { ... on Commit {
+      oid
       url
       history(first: 3) { ${AUTHORS} }
       statusCheckRollup { contexts(first: 100) { nodes {
@@ -219,7 +234,7 @@ function ciBranchFields(index: number, suites: boolean): string {
       ${checkSuites}
     } }
   }
-  c${index}: defaultBranchRef { compare(headRef: $branch${index}) {
+  c${index}: defaultBranchRef { name compare(headRef: $branch${index}) {
     aheadBy commits(first: 100) { ${AUTHORS} }
   } }`;
 }
@@ -251,8 +266,7 @@ export async function fetchCiJobs(
   const data = await gh.gql<{
     rateLimit: { remaining: number };
     repository:
-      | (Record<`b${number}`, CiBranchNode | null> &
-          Record<`c${number}`, { compare: CompareNode | null } | null>)
+      | (Record<`b${number}`, CiBranchNode | null> & Record<`c${number}`, DefaultBranchNode | null>)
       | null;
   }>(
     `query CiJobs($owner: String!, $name: String!, ${params}) {
@@ -266,7 +280,7 @@ export async function fetchCiJobs(
   const fields = data.repository;
   const jobs = branches.flatMap((branch, i) => {
     const node = fields[`b${i}`];
-    return node ? toCiJobs(repo, branch, node, fields[`c${i}`]?.compare ?? null) : [];
+    return node ? toCiJobs(repo, branch, node, fields[`c${i}`] ?? null) : [];
   });
   return { jobs, rateRemaining: data.rateLimit.remaining };
 }

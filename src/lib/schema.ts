@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { filterError, ISSUE_REF, LOGIN, parseFilter, quoteValue, REPO, usesOther } from "./filter";
-import { isStatusLabel } from "./status";
+import { isPullStatusLabel } from "./status";
 
 const id = z
   .string()
@@ -25,13 +25,17 @@ const LegacyGroupSchema = z.object({
 });
 type LegacyGroup = z.infer<typeof LegacyGroupSchema>;
 
+/** The filter term for a legacy label naming a state, not a GitHub label; null otherwise. */
+const stateTerm = (name: string) =>
+  name === "is:has-pr" ? "has:pr" : isPullStatusLabel(name) ? name : null;
+
 /**
  * The filter a legacy group stands for: any → `label:a|b`, all → `label:a label:b`; null for
  * the catch-all, which `migrateAxis` rewrites.
  */
 function legacyFilter({ labels = [], match = "any", kind = "any" }: LegacyGroup): string | null {
-  const plain = labels.filter((name) => !isStatusLabel(name)).map(quoteValue);
-  const statuses = labels.filter(isStatusLabel);
+  const plain = labels.filter((name) => stateTerm(name) === null).map(quoteValue);
+  const statuses = labels.flatMap((name) => stateTerm(name) ?? []);
   const parts =
     match === "all"
       ? [...plain.map((name) => `label:${name}`), ...statuses]
@@ -235,11 +239,31 @@ function migrateScope(config: unknown): unknown {
 }
 
 /** The config version this build writes; a config without `version` is version 0. */
-export const CONFIG_VERSION = 1;
+export const CONFIG_VERSION = 2;
+
+/** `value` with `step` applied to each of its items that is an object, if it is an array. */
+const mapRaw = (value: unknown, step: (raw: Raw) => Raw): unknown =>
+  Array.isArray(value) ? value.map((item: unknown) => (isRaw(item) ? step(item) : item)) : value;
+
+/** `config` with `step` applied to each dashboard. */
+const mapDashboards = (config: Raw, step: (dashboard: Raw) => Raw): Raw =>
+  Array.isArray(config.dashboards)
+    ? { ...config, dashboards: mapRaw(config.dashboards, step) }
+    : config;
+
+/** `dashboard` with `rewrite` applied to its own filter and to each of its groups'. */
+function mapFilters(dashboard: Raw, rewrite: (filter: string) => string): Raw {
+  const withFilter = (raw: Raw): Raw =>
+    typeof raw.filter === "string" ? { ...raw, filter: rewrite(raw.filter) } : raw;
+  const groups = (["swimlanes", "columns", "groups"] as const)
+    .filter((key) => Array.isArray(dashboard[key]))
+    .map((key) => [key, mapRaw(dashboard[key], withFilter)]);
+  return { ...withFilter(dashboard), ...Object.fromEntries(groups) };
+}
 
 /** Puts a swimlane for failed CI jobs on top, under an id no lane there has. */
-function withCiLane(dashboard: unknown): unknown {
-  if (!isRaw(dashboard) || !Array.isArray(dashboard.swimlanes)) return dashboard;
+function withCiLane(dashboard: Raw): Raw {
+  if (!Array.isArray(dashboard.swimlanes)) return dashboard;
   const lanes: unknown[] = dashboard.swimlanes;
   const taken = new Set(lanes.map((lane) => (isRaw(lane) ? lane.id : undefined)));
   let laneId = "ci-jobs";
@@ -249,14 +273,26 @@ function withCiLane(dashboard: unknown): unknown {
 }
 
 /** Version 1 brought failed CI jobs, which no lane of an older dashboard asks for. */
-function addCiLane(config: Raw): Raw {
-  if (!Array.isArray(config.dashboards)) return config;
-  const dashboards: unknown[] = config.dashboards;
-  return { ...config, dashboards: dashboards.map(withCiLane) };
-}
+const addCiLane = (config: Raw) => mapDashboards(config, withCiLane);
+
+/**
+ * `filter` with `is:has-pr` written as `has:pr`: `is:a|"has-pr"` turns into `(is:a OR has:pr)`.
+ * shortcut: rewrites a quoted value holding ` is:has-pr` too; parse the filter if one ever does.
+ */
+const hasPrFilter = (filter: string) =>
+  filter.replaceAll(/(?<=^|[\s(-])is:([\w:|"-]+)/g, (term, values: string) => {
+    const all = values.split("|");
+    const rest = all.filter((value) => value.replaceAll('"', "").toLowerCase() !== "has-pr");
+    if (rest.length === all.length) return term;
+    return rest.length === 0 ? "has:pr" : `(is:${rest.join("|")} OR has:pr)`;
+  });
+
+/** Version 2 renamed `is:has-pr` to `has:pr`; `legacyFilter` takes care of a legacy label. */
+const renameHasPr = (config: Raw) =>
+  mapDashboards(config, (dashboard) => mapFilters(dashboard, hasPrFilter));
 
 /** `UPGRADES[n]` takes a version-n config to version n + 1. */
-const UPGRADES: ((config: Raw) => Raw)[] = [addCiLane];
+const UPGRADES: ((config: Raw) => Raw)[] = [addCiLane, renameHasPr];
 
 /**
  * Brings a config up to `CONFIG_VERSION` one step at a time. A version this build does not know

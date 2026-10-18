@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- `has:pr` replaces `is:has-pr`, for issues and CI jobs alike; loading a config rewrites
+  filters that use the old term (config version 2).
+
 ### Fixed
 
 - A failed scheduled or manually dispatched run on the default branch shows as a CI job card;

@@ -73,12 +73,12 @@ export function isBlocked(issue: Issue, byKey: Map<string, Issue>): boolean {
 const keyOf = (ref: { repo: string; number: number }): string => issueKey(ref.repo, ref.number);
 
 /** An issue with what filters test it on; see `itemsOf`. */
-type Item = Omit<Issue, "statuses"> & FilterItem;
+type Item = Issue & FilterItem;
 
 /**
- * An issue with what filters test it on: its statuses plus `is:has-pr` when an open PR closes
- * it, whether an open blocker holds it, and whether it blocks an open issue. Every open item in
- * `issues` counts, whoever's it is; one in a repo outside them is never seen.
+ * An issue with what filters test it on: whether an open PR closes it, whether an open blocker
+ * holds it, and whether it blocks an open issue. Every open item in `issues` counts, whoever's
+ * it is; one in a repo outside them is never seen.
  */
 export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Issue) => Item {
   const opened = issues.filter((issue) => issue.state === "OPEN");
@@ -87,7 +87,7 @@ export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Iss
   return (issue) => ({
     ...issue,
     authors: issue.author === null ? [] : [issue.author],
-    statuses: withPr.has(keyOf(issue)) ? [...issue.statuses, "is:has-pr"] : issue.statuses,
+    hasPr: withPr.has(keyOf(issue)),
     blocked: isBlocked(issue, byKey),
     blocking: blocking.has(keyOf(issue)),
     name: null,
@@ -102,7 +102,8 @@ const jobItem = (job: CiJob): FilterItem => ({
   authors: job.authors,
   assignees: [],
   labels: [],
-  statuses: job.pr ? ["is:has-pr"] : [],
+  statuses: [],
+  hasPr: job.pr !== null,
   parent: null,
   subIssues: { total: 0 },
   blocked: false,
@@ -122,20 +123,6 @@ const jobCard = (job: CiJob): CiJobCard => ({
   failedAt: job.failedAt,
   pr: job.pr,
 });
-
-/** `jobs` that one of the global `users` (empty for everyone) has commits in and that pass `scope`. */
-function scopedJobs(
-  jobs: CiJob[],
-  users: string[],
-  viewer: string | null,
-  scope: FilterNode | null = null,
-): { job: CiJob; item: FilterItem }[] {
-  const passes = inScope(users, viewer, scope);
-  return jobs.flatMap((job) => {
-    const item = jobItem(job);
-    return passes(item) ? [{ job, item }] : [];
-  });
-}
 
 /**
  * Keys of the epic's blockers, its sub-issues and the issues it blocks, plus the PRs
@@ -200,15 +187,20 @@ function inScope(
 }
 
 /**
- * `issues` by key, and the open ones that one of the global `users` (empty for everyone)
- * authored or is assigned to and that pass `scope`, each with its item.
+ * `issues` by key, plus the open ones and the failed CI `jobs` that one of the global `users`
+ * (empty for everyone) is in and that pass `scope`, each with its item.
  */
-function openItemsOf(
+function scopedItems(
   issues: Issue[],
+  jobs: CiJob[],
   users: string[],
   viewer: string | null,
   scope: FilterNode | null = null,
-): { byKey: Map<string, Issue>; open: { issue: Issue; item: Item }[] } {
+): {
+  byKey: Map<string, Issue>;
+  open: { issue: Issue; item: Item }[];
+  openJobs: { job: CiJob; item: FilterItem }[];
+} {
   const byKey = new Map(issues.map((issue) => [keyOf(issue), issue]));
   // From all of `issues`, not just the open ones.
   const itemOf = itemsOf(issues, byKey);
@@ -218,15 +210,26 @@ function openItemsOf(
     const item = itemOf(issue);
     return passes(item) ? [{ issue, item }] : [];
   });
-  return { byKey, open };
+  const openJobs = jobs.flatMap((job) => {
+    const item = jobItem(job);
+    return passes(item) ? [{ job, item }] : [];
+  });
+  return { byKey, open, openJobs };
 }
 
-/** The dashboard's filter, swimlanes and columns, parsed. */
+/** The dashboard's filter, swimlanes, columns and `epicLabel` (as a `labelKey`), parsed. */
 function compileGrid(dashboard: BoardDashboard) {
+  const epicLabel = dashboard.epicLabel && labelKey(dashboard.epicLabel);
   return {
     scope: parseFilter(dashboard.filter),
     swimlanes: compile(dashboard.swimlanes),
     columns: compile(dashboard.columns),
+    epicLabel,
+    /** An issue with the board's `epicLabel`. */
+    isEpic: (item: FilterItem): boolean =>
+      item.kind === "issue" &&
+      epicLabel !== undefined &&
+      item.labels.some((label) => labelKey(label.name) === epicLabel),
   };
 }
 
@@ -251,7 +254,7 @@ function firstGroup<G extends Group>(
   return groups.find((group) => matchesFilter(group.node, item, { viewer, other: true }));
 }
 
-/** Whether the dashboard shows `item` in a cell or group, blocked-hiding aside. */
+/** Whether the dashboard shows `item` in a cell, group or epic strip, blocked-hiding aside. */
 function placer(dashboard: Dashboard, viewer: string | null): (item: FilterItem) => boolean {
   const passes = inScope([], viewer, parseFilter(dashboard.filter));
   if (dashboard.type === "inbox") {
@@ -259,7 +262,7 @@ function placer(dashboard: Dashboard, viewer: string | null): (item: FilterItem)
     return (item) => passes(item) && firstGroup(groups, item, viewer) !== undefined;
   }
   const grid = compileGrid(dashboard);
-  return (item) => passes(item) && placeOnGrid(grid, item, viewer) !== null;
+  return (item) => passes(item) && (grid.isEpic(item) || placeOnGrid(grid, item, viewer) !== null);
 }
 
 /**
@@ -320,23 +323,25 @@ const toCard = (item: Item, labels: LabelRef[], isEpic: boolean): Card => ({
   blocked: item.blocked,
   isEpic,
   statuses: item.statuses,
+  hasPr: item.hasPr,
   createdAt: item.createdAt,
   updatedAt: item.updatedAt,
 });
 
 /**
- * The open items of the global repos' `issues` that one of the global `users` (empty for
- * everyone) authored or is assigned to and that pass the dashboard's filter. `viewer` is what
- * `@me` stands for.
+ * The repos of the open `issues` and failed CI `jobs` that one of the global `users` (empty for
+ * everyone) is in and that pass the dashboard's filter. `viewer` is what `@me` stands for.
  */
-export function scopedIssues(
+export function scopedRepos(
   issues: Issue[],
+  jobs: CiJob[],
   dashboard: Pick<Dashboard, "filter">,
   users: string[] = [],
   viewer: string | null = null,
-): Issue[] {
-  const { open } = openItemsOf(issues, users, viewer, parseFilter(dashboard.filter));
-  return open.map(({ issue }) => issue);
+): Set<string> {
+  const scope = parseFilter(dashboard.filter);
+  const { open, openJobs } = scopedItems(issues, jobs, users, viewer, scope);
+  return new Set([...open.map(({ issue }) => issue.repo), ...openJobs.map(({ job }) => job.repo)]);
 }
 
 /**
@@ -357,11 +362,11 @@ export function unmatchedItems(
   const placers = dashboards.map((dashboard) => placer(dashboard, viewer));
   const placed = (item: FilterItem) => placers.some((places) => places(item));
   const missed = ({ item }: { item: FilterItem }) => !hide.includes(item.repo) && !placed(item);
-  // Hidden repos are dropped last: their items still count for `is:has-pr` and blockers.
-  const unmatched = (scope: FilterNode | null) => ({
-    open: openItemsOf(issues, users, viewer, scope).open.filter(missed),
-    openJobs: scopedJobs(jobs, users, viewer, scope).filter(missed),
-  });
+  // Hidden repos are dropped last: their items still count for `has:pr` and blockers.
+  const unmatched = (scope: FilterNode | null) => {
+    const { open, openJobs } = scopedItems(issues, jobs, users, viewer, scope);
+    return { open: open.filter(missed), openJobs: openJobs.filter(missed) };
+  };
   const shown = unmatched(filter);
   const all = filter ? unmatched(null) : shown;
   const sort = { by: "updated", dir: "desc" } as const;
@@ -390,13 +395,11 @@ export function buildBoard(
 ): Board {
   const axes = compileGrid(dashboard);
   const { scope } = axes;
-  const { byKey, open } = openItemsOf(issues, users, viewer, scope);
-  const openJobs = scopedJobs(jobs, users, viewer, scope);
+  const { byKey, open, openJobs } = scopedItems(issues, jobs, users, viewer, scope);
   const wanted = barFilter(filters, byKey);
-  const epicLabel = dashboard.epicLabel && labelKey(dashboard.epicLabel);
   const shown = labelShown(
     [scope, ...[...axes.swimlanes, ...axes.columns].map((group) => group.node)],
-    epicLabel,
+    axes.epicLabel,
   );
   const facets = facetsOf(open, openJobs, shown, filters, dashboard.sort);
   const { sort } = facets;
@@ -443,10 +446,7 @@ export function buildBoard(
   for (const { issue, item } of open) {
     if (filters.hide?.includes(issue.repo)) continue;
 
-    const isEpic =
-      issue.kind === "issue" &&
-      epicLabel !== undefined &&
-      issue.labels.some((label) => labelKey(label.name) === epicLabel);
+    const isEpic = axes.isEpic(item);
     if (isEpic) epicIssues.push(issue);
 
     if (wanted(item, keyOf(issue), `${issue.number} ${issue.title}`))
@@ -492,8 +492,7 @@ export function buildInbox(
 ): Inbox {
   const scope = parseFilter(dashboard.filter);
   const groups = compile(dashboard.groups);
-  const { byKey, open } = openItemsOf(issues, users, viewer, scope);
-  const openJobs = scopedJobs(jobs, users, viewer, scope);
+  const { byKey, open, openJobs } = scopedItems(issues, jobs, users, viewer, scope);
   const wanted = barFilter(filters, byKey);
   const shown = labelShown([scope, ...groups.map((group) => group.node)]);
   const facets = facetsOf(open, openJobs, shown, filters, dashboard.sort);

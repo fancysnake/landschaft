@@ -1,5 +1,5 @@
 import type { SortBy, SortDir } from "./schema";
-import type { PullStatusLabel, StatusLabel } from "./status";
+import type { PullStatusLabel } from "./status";
 
 export type IssueState = "OPEN" | "CLOSED";
 export type IssueKind = "issue" | "pr";
@@ -85,9 +85,9 @@ export function parseIssueKey(key: string): { repo: string; number: number } | n
 }
 
 /**
- * A check run or commit status that failed on a branch's head commit. `authors` are those of the
- * branch's commits ahead of the default branch, or of its last three when none are ahead; a board
- * shows the job when one of them is one of the global users.
+ * A check run or commit status that failed on an unmerged branch's head commit. `authors` are
+ * those of the branch's commits ahead of the default branch, or of its last three on the default
+ * branch or one without a merge base; a board shows the job when one of them is a global user.
  */
 export interface CiJob {
   repo: string;
@@ -126,8 +126,9 @@ export interface IssueItemCard {
   progress: Progress | null;
   blocked: boolean;
   isEpic: boolean;
-  /** At most `is:has-pr` for issues. */
-  statuses: StatusLabel[];
+  statuses: PullStatusLabel[];
+  /** An open PR closes it. */
+  hasPr: boolean;
   createdAt: string;
   updatedAt: string;
 }

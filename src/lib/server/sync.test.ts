@@ -85,7 +85,7 @@ function fakeGithub(
             const index = key.slice("branch".length);
             return [
               [`b${index}`, failing[branch as string] ?? null],
-              [`c${index}`, { compare: null }],
+              [`c${index}`, { name: "main", compare: null }],
             ];
           }),
         );
@@ -141,7 +141,9 @@ function fakeGithub(
 /** A branch whose head commit has the failed commit status `name`. */
 const redBranch = (name: string): CiBranchNode => ({
   associatedPullRequests: { nodes: [] },
+  mergedPullRequests: { nodes: [] },
   target: {
+    oid: "abc",
     url: "https://github.com/acme/app/commit/abc",
     history: { nodes: [{ author: { user: { login: "ann" } } }] },
     statusCheckRollup: {

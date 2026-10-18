@@ -41,7 +41,7 @@ describe("Db migration", () => {
     first.upsertIssues([makeIssue({ number: 1, kind: "pr" })]);
     first.close();
     const raw = new DatabaseSync(file);
-    raw.exec(`UPDATE issues SET status_json = '["is:ci-not-ok","is:has-pr","is:conflicting"]'`);
+    raw.exec(`UPDATE issues SET status_json = '["is:ci-not-ok","has:pr","is:conflicting"]'`);
     raw.close();
 
     const db = new Db(file);
