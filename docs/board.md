@@ -60,10 +60,11 @@ nothing on top, one of its last three commits. A branch with nothing but a bot's
 top of main stays off. `author:` and `user:` match those commit authors.
 
 `is:ci-job` picks the jobs, `job:` and `branch:` match job and branch names (any case,
-`a|b` for either), and `has:pr` holds when an open PR comes from the branch. A catch-all
+`a|b` for either), and `has:pr` holds when an open PR comes from the branch. A job carries
+that PR's labels: the card shows them, and `label:` and the label filter match them. A catch-all
 swimlane, column or inbox group takes jobs like any other item; `-is:ci-job` in a dashboard's
 filter keeps them off it. The search box matches job and branch names, and the CI job filter
-picks jobs by name and hides issues; the assignee, label and epic filters hide jobs.
+picks jobs by name and hides issues; the assignee and epic filters hide jobs.
 
 Each sync first reads the head commit status of every branch, then fetches jobs and commit
 authors for the failing ones and the default branch alone. That status leaves out scheduled

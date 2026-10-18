@@ -794,6 +794,22 @@ describe("CI jobs", () => {
     expect(board.jobs).toEqual(["lint", "test"]);
   });
 
+  it("takes its open PR's labels for filters, facets and the card", () => {
+    const pr = makeIssue({ number: 7, kind: "pr", labels: [label("team-a"), label("bug")] });
+    const withPr = [makeJob({ name: "lint", pr: { number: 7, url: pr.url } }), ...jobs];
+    const lanes = [
+      { id: "a", name: "A", filter: "label:team-a", hideBlocked: false },
+      { id: "rest", name: "Rest", filter: "other", hideBlocked: false },
+    ];
+    const dashboard = { ...DASHBOARD, swimlanes: lanes, filter: "is:ci-job" };
+    const board = buildBoard([pr], dashboard, {}, [], new Set(), null, withPr);
+    expect(board.cells[cell("a", "todo")]?.map(numberOf)).toEqual(["lint"]);
+    expect(board.cells[cell("a", "todo")]?.[0]?.labels.map((l) => l.name)).toEqual(["bug"]);
+    expect(board.labels).toEqual(["bug"]);
+    const filtered = buildBoard([pr], dashboard, { label: "BUG" }, [], new Set(), null, withPr);
+    expect(filtered.total).toBe(1);
+  });
+
   it("lists a job no dashboard places as unmatched", () => {
     const issuesOnly = { ...DASHBOARD, filter: "-is:ci-job" };
     const unmatched = unmatchedItems([], [issuesOnly], ["bob"], null, [], jobs).items;

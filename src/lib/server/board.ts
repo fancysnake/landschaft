@@ -95,13 +95,19 @@ export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Iss
   });
 }
 
-/** A failed CI job as filters see it: no labels, assignees or links, never blocked. */
-const jobItem = (job: CiJob): FilterItem => ({
+/** A failed CI job with what filters test it on. */
+type JobItem = Omit<FilterItem, "labels"> & { labels: LabelRef[] };
+
+/**
+ * A failed CI job as filters see it: the labels of its open PR in `byKey`, no assignees or links,
+ * never blocked.
+ */
+const jobItem = (job: CiJob, byKey: Map<string, Issue>): JobItem => ({
   kind: "ci-job",
   repo: job.repo,
   authors: job.authors,
   assignees: [],
-  labels: [],
+  labels: (job.pr && byKey.get(issueKey(job.repo, job.pr.number))?.labels) ?? [],
   statuses: [],
   hasPr: job.pr !== null,
   parent: null,
@@ -112,7 +118,8 @@ const jobItem = (job: CiJob): FilterItem => ({
   branch: job.branch,
 });
 
-const jobCard = (job: CiJob): CiJobCard => ({
+/** `job` as a card showing `labels`. */
+const jobCard = (job: CiJob, labels: LabelRef[]): CiJobCard => ({
   key: ciJobKey(job),
   kind: "ci-job",
   repo: job.repo,
@@ -122,6 +129,7 @@ const jobCard = (job: CiJob): CiJobCard => ({
   url: job.url,
   failedAt: job.failedAt,
   pr: job.pr,
+  labels,
 });
 
 /**
@@ -199,7 +207,7 @@ function scopedItems(
 ): {
   byKey: Map<string, Issue>;
   open: { issue: Issue; item: Item }[];
-  openJobs: { job: CiJob; item: FilterItem }[];
+  openJobs: { job: CiJob; item: JobItem }[];
 } {
   const byKey = new Map(issues.map((issue) => [keyOf(issue), issue]));
   // From all of `issues`, not just the open ones.
@@ -211,7 +219,7 @@ function scopedItems(
     return passes(item) ? [{ issue, item }] : [];
   });
   const openJobs = jobs.flatMap((job) => {
-    const item = jobItem(job);
+    const item = jobItem(job, byKey);
     return passes(item) ? [{ job, item }] : [];
   });
   return { byKey, open, openJobs };
@@ -271,17 +279,21 @@ function placer(dashboard: Dashboard, viewer: string | null): (item: FilterItem)
  */
 function facetsOf(
   open: { issue: Issue }[],
-  openJobs: { job: CiJob }[],
+  openJobs: { job: CiJob; item: JobItem }[],
   shown: (label: { name: string }) => boolean,
   filters: ViewQuery,
   sort: Dashboard["sort"],
 ): Facets {
   const assignees = new Set<string>();
+  for (const { issue } of open)
+    for (const assignee of issue.assignees) assignees.add(assignee.login);
   /** First spelling seen of each label, by its `labelKey`. */
   const labels = new Map<string, string>();
-  for (const { issue } of open) {
-    for (const assignee of issue.assignees) assignees.add(assignee.login);
-    for (const label of issue.labels.filter(shown)) {
+  for (const { labels: own } of [
+    ...open.map(({ issue }) => issue),
+    ...openJobs.map(({ item }) => item),
+  ]) {
+    for (const label of own.filter(shown)) {
       const key = labelKey(label.name);
       if (!labels.has(key)) labels.set(key, label.name);
     }
@@ -374,7 +386,7 @@ export function unmatchedItems(
   return {
     items: [
       ...shown.open.map(({ item }) => toCard(item, item.labels, false)),
-      ...shown.openJobs.map(({ job }) => jobCard(job)),
+      ...shown.openJobs.map(({ job, item }) => jobCard(job, item.labels)),
     ].toSorted(compareBy(sort.by, sort.dir)),
     offer: { labels, repos, users: assignees },
   };
@@ -457,7 +469,7 @@ export function buildBoard(
       !filters.hide?.includes(job.repo) &&
       wanted(item, ciJobKey(job), `${job.name} ${job.branch}`)
     )
-      put(item, jobCard(job));
+      put(item, jobCard(job, item.labels.filter(shown)));
   }
 
   const compare = compareBy(sort.by, sort.dir);
@@ -516,7 +528,7 @@ export function buildInbox(
       !filters.hide?.includes(job.repo) &&
       wanted(item, ciJobKey(job), `${job.name} ${job.branch}`)
     )
-      put(item, jobCard(job));
+      put(item, jobCard(job, item.labels.filter(shown)));
   }
   const compare = compareBy(facets.sort.by, facets.sort.dir);
   return {

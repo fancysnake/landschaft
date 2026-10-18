@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- A CI job carries the labels of the open PR from its branch: its card shows them, and label
+  filters match them.
+
 ## [4.0.0] - 2026-10-18
 
 ### Changed
