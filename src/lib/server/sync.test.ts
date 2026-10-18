@@ -73,7 +73,10 @@ function fakeGithub(
           })),
         ];
         const refs = { pageInfo: { hasNextPage: false, endCursor: null }, nodes };
-        return { rateLimit: { remaining }, repository: { refs } } as T;
+        return {
+          rateLimit: { remaining },
+          repository: { defaultBranchRef: { name: "main" }, refs },
+        } as T;
       }
       if (query.includes("query CiJobs")) {
         const branches = Object.entries(variables).filter(([key]) => key.startsWith("branch"));
@@ -295,7 +298,7 @@ describe("Syncer", () => {
     expect(syncer.rateRemaining).toBe(50);
   });
 
-  it("reads jobs of the red branches alone and replaces the cached ones", async () => {
+  it("reads jobs of the red and default branches alone and replaces the cached ones", async () => {
     db.setCiJobs(REPO, [
       {
         repo: REPO,
@@ -315,8 +318,10 @@ describe("Syncer", () => {
     await new Syncer({ db, gh, now: () => now }).syncRepo(REPO);
     const jobQueries = calls.filter((c) => c.query.includes("query CiJobs"));
     expect(jobQueries.map((c) => c.variables)).toEqual([
-      expect.objectContaining({ branch0: "feat/x", branch1: "gone", ref0: "refs/heads/feat/x" }),
+      expect.objectContaining({ branch0: "main", branch1: "feat/x", branch2: "gone" }),
     ]);
+    // Check suites of the green default branch alone.
+    expect(jobQueries[0]?.query.match(/checkSuites\(/g)).toHaveLength(1);
     expect(db.listCiJobs([REPO])).toEqual([
       {
         repo: REPO,

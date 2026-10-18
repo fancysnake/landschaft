@@ -181,21 +181,24 @@ export class Syncer {
   }
 
   /**
-   * Replaces the cached failed CI jobs: lists the branches whose head commit failed, then reads
-   * jobs and commit authors of those alone, `CI_BATCH` branches per query.
+   * Replaces the cached failed CI jobs: lists the branches whose head commit failed and the
+   * default branch, then reads jobs and commit authors of those alone, `CI_BATCH` per query.
    */
   private async refreshCiJobs(repo: string): Promise<void> {
     const failing: string[] = [];
+    let defaultBranch: string | null = null;
     let after: string | null = null;
     do {
       const page = await fetchFailingBranchesPage(this.gh, repo, after);
       failing.push(...page.branches);
+      defaultBranch = page.defaultBranch;
       after = page.hasNextPage ? page.endCursor : null;
       this.spend(page.rateRemaining, Boolean(after) || failing.length > 0);
     } while (after);
     const jobs: CiJob[] = [];
     for (let start = 0; start < failing.length; start += CI_BATCH) {
-      const page = await fetchCiJobs(this.gh, repo, failing.slice(start, start + CI_BATCH));
+      const batch = failing.slice(start, start + CI_BATCH);
+      const page = await fetchCiJobs(this.gh, repo, batch, defaultBranch);
       jobs.push(...page.jobs);
       this.spend(page.rateRemaining, start + CI_BATCH < failing.length);
     }

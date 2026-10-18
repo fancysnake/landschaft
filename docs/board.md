@@ -65,8 +65,10 @@ filter keeps them off it. The search box matches job and branch names, and the C
 picks jobs by name and hides issues; the assignee, label and epic filters hide jobs.
 
 Each sync first reads the head commit status of every branch, then fetches jobs and commit
-authors for the failing ones alone. It looks at the head commit only, so a job that skipped
-it (a path filter, say) hides an older failure.
+authors for the failing ones and the default branch alone. That status leaves out scheduled
+and manually dispatched runs, so on the default branch the sync also reads the head commit's
+check suites; on other branches such a run's failure stays off the board. It looks at the head
+commit only, so a job that skipped it (a path filter, say) hides an older failure.
 
 ## Inbox
 

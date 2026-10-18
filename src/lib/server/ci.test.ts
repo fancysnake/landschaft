@@ -86,6 +86,21 @@ describe("toCiJobs", () => {
     expect(jobs.map(({ name, failedAt }) => [name, failedAt])).toEqual([["lint", later]]);
   });
 
+  it("adds the check suites the rollup lacks, the newest run per job still deciding", () => {
+    const later = "2026-05-03T00:00:00Z";
+    const head = branch([checkRun("test", "FAILURE")]);
+    head.target.checkSuites = {
+      nodes: [
+        { checkRuns: { nodes: [checkRun("mutation", "FAILURE", "Mutation Tests")] } },
+        { checkRuns: { nodes: [checkRun("test", "SUCCESS", "CI", later)] } },
+      ],
+    };
+    const jobs = toCiJobs("acme/app", "main", head, null);
+    expect(jobs.map(({ workflow, name }) => [workflow, name])).toEqual([
+      ["Mutation Tests", "mutation"],
+    ]);
+  });
+
   it("tells apart jobs whose workflow and name join into the same path", () => {
     const jobs = toCiJobs(
       "acme/app",
