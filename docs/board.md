@@ -51,7 +51,8 @@ opened the PR, as long as the PR is in one of the global repos; such an issue ca
 A job whose newest run on a branch failed shows as a card of its own: a GitHub Actions job, a
 check run from another app, or a commit status. The card links to the run and names the
 branch, when the job failed and the open PR from the branch, if any. A passing run on the
-branch removes it; an old failure stays however long the branch sits untouched.
+branch removes it, and so does merging the branch; an old failure stays however long the
+branch sits untouched.
 
 Every branch counts, but a board shows its jobs only when the branch is one of the global
 users': one of them authored a commit the branch has on top of the default branch, or, with

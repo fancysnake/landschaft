@@ -85,7 +85,7 @@ export function parseIssueKey(key: string): { repo: string; number: number } | n
 }
 
 /**
- * A check run or commit status that failed on a branch's head commit. `authors` are those of the
+ * A check run or commit status that failed on an unmerged branch's head commit. `authors` are those of the
  * branch's commits ahead of the default branch, or of its last three when none are ahead; a board
  * shows the job when one of them is one of the global users.
  */
