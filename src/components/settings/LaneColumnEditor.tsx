@@ -39,7 +39,7 @@ function slug(name: string, taken: Set<string>): string {
 }
 
 const button =
-  "rounded border border-neutral-300 bg-white px-1.5 text-xs leading-5 hover:bg-neutral-50 disabled:opacity-40";
+  "rounded-md border border-neutral-200 bg-white px-1.5 text-xs leading-5 text-neutral-600 shadow-xs hover:bg-neutral-50 disabled:opacity-40";
 
 export function LaneColumnEditor<T extends Group>({
   title,
@@ -73,7 +73,7 @@ export function LaneColumnEditor<T extends Group>({
               <input
                 value={item.name}
                 onChange={(event) => replace(index, { ...item, name: event.target.value })}
-                className="w-full rounded-md border border-neutral-300 px-2 py-1 text-sm"
+                className="field w-full"
               />
               <div className="mt-0.5 font-mono text-[10px] text-neutral-400">{item.id}</div>
               {flag && (

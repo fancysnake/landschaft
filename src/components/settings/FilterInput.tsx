@@ -30,9 +30,7 @@ export function FilterInput({
         aria-invalid={error !== null}
         aria-describedby={error ? errorId : undefined}
         spellCheck={false}
-        className={`w-full rounded-md border px-2 py-1 font-mono text-sm ${
-          error ? "border-red-400" : "border-neutral-300"
-        }`}
+        className="field w-full font-mono aria-invalid:border-red-400"
       />
       <datalist id={listId}>
         {suggestFilter(value, offer).map((option) => (

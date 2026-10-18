@@ -36,7 +36,7 @@ export function LabelPicker({ value, onChange, options, placeholder, single }: P
   };
 
   return (
-    <div className="flex min-h-9 flex-wrap items-center gap-1 rounded-md border border-neutral-300 bg-white px-1.5 py-1">
+    <div className="flex min-h-9 flex-wrap items-center gap-1 rounded-md border border-neutral-300 bg-white px-1.5 py-1 shadow-xs">
       {value.map((name) => (
         <span
           key={name}

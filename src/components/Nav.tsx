@@ -13,10 +13,10 @@ interface Props {
 }
 
 const link = (active: boolean, inactive = false) =>
-  `rounded-md px-2 py-1 text-sm ${
+  `rounded-md px-2.5 py-1 text-sm transition-colors ${
     active
-      ? "bg-neutral-800 text-white"
-      : `${inactive ? "text-neutral-400" : "text-neutral-700"} hover:bg-neutral-200`
+      ? "bg-neutral-900 font-medium text-white"
+      : `${inactive ? "text-neutral-400" : "text-neutral-600"} hover:bg-neutral-100 hover:text-neutral-900`
   }`;
 
 /**
@@ -31,40 +31,47 @@ export default function Nav({ path, dashboards, repos }: Props) {
     dashboard.repos.every((repo) => !shown.includes(repo));
 
   return (
-    <nav className="flex flex-wrap items-center gap-1 border-b border-neutral-200 bg-white px-4 py-2">
-      <a href="/" className="mr-3 font-semibold tracking-tight">
-        landschaft
-      </a>
-      {dashboards.map((dashboard) => (
-        <a
-          key={dashboard.id}
-          href={`/d/${dashboard.id}`}
-          title={inactive(dashboard) ? "No items in the repositories switched on" : undefined}
-          className={link(path === `/d/${dashboard.id}`, inactive(dashboard))}
-        >
-          {dashboard.name}
+    <nav className="border-b border-neutral-200 bg-white">
+      <div className="flex flex-wrap items-center gap-1 px-4 py-2">
+        <a href="/" className="mr-4 text-[17px] font-semibold tracking-tight">
+          landschaft
         </a>
-      ))}
-      {dashboards.length > 0 && (
-        <a
-          href="/unmatched"
-          title="Open items no dashboard places"
-          className={link(path === "/unmatched")}
-        >
-          Unmatched
-        </a>
-      )}
-      <div className="ml-auto flex flex-wrap items-center gap-3">
-        {status && (
-          <SyncStatus
-            status={status}
-            syncing={syncing}
-            error={error}
-            onSync={(full) => void sync(full)}
-            onDismissError={dismissError}
-          />
+        {dashboards.map((dashboard) => (
+          <a
+            key={dashboard.id}
+            href={`/d/${dashboard.id}`}
+            title={inactive(dashboard) ? "No items in the repositories switched on" : undefined}
+            className={link(path === `/d/${dashboard.id}`, inactive(dashboard))}
+          >
+            {dashboard.name}
+          </a>
+        ))}
+        {dashboards.length > 0 && (
+          <a
+            href="/unmatched"
+            title="Open items no dashboard places"
+            className={link(path === "/unmatched")}
+          >
+            Unmatched
+          </a>
         )}
-        {repos.length > 1 && (
+        <div className="ml-auto flex flex-wrap items-center gap-3">
+          {status && (
+            <SyncStatus
+              status={status}
+              syncing={syncing}
+              error={error}
+              onSync={(full) => void sync(full)}
+              onDismissError={dismissError}
+            />
+          )}
+          <a href="/settings" className={link(path === "/settings")}>
+            Settings
+          </a>
+        </div>
+      </div>
+      {repos.length > 1 && (
+        <div className="border-t border-neutral-100 px-4 py-2">
           <Toggles
             label="Repositories"
             options={repos
@@ -73,11 +80,8 @@ export default function Nav({ path, dashboards, repos }: Props) {
             selected={shown}
             onChange={(selected) => setHidden(repos.filter((repo) => !selected.includes(repo)))}
           />
-        )}
-        <a href="/settings" className={link(path === "/settings")}>
-          Settings
-        </a>
-      </div>
+        </div>
+      )}
     </nav>
   );
 }

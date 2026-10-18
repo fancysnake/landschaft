@@ -13,7 +13,7 @@ interface Props {
   onChange(patch: Partial<Filters>): void;
 }
 
-const select = "rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm text-neutral-800";
+const select = "field";
 
 export function FilterBar({ filters, facets, epics, onChange }: Props) {
   const [text, setText] = useState(filters.q ?? "");
@@ -28,13 +28,6 @@ export function FilterBar({ filters, facets, epics, onChange }: Props) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <input
-        type="search"
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        placeholder="Search title, #number, job or branch"
-        className={`${select} w-64`}
-      />
       <select
         aria-label="Assignee"
         value={filters.assignee ?? ""}
@@ -91,7 +84,14 @@ export function FilterBar({ filters, facets, epics, onChange }: Props) {
           ))}
         </select>
       )}
-      <span className="ml-auto flex items-center gap-1 text-sm text-neutral-600">
+      <input
+        type="search"
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        placeholder="Search title, #number, job or branch"
+        className={`${select} ml-auto w-72 max-w-full`}
+      />
+      <span className="flex items-center gap-2 text-sm text-neutral-500">
         Sort
         <select
           value={facets.sort.by}
@@ -117,7 +117,7 @@ export function FilterBar({ filters, facets, epics, onChange }: Props) {
             setText("");
             onChange(Object.fromEntries(TEXT_FILTER_KEYS.map((key) => [key, undefined])));
           }}
-          className="text-sm text-sky-700 hover:underline"
+          className="text-sm font-medium text-sky-700 hover:underline"
         >
           Clear filters
         </button>

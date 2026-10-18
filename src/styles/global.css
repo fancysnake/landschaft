@@ -1,1 +1,32 @@
 @import "tailwindcss";
+@import "@fontsource-variable/source-sans-3";
+@import "@fontsource-variable/jetbrains-mono";
+
+@theme {
+  --font-sans: "Source Sans 3 Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+}
+
+@layer base {
+  :where(a, button, input, select, textarea, summary):focus-visible {
+    outline: 2px solid var(--color-sky-500);
+    outline-offset: 1px;
+  }
+}
+
+/* Shape only, so a colour class next to them never fights over the same property. */
+@utility pill {
+  @apply inline-flex items-center rounded px-1.5 text-[11px] leading-[18px] font-medium ring-1 ring-inset;
+}
+
+@utility btn {
+  @apply inline-flex items-center gap-1 rounded-md border px-3 py-1 text-sm font-medium transition-colors disabled:opacity-40;
+}
+
+@utility field {
+  @apply rounded-md border border-neutral-300 bg-white px-2.5 py-1 text-sm text-neutral-800 shadow-xs placeholder:text-neutral-400;
+}
+
+@utility panel {
+  @apply rounded-lg border border-neutral-200 bg-white;
+}

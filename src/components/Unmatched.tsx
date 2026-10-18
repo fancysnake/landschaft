@@ -43,10 +43,10 @@ export default function Unmatched() {
   }
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-3 p-6">
-      <h1 className="text-lg font-semibold">
+    <div className="mx-auto flex max-w-6xl flex-col gap-4 p-5">
+      <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
         Unmatched
-        <span className="ml-2 text-sm font-normal text-neutral-500">
+        <span className="ml-3 text-sm font-normal tracking-normal text-neutral-500 tabular-nums">
           {data.items.length} items on no dashboard
         </span>
       </h1>
@@ -70,9 +70,11 @@ export default function Unmatched() {
             const cards = data.items.filter((card) => card.kind === kind);
             return (
               <section key={kind} className="flex flex-col gap-2">
-                <h2 className="text-sm font-semibold text-neutral-700">
+                <h2 className="text-sm font-semibold tracking-wide text-neutral-500 uppercase">
                   {title}
-                  <span className="ml-1.5 font-normal text-neutral-500">{cards.length}</span>
+                  <span className="ml-1.5 font-normal text-neutral-400 tabular-nums">
+                    {cards.length}
+                  </span>
                 </h2>
                 <ul className="flex flex-col gap-2">
                   {cards.map((card) => (

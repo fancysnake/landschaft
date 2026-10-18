@@ -10,11 +10,11 @@ interface Props {
 export function EpicTile({ epic, selected, onToggle, onToggleStar }: Props) {
   return (
     <div
-      className={`flex shrink-0 rounded-md border text-xs ${epic.starred ? "w-60 border-l-4" : "w-52"} ${
+      className={`flex shrink-0 rounded-lg border text-xs shadow-xs transition-colors ${epic.starred ? "w-60 border-l-[3px]" : "w-52"} ${
         selected
-          ? "border-violet-500 bg-violet-50"
+          ? "border-violet-400 bg-violet-50 ring-1 ring-violet-400"
           : epic.starred
-            ? "border-amber-300 border-l-amber-500 bg-amber-50 shadow-sm hover:border-violet-300"
+            ? "border-neutral-200 border-l-amber-400 bg-white hover:border-violet-300"
             : "border-neutral-200 bg-white hover:border-violet-300"
       }`}
     >
@@ -47,13 +47,13 @@ export function EpicTile({ epic, selected, onToggle, onToggleStar }: Props) {
             {epic.title}
           </span>
           {epic.starred && (
-            <span className="shrink-0 rounded bg-amber-100 px-1 text-amber-800">active</span>
+            <span className="pill shrink-0 bg-amber-50 text-amber-700 ring-amber-200">active</span>
           )}
         </div>
         <div className="mt-1 flex items-center gap-2">
-          <div className="h-1.5 flex-1 overflow-hidden rounded bg-neutral-200">
+          <div className="h-1 flex-1 overflow-hidden rounded-full bg-neutral-100">
             <div
-              className="h-full bg-emerald-500"
+              className="h-full rounded-full bg-emerald-500"
               style={{ width: `${epic.progress?.percent ?? 0}%` }}
             />
           </div>
