@@ -95,7 +95,7 @@ export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Iss
   });
 }
 
-/** A failed CI job with what filters test it on. */
+/** A failed CI job as filters see it, its labels carrying the colours its card shows. */
 type JobItem = Omit<FilterItem, "labels"> & { labels: LabelRef[] };
 
 /**
@@ -273,38 +273,32 @@ function placer(dashboard: Dashboard, viewer: string | null): (item: FilterItem)
   return (item) => passes(item) && (grid.isEpic(item) || placeOnGrid(grid, item, viewer) !== null);
 }
 
-/**
- * The repo chips, filter options and sort of a view over `open` and `openJobs`, offering the
- * `shown` labels.
- */
+/** The repo chips, filter options and sort of a view over `items`, offering the `shown` labels. */
 function facetsOf(
-  open: { issue: Issue }[],
-  openJobs: { job: CiJob; item: JobItem }[],
+  items: FilterItem[],
   shown: (label: { name: string }) => boolean,
   filters: ViewQuery,
   sort: Dashboard["sort"],
 ): Facets {
+  const repos = new Set<string>();
   const assignees = new Set<string>();
-  for (const { issue } of open)
-    for (const assignee of issue.assignees) assignees.add(assignee.login);
   /** First spelling seen of each label, by its `labelKey`. */
   const labels = new Map<string, string>();
-  for (const { labels: own } of [
-    ...open.map(({ issue }) => issue),
-    ...openJobs.map(({ item }) => item),
-  ]) {
-    for (const label of own.filter(shown)) {
+  const jobs = new Set<string>();
+  for (const item of items) {
+    repos.add(item.repo);
+    for (const assignee of item.assignees) assignees.add(assignee.login);
+    for (const label of item.labels.filter(shown)) {
       const key = labelKey(label.name);
       if (!labels.has(key)) labels.set(key, label.name);
     }
+    if (item.kind === "ci-job" && item.name !== null) jobs.add(item.name);
   }
   return {
-    repos: [
-      ...new Set([...open.map(({ issue }) => issue.repo), ...openJobs.map(({ job }) => job.repo)]),
-    ].toSorted(),
+    repos: [...repos].toSorted(),
     assignees: [...assignees].toSorted(),
     labels: [...labels.values()].toSorted(),
-    jobs: [...new Set(openJobs.map(({ job }) => job.name))].toSorted(),
+    jobs: [...jobs].toSorted(),
     sort: { by: filters.sort ?? sort.by, dir: filters.dir ?? sort.dir },
   };
 }
@@ -382,7 +376,12 @@ export function unmatchedItems(
   const shown = unmatched(filter);
   const all = filter ? unmatched(null) : shown;
   const sort = { by: "updated", dir: "desc" } as const;
-  const { repos, assignees, labels } = facetsOf(all.open, all.openJobs, () => true, {}, sort);
+  const { repos, assignees, labels } = facetsOf(
+    [...all.open, ...all.openJobs].map(({ item }) => item),
+    () => true,
+    {},
+    sort,
+  );
   return {
     items: [
       ...shown.open.map(({ item }) => toCard(item, item.labels, false)),
@@ -413,7 +412,12 @@ export function buildBoard(
     [scope, ...[...axes.swimlanes, ...axes.columns].map((group) => group.node)],
     axes.epicLabel,
   );
-  const facets = facetsOf(open, openJobs, shown, filters, dashboard.sort);
+  const facets = facetsOf(
+    [...open, ...openJobs].map(({ item }) => item),
+    shown,
+    filters,
+    dashboard.sort,
+  );
   const { sort } = facets;
 
   const board: Board = {
@@ -507,7 +511,12 @@ export function buildInbox(
   const { byKey, open, openJobs } = scopedItems(issues, jobs, users, viewer, scope);
   const wanted = barFilter(filters, byKey);
   const shown = labelShown([scope, ...groups.map((group) => group.node)]);
-  const facets = facetsOf(open, openJobs, shown, filters, dashboard.sort);
+  const facets = facetsOf(
+    [...open, ...openJobs].map(({ item }) => item),
+    shown,
+    filters,
+    dashboard.sort,
+  );
   const cards = new Map<string, Card[]>(groups.map((group) => [group.id, []]));
   let total = 0;
   const put = (item: FilterItem, card: Card) => {
