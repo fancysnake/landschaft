@@ -328,7 +328,7 @@ describe("toCiJobs", () => {
           type: "StatusContext",
           context: "ci/jenkins",
           state: "ERROR",
-          targetUrl: null,
+          targetUrl: "javascript:alert(1)",
           createdAt: "2026-05-02T00:00:00Z",
         },
         {

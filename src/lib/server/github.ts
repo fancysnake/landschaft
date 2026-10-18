@@ -472,6 +472,11 @@ export async function fetchFailingBranchesPage(
   };
 }
 
+/** `url` when it is http(s); apps and status posters set it, and it lands in an href. */
+function webUrl(url: string | null): string | null {
+  return url !== null && /^https?:\/\//i.test(url) ? url : null;
+}
+
 /** A cancelled, skipped or neutral job is no failure. */
 const FAILED_CONCLUSIONS = new Set(["FAILURE", "TIMED_OUT", "STARTUP_FAILURE"]);
 
@@ -545,7 +550,7 @@ export function toCiJobs(
           ...job,
           workflow: check.checkSuite.workflowRun?.workflow.name ?? null,
           name: check.name,
-          url: check.detailsUrl ?? check.url,
+          url: webUrl(check.detailsUrl) ?? check.url,
           failedAt: check.completedAt ?? "",
         },
       ];
@@ -556,7 +561,7 @@ export function toCiJobs(
         ...job,
         workflow: null,
         name: check.context,
-        url: check.targetUrl ?? target.url,
+        url: webUrl(check.targetUrl) ?? target.url,
         failedAt: check.createdAt,
       },
     ];
