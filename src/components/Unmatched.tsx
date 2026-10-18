@@ -6,7 +6,7 @@ import { useSynced } from "../lib/client/useSynced";
 import { CardView } from "./board/IssueCard";
 import { ErrorBanner } from "./ErrorBanner";
 
-/** Open items in the repos switched on that no dashboard places in a cell. */
+/** Open items in the repos switched on that no dashboard places in a cell or inbox group. */
 export default function Unmatched() {
   const [hidden] = useHiddenRepos();
   const get = useCallback(() => api.unmatched(hidden), [hidden]);

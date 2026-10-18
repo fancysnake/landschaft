@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type { LabelDef } from "../../lib/types";
 
 import { api, errorMessage } from "../../lib/client/api";
-import { type Config, type Dashboard } from "../../lib/schema";
+import { type Config, type Dashboard, withType } from "../../lib/schema";
 import { DashboardEditor } from "./DashboardEditor";
 import { ScopeEditor } from "./ScopeEditor";
 
@@ -12,14 +12,12 @@ function newId(): string {
 }
 
 function newDashboard(): Dashboard {
-  return {
+  return withType("board", {
     id: newId(),
     name: "New dashboard",
     filter: "",
     sort: { by: "updated", dir: "desc" },
-    swimlanes: [{ id: "all", name: "Everything", filter: "", hideBlocked: false }],
-    columns: [{ id: "todo", name: "Todo", filter: "" }],
-  };
+  });
 }
 
 type Notice = { kind: "ok" | "error"; text: string } | null;

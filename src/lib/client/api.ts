@@ -1,16 +1,23 @@
 import type {
-  BoardQuery,
+  BoardDashboard,
+  ViewQuery,
   Config,
-  Dashboard,
   Filters,
+  InboxDashboard,
   StarEpicRequest,
   SyncRequest,
 } from "../schema";
-import type { Board, Card, LabelDef, SyncStatus } from "../types";
+import type { Board, Card, Inbox, LabelDef, SyncStatus } from "../types";
 
 export interface BoardResponse {
-  dashboard: Dashboard;
+  dashboard: BoardDashboard;
   board: Board;
+  status: SyncStatus;
+}
+
+export interface InboxResponse {
+  dashboard: InboxDashboard;
+  inbox: Inbox;
   status: SyncStatus;
 }
 
@@ -69,14 +76,17 @@ export function filtersToQuery(filters: Filters): string {
   return params.toString();
 }
 
+function viewUrl(dashboardId: string, view: "board" | "inbox", { hide, ...filters }: ViewQuery) {
+  const params = new URLSearchParams(filtersToQuery(filters));
+  if (hide?.length) params.set("hide", hide.join(","));
+  return `/api/dashboards/${encodeURIComponent(dashboardId)}/${view}?${params}`;
+}
+
 export const api = {
-  board: (dashboardId: string, { hide, ...filters }: BoardQuery) => {
-    const params = new URLSearchParams(filtersToQuery(filters));
-    if (hide?.length) params.set("hide", hide.join(","));
-    return request<BoardResponse>(
-      `/api/dashboards/${encodeURIComponent(dashboardId)}/board?${params}`,
-    );
-  },
+  board: (dashboardId: string, query: ViewQuery) =>
+    request<BoardResponse>(viewUrl(dashboardId, "board", query)),
+  inbox: (dashboardId: string, query: ViewQuery) =>
+    request<InboxResponse>(viewUrl(dashboardId, "inbox", query)),
   unmatched: (hide: string[]) =>
     request<UnmatchedResponse>(`/api/unmatched?hide=${encodeURIComponent(hide.join(","))}`),
   version: () => request<SyncStatus>("/api/version"),

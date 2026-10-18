@@ -15,7 +15,8 @@ const { dashboards } = loadConfig();
           <a href="/settings" class="text-sky-700 underline">
             Create one in settings
           </a>{" "}
-          after adding the repositories to watch, then define its swimlanes and columns.
+          after adding the repositories to watch: a board with swimlanes and columns, or an inbox
+          of groups.
         </p>
       ) : (
         <ul class="grid gap-3 sm:grid-cols-2">
@@ -30,7 +31,9 @@ const { dashboards } = loadConfig();
                   {dashboard.filter || "all items"}
                 </div>
                 <div class="mt-1 text-xs text-neutral-400">
-                  {dashboard.swimlanes.length} swimlanes · {dashboard.columns.length} columns
+                  {dashboard.type === "board"
+                    ? `board · ${dashboard.swimlanes.length} swimlanes · ${dashboard.columns.length} columns`
+                    : `inbox · ${dashboard.groups.length} groups`}
                 </div>
               </a>
             </li>

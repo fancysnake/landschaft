@@ -7,9 +7,11 @@ import {
   parseFilter,
 } from "../filter";
 import {
-  type BoardQuery,
+  type BoardDashboard,
+  type ViewQuery,
   type Dashboard,
   type Filters,
+  type InboxDashboard,
   OTHER_LOOKS_AT,
   type SortBy,
   type SortDir,
@@ -21,6 +23,8 @@ import {
   type CiJob,
   type CiJobCard,
   ciJobKey,
+  type Facets,
+  type Inbox,
   type Issue,
   issueKey,
   type IssueRef,
@@ -217,7 +221,7 @@ function openItemsOf(
 }
 
 /** The dashboard's filter, swimlanes and columns, parsed. */
-function compileGrid(dashboard: Dashboard) {
+function compileGrid(dashboard: BoardDashboard) {
   return {
     scope: parseFilter(dashboard.filter),
     swimlanes: compile(dashboard.swimlanes),
@@ -235,6 +239,70 @@ function placeOnGrid<L extends Group, C extends Group>(
   const lanes = placeIn(axes.swimlanes, hit, OTHER_LOOKS_AT.swimlanes);
   const columns = placeIn(axes.columns, hit, OTHER_LOOKS_AT.columns);
   return lanes.length > 0 && columns.length > 0 ? { lanes, columns } : null;
+}
+
+/** The first inbox group `item` matches; `other` holds in each, as no earlier one took it. */
+function firstGroup<G extends Group>(
+  groups: G[],
+  item: FilterItem,
+  viewer: string | null,
+): G | undefined {
+  return groups.find((group) => matchesFilter(group.node, item, { viewer, other: true }));
+}
+
+/** Whether the dashboard shows `item` in a cell or group, blocked-hiding aside. */
+function placer(dashboard: Dashboard, viewer: string | null): (item: FilterItem) => boolean {
+  const passes = inScope([], viewer, parseFilter(dashboard.filter));
+  if (dashboard.type === "inbox") {
+    const groups = compile(dashboard.groups);
+    return (item) => passes(item) && firstGroup(groups, item, viewer) !== undefined;
+  }
+  const grid = compileGrid(dashboard);
+  return (item) => passes(item) && placeOnGrid(grid, item, viewer) !== null;
+}
+
+/**
+ * The repo chips, filter options and sort of a view over `open` and `openJobs`, offering the
+ * `shown` labels.
+ */
+function facetsOf(
+  open: { issue: Issue }[],
+  openJobs: { job: CiJob }[],
+  shown: (label: { name: string }) => boolean,
+  filters: ViewQuery,
+  sort: Dashboard["sort"],
+): Facets {
+  const assignees = new Set<string>();
+  /** First spelling seen of each label, by its `labelKey`. */
+  const labels = new Map<string, string>();
+  for (const { issue } of open) {
+    for (const assignee of issue.assignees) assignees.add(assignee.login);
+    for (const label of issue.labels.filter(shown)) {
+      const key = labelKey(label.name);
+      if (!labels.has(key)) labels.set(key, label.name);
+    }
+  }
+  return {
+    repos: [
+      ...new Set([...open.map(({ issue }) => issue.repo), ...openJobs.map(({ job }) => job.repo)]),
+    ].toSorted(),
+    assignees: [...assignees].toSorted(),
+    labels: [...labels.values()].toSorted(),
+    jobs: [...new Set(openJobs.map(({ job }) => job.name))].toSorted(),
+    sort: { by: filters.sort ?? sort.by, dir: filters.dir ?? sort.dir },
+  };
+}
+
+/**
+ * Whether a card keeps a label: all but the ones `nodes` ask for and the `epicLabel`, compared
+ * by `labelKey`.
+ */
+function labelShown(
+  nodes: (FilterNode | null)[],
+  epicLabel?: string,
+): (label: { name: string }) => boolean {
+  const structural = new Set([...nodes.flatMap(askedLabels), ...(epicLabel ? [epicLabel] : [])]);
+  return (label) => !structural.has(labelKey(label.name));
 }
 
 /** `item` as a card showing `labels`. */
@@ -272,8 +340,8 @@ export function scopedIssues(
 
 /**
  * Cards for the open items of the global `users` in `issues` that no dashboard places in a
- * cell, and of their failed CI `jobs`, outside the `hide` repos, most recently updated first. One
- * a swimlane hides as blocked counts as placed.
+ * cell or group, and of their failed CI `jobs`, outside the `hide` repos, most recently updated
+ * first. One a swimlane hides as blocked counts as placed.
  */
 export function unmatchedItems(
   issues: Issue[],
@@ -283,12 +351,8 @@ export function unmatchedItems(
   hide: readonly string[] = [],
   jobs: CiJob[] = [],
 ): Card[] {
-  const grids = dashboards.map(compileGrid);
-  const placed = (item: FilterItem) =>
-    grids.some(
-      (grid) =>
-        matchesFilter(grid.scope, item, { viewer }) && placeOnGrid(grid, item, viewer) !== null,
-    );
+  const placers = dashboards.map((dashboard) => placer(dashboard, viewer));
+  const placed = (item: FilterItem) => placers.some((places) => places(item));
   const missed = ({ item }: { item: FilterItem }) => !hide.includes(item.repo) && !placed(item);
   // Hidden repos are dropped last: their items still count for `is:has-pr` and blockers.
   return [
@@ -307,8 +371,8 @@ export function unmatchedItems(
  */
 export function buildBoard(
   issues: Issue[],
-  dashboard: Dashboard,
-  filters: BoardQuery = {},
+  dashboard: BoardDashboard,
+  filters: ViewQuery = {},
   users: string[] = [],
   starred: ReadonlySet<string> = new Set(),
   viewer: string | null = null,
@@ -319,30 +383,22 @@ export function buildBoard(
   const { byKey, open } = openItemsOf(issues, users, viewer, scope);
   const openJobs = scopedJobs(jobs, users, viewer, scope);
   const wanted = barFilter(filters, byKey);
-  const present = [...new Set([...open, ...openJobs].map(({ item }) => item.repo))].toSorted();
-  const repos = new Set(present.filter((repo) => !filters.hide?.includes(repo)));
   const epicLabel = dashboard.epicLabel && labelKey(dashboard.epicLabel);
-  // By `labelKey`, like every label comparison here.
-  const structural = new Set<string>([
-    ...askedLabels(scope),
-    ...[...axes.swimlanes, ...axes.columns].flatMap((group) => askedLabels(group.node)),
-    ...(epicLabel ? [epicLabel] : []),
-  ]);
-  const shown = (label: { name: string }) => !structural.has(labelKey(label.name));
-  const sort = { by: filters.sort ?? dashboard.sort.by, dir: filters.dir ?? dashboard.sort.dir };
+  const shown = labelShown(
+    [scope, ...[...axes.swimlanes, ...axes.columns].map((group) => group.node)],
+    epicLabel,
+  );
+  const facets = facetsOf(open, openJobs, shown, filters, dashboard.sort);
+  const { sort } = facets;
 
   const board: Board = {
+    ...facets,
     cells: {},
     laneTotals: {},
     columnTotals: {},
     hiddenBlocked: {},
     epics: [],
     total: 0,
-    repos: present,
-    assignees: [],
-    labels: [],
-    jobs: [],
-    sort,
   };
   for (const lane of dashboard.swimlanes) {
     board.laneTotals[lane.id] = 0;
@@ -351,11 +407,7 @@ export function buildBoard(
   }
   for (const column of dashboard.columns) board.columnTotals[column.id] = 0;
 
-  const assignees = new Set<string>();
-  /** First spelling seen of each label, by its `labelKey`. */
-  const labels = new Map<string, string>();
   const epicIssues: Issue[] = [];
-  const jobNames = new Set<string>();
 
   /** Puts `card` in every cell `item` lands in, and counts it once if it shows in any. */
   const put = (item: FilterItem, card: Card) => {
@@ -379,12 +431,7 @@ export function buildBoard(
   };
 
   for (const { issue, item } of open) {
-    for (const assignee of issue.assignees) assignees.add(assignee.login);
-    for (const label of issue.labels.filter(shown)) {
-      const key = labelKey(label.name);
-      if (!labels.has(key)) labels.set(key, label.name);
-    }
-    if (!repos.has(issue.repo)) continue;
+    if (filters.hide?.includes(issue.repo)) continue;
 
     const isEpic =
       issue.kind === "issue" &&
@@ -396,8 +443,10 @@ export function buildBoard(
       put(item, toCard(item, issue.labels.filter(shown), isEpic));
   }
   for (const { job, item } of openJobs) {
-    jobNames.add(job.name);
-    if (repos.has(job.repo) && wanted(item, ciJobKey(job), `${job.name} ${job.branch}`))
+    if (
+      !filters.hide?.includes(job.repo) &&
+      wanted(item, ciJobKey(job), `${job.name} ${job.branch}`)
+    )
       put(item, jobCard(job));
   }
 
@@ -416,8 +465,54 @@ export function buildBoard(
       progress: issue.subIssues.total > 0 ? issue.subIssues : null,
       starred: isStarred(issue),
     }));
-  board.assignees = [...assignees].toSorted();
-  board.labels = [...labels.values()].toSorted();
-  board.jobs = [...jobNames].toSorted();
   return board;
+}
+
+/**
+ * Puts each of the dashboard's `scopedIssues`, and the failed CI `jobs` that pass the same scope,
+ * in the first group it matches, in sort order.
+ */
+export function buildInbox(
+  issues: Issue[],
+  dashboard: InboxDashboard,
+  filters: ViewQuery = {},
+  users: string[] = [],
+  viewer: string | null = null,
+  jobs: CiJob[] = [],
+): Inbox {
+  const scope = parseFilter(dashboard.filter);
+  const groups = compile(dashboard.groups);
+  const { byKey, open } = openItemsOf(issues, users, viewer, scope);
+  const openJobs = scopedJobs(jobs, users, viewer, scope);
+  const wanted = barFilter(filters, byKey);
+  const shown = labelShown([scope, ...groups.map((group) => group.node)]);
+  const facets = facetsOf(open, openJobs, shown, filters, dashboard.sort);
+  const cards = new Map<string, Card[]>(groups.map((group) => [group.id, []]));
+  let total = 0;
+  const put = (item: FilterItem, card: Card) => {
+    const group = firstGroup(groups, item, viewer);
+    if (!group) return;
+    cards.get(group.id)!.push(card);
+    total += 1;
+  };
+  for (const { issue, item } of open) {
+    if (
+      !filters.hide?.includes(issue.repo) &&
+      wanted(item, keyOf(issue), `${issue.number} ${issue.title}`)
+    )
+      put(item, toCard(item, issue.labels.filter(shown), false));
+  }
+  for (const { job, item } of openJobs) {
+    if (
+      !filters.hide?.includes(job.repo) &&
+      wanted(item, ciJobKey(job), `${job.name} ${job.branch}`)
+    )
+      put(item, jobCard(job));
+  }
+  const compare = compareBy(facets.sort.by, facets.sort.dir);
+  return {
+    ...facets,
+    groups: Object.fromEntries([...cards].map(([id, list]) => [id, list.toSorted(compare)])),
+    total,
+  };
 }
