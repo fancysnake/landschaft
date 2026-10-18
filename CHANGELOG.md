@@ -12,10 +12,15 @@ The format is based on [Keep a Changelog], and this project adheres to
 - Failed CI jobs are board items: one card per job whose newest run on a branch of the global
   users failed, with filter terms `is:ci-job`, `job:` and `branch:`; `is:has-pr` picks the
   jobs whose branch has an open PR.
-- An Unmatched tab in the top bar lists the open items no dashboard places in a cell;
-  `GET /api/unmatched` serves it.
-- The config has a `version`; loading upgrades an older config, and dashboards from before CI
+- An Unmatched tab in the top bar lists the open items no dashboard places in a cell or inbox
+  group; `GET /api/unmatched` serves it.
+- The config has a `version`; loading upgrades an older config, and boards from before CI
   jobs get a top `Failed CI` swimlane (`is:ci-job`).
+- A dashboard `type`, `board` or `inbox`, chosen in Settings; dashboards without one load as
+  boards.
+- Inbox dashboards list PRs, issues and failed CI jobs in groups, each item in the first group
+  whose filter it matches; groups can start collapsed. `GET /api/dashboards/:id/inbox` serves
+  them.
 
 ### Removed
 

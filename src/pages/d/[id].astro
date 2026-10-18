@@ -1,5 +1,6 @@
 ---
 import Board from "../../components/board/Board";
+import Inbox from "../../components/board/Inbox";
 import Base from "../../layouts/Base.astro";
 import { findDashboard, loadConfig } from "../../lib/server/config";
 
@@ -9,5 +10,11 @@ if (!dashboard) return Astro.redirect("/", 302);
 ---
 
 <Base title={dashboard.name}>
-  <Board client:only="react" dashboardId={dashboard.id} />
+  {
+    dashboard.type === "inbox" ? (
+      <Inbox client:only="react" dashboardId={dashboard.id} />
+    ) : (
+      <Board client:only="react" dashboardId={dashboard.id} />
+    )
+  }
 </Base>

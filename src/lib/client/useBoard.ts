@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 
-import type { BoardQuery } from "../schema";
+import type { ViewQuery } from "../schema";
 
 import { api, type BoardResponse, errorMessage } from "./api";
 import { useSynced } from "./useSynced";
@@ -8,13 +8,12 @@ import { useSynced } from "./useSynced";
 export interface BoardController {
   data: BoardResponse | null;
   error: string | null;
-  loading: boolean;
   setEpicStarred(epic: string, starred: boolean): Promise<void>;
   dismissError(): void;
 }
 
 /** Loads the board for the current query, and again whenever a sync lands. */
-export function useBoard(dashboardId: string, query: BoardQuery): BoardController {
+export function useBoard(dashboardId: string, query: ViewQuery): BoardController {
   const get = useCallback(() => api.board(dashboardId, query), [dashboardId, query]);
   const { data, error, setError, load } = useSynced(get);
 
@@ -35,5 +34,5 @@ export function useBoard(dashboardId: string, query: BoardQuery): BoardControlle
 
   const dismissError = useCallback(() => setError(null), [setError]);
 
-  return { data, error, loading: data === null && error === null, setEpicStarred, dismissError };
+  return { data, error, setEpicStarred, dismissError };
 }

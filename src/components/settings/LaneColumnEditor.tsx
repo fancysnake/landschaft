@@ -1,4 +1,4 @@
-import type { Axis } from "../../lib/schema";
+import type { ReactNode } from "react";
 
 import { filterError, type Offer } from "../../lib/filter";
 import { FilterInput } from "./FilterInput";
@@ -7,8 +7,10 @@ interface Group {
   id: string;
   name: string;
   filter: string;
-  hideBlocked?: boolean;
 }
+
+/** The keys of `T` holding a boolean. */
+type FlagKey<T> = { [K in keyof T]: T[K] extends boolean ? K : never }[keyof T];
 
 interface Props<T extends Group> {
   title: string;
@@ -17,8 +19,12 @@ interface Props<T extends Group> {
   create(id: string): T;
   /** Completed in filters. */
   offer: Offer;
-  /** Swimlanes get the "hide blocked" toggle. */
-  axis: Axis;
+  /** How the entries' filters combine, beside the title. */
+  hint: ReactNode;
+  /** Below which "remove" is off. */
+  minItems: number;
+  /** A per-entry checkbox and its label. */
+  flag?: { key: FlagKey<T>; label: string };
 }
 
 function slug(name: string, taken: Set<string>): string {
@@ -41,7 +47,9 @@ export function LaneColumnEditor<T extends Group>({
   onChange,
   create,
   offer,
-  axis,
+  hint,
+  minItems,
+  flag,
 }: Props<T>) {
   const replace = (index: number, item: T) =>
     onChange(items.map((current, i) => (i === index ? item : current)));
@@ -56,11 +64,7 @@ export function LaneColumnEditor<T extends Group>({
     <section>
       <div className="mb-2 flex items-baseline justify-between">
         <h3 className="font-medium">{title}</h3>
-        <span className="text-xs text-neutral-500">
-          every matching entry shows the item · GitHub search syntax · empty = all ·{" "}
-          <code>other</code> = matched by no{" "}
-          {axis === "swimlanes" ? "lane above" : "column to the right"}
-        </span>
+        <span className="text-xs text-neutral-500">{hint}</span>
       </div>
       <ol className="space-y-2">
         {items.map((item, index) => (
@@ -72,16 +76,16 @@ export function LaneColumnEditor<T extends Group>({
                 className="w-full rounded-md border border-neutral-300 px-2 py-1 text-sm"
               />
               <div className="mt-0.5 font-mono text-[10px] text-neutral-400">{item.id}</div>
-              {axis === "swimlanes" && (
+              {flag && (
                 <label className="mt-1 flex items-center gap-1 text-xs text-neutral-700">
                   <input
                     type="checkbox"
-                    checked={Boolean(item.hideBlocked)}
+                    checked={Boolean(item[flag.key])}
                     onChange={(event) =>
-                      replace(index, { ...item, hideBlocked: event.target.checked })
+                      replace(index, { ...item, [flag.key]: event.target.checked })
                     }
                   />
-                  hide blocked
+                  {flag.label}
                 </label>
               )}
             </div>
@@ -112,7 +116,7 @@ export function LaneColumnEditor<T extends Group>({
               <button
                 type="button"
                 className={button}
-                disabled={items.length === 1}
+                disabled={items.length <= minItems}
                 onClick={() => onChange(items.filter((_, i) => i !== index))}
               >
                 remove

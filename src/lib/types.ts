@@ -143,7 +143,25 @@ export interface Epic {
   starred: boolean;
 }
 
-export interface Board {
+/** What the filter bar and repo chips need from any dashboard view. */
+export interface Facets {
+  /** Repos among the dashboard's items, whether shown or not; the view's repo chips. */
+  repos: string[];
+  assignees: string[];
+  labels: string[];
+  /** Names of the failed CI jobs among the dashboard's items. */
+  jobs: string[];
+  sort: { by: SortBy; dir: SortDir };
+}
+
+export interface Inbox extends Facets {
+  /** Cards by group id; each item sits in the first group it matches. */
+  groups: Record<string, Card[]>;
+  /** Items shown in a group. */
+  total: number;
+}
+
+export interface Board extends Facets {
   cells: Record<string, Card[]>;
   laneTotals: Record<string, number>;
   /** Issues shown in each column; one in several lanes counts once. */
@@ -152,13 +170,6 @@ export interface Board {
   epics: Epic[];
   /** Issues shown in at least one cell; one in several cells counts once. */
   total: number;
-  /** Repos among the dashboard's items, whether shown or not; the board's repo chips. */
-  repos: string[];
-  assignees: string[];
-  labels: string[];
-  /** Names of the failed CI jobs among the dashboard's items. */
-  jobs: string[];
-  sort: { by: SortBy; dir: SortDir };
 }
 
 export function cellKey(laneId: string, colId: string): string {

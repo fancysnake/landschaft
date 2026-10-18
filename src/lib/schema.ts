@@ -123,14 +123,25 @@ const dashboardFilter = z.string().superRefine((text, ctx) => {
   if (message) ctx.addIssue({ code: "custom", message });
 });
 
-export const DashboardSchema = z
+/** A config object as read from JSON, before validation. */
+type Raw = Record<string, unknown>;
+const isRaw = (value: unknown): value is Raw =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** What every dashboard type has. */
+const shared = {
+  id,
+  name: z.string().min(1),
+  /** Narrows the global base set; empty takes all of it. */
+  filter: dashboardFilter.default(""),
+  sort: SortSchema.default({ by: "updated", dir: "desc" }),
+};
+
+const BoardDashboardSchema = z
   .object({
-    id,
-    name: z.string().min(1),
-    /** Narrows the global base set; empty takes all of it. */
-    filter: dashboardFilter.default(""),
+    type: z.literal("board"),
+    ...shared,
     epicLabel: z.string().min(1).optional(),
-    sort: SortSchema.default({ by: "updated", dir: "desc" }),
     swimlanes: z.array(SwimlaneSchema).min(1).transform(migrateAxis("swimlanes")),
     columns: z.array(ColumnSchema).min(1).transform(migrateAxis("columns")),
   })
@@ -142,10 +153,33 @@ export const DashboardSchema = z
     }
   });
 
-/** A config object as read from JSON, before validation. */
-type Raw = Record<string, unknown>;
-const isRaw = (value: unknown): value is Raw =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
+/** An inbox group; an item lands in the first one whose filter it matches. */
+export const InboxGroupSchema = z.object({
+  id,
+  name: z.string().min(1),
+  /** `other` holds for every item that reaches the group: an earlier match would have taken it. */
+  filter: filterText.default(""),
+  collapsed: z.boolean().default(false),
+});
+
+const InboxDashboardSchema = z
+  .object({
+    type: z.literal("inbox"),
+    ...shared,
+    groups: z.array(InboxGroupSchema).default([]),
+  })
+  .superRefine((dashboard, ctx) => {
+    if (!hasUniqueIds(dashboard.groups)) {
+      ctx.addIssue({ code: "custom", path: ["groups"], message: "ids must be unique" });
+    }
+  });
+
+/** A dashboard without `type` predates the inbox, so it is a board. */
+export const DashboardSchema = z.preprocess(
+  (dashboard) =>
+    isRaw(dashboard) && dashboard.type === undefined ? { type: "board", ...dashboard } : dashboard,
+  z.discriminatedUnion("type", [BoardDashboardSchema, InboxDashboardSchema]),
+);
 /** A legacy list field as a list; malformed values stay in for validation to report. */
 const list = (value: unknown): unknown[] => (value === undefined ? [] : [value].flat());
 const union = (lists: unknown[][]) => [...new Set(lists.flat())];
@@ -257,13 +291,33 @@ export const ConfigSchema = z.preprocess(
     }),
 );
 
-export type Swimlane = Dashboard["swimlanes"][number];
-export type Column = Dashboard["columns"][number];
+export type BoardDashboard = Extract<Dashboard, { type: "board" }>;
+export type InboxDashboard = Extract<Dashboard, { type: "inbox" }>;
+export type DashboardType = Dashboard["type"];
+export type Swimlane = BoardDashboard["swimlanes"][number];
+export type Column = BoardDashboard["columns"][number];
+export type InboxGroup = InboxDashboard["groups"][number];
 export type Sort = z.infer<typeof SortSchema>;
 export type SortBy = z.infer<typeof SortBySchema>;
 export type SortDir = z.infer<typeof SortDirSchema>;
 export type Config = z.infer<typeof ConfigSchema>;
 export type Dashboard = Config["dashboards"][number];
+
+/** A fresh dashboard of `type` keeping `base`, the fields every type has. */
+export function withType(
+  type: DashboardType,
+  from: Pick<Dashboard, "id" | "name" | "filter" | "sort">,
+): Dashboard {
+  const base = { id: from.id, name: from.name, filter: from.filter, sort: from.sort };
+  return type === "board"
+    ? {
+        type,
+        ...base,
+        swimlanes: [{ id: "all", name: "Everything", filter: "", hideBlocked: false }],
+        columns: [{ id: "todo", name: "Todo", filter: "" }],
+      }
+    : { type, ...base, groups: [] };
+}
 
 export const StarEpicRequestSchema = z.object({ epic: issueRef, starred: z.boolean() });
 export type StarEpicRequest = z.infer<typeof StarEpicRequestSchema>;
@@ -283,8 +337,8 @@ export type Filters = { [K in TextFilterKey]?: string } & {
   dir?: SortDir;
 };
 
-/** What the board endpoint takes: the URL filters plus the repos hidden in this browser. */
-export type BoardQuery = Filters & {
+/** What the view endpoints take: the URL filters plus the repos hidden in this browser. */
+export type ViewQuery = Filters & {
   /** Repos switched off in the nav, kept per browser. */
   hide?: string[];
 };
@@ -300,8 +354,8 @@ const repoList = z
   .optional()
   .transform((value) => value?.split(",").filter(Boolean));
 
-/** The board query string; empty strings count as "not set". */
-export const BoardQuerySchema: z.ZodType<BoardQuery, Record<string, unknown>> = z.object({
+/** The view endpoints' query string; empty strings count as "not set". */
+export const ViewQuerySchema: z.ZodType<ViewQuery, Record<string, unknown>> = z.object({
   ...(Object.fromEntries(TEXT_FILTER_KEYS.map((key) => [key, optionalText])) as Record<
     TextFilterKey,
     typeof optionalText

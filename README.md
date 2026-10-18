@@ -15,6 +15,9 @@ swimlanes × columns, each defined by a filter in GitHub search syntax. The boar
 GitHub. Everything runs on your machine against a local SQLite cache that refreshes in the
 background.
 
+A dashboard can instead be an inbox: a flat list of PRs and issues, each in the first of its
+groups whose filter it matches, for triage.
+
 <!-- --8<-- [end:grid] -->
 
 Documentation is at [landschaft.fancysnake.dev](https://landschaft.fancysnake.dev).
@@ -122,8 +125,9 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
   catch-all; `other label:b` below a `label:a` lane takes the `b` issues the `a` lane did
   not. Issues that fit no lane or no column are left off the board.
 - **Unmatched**, a tab in the top bar, lists the open items of the global users that no
-  dashboard places in a cell, in the repos switched on. An item a swimlane hides as blocked
-  counts as placed, and so does one that misses one board's grid but lands on another's.
+  dashboard places in a cell or inbox group, in the repos switched on. An item a swimlane hides
+  as blocked counts as placed, and so does one that misses one board's grid but lands on
+  another's.
 - **Hide blocked** (per swimlane) drops issues that have at least one open blocker
   (GitHub "blocked by" relationships).
 - Issues carrying the **epic label** appear in the strip above the board with sub-issue

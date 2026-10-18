@@ -2,6 +2,10 @@ import type { APIContext, APIRoute } from "astro";
 
 import { ZodError, type ZodType } from "zod";
 
+import { type Dashboard, type DashboardType, ViewQuerySchema } from "../schema";
+import { getApp } from "./app";
+import { findDashboard, loadConfig } from "./config";
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -34,6 +38,22 @@ export async function parseBody<T>(schema: ZodType<T>, request: Request): Promis
 
 export function parseQuery<T>(schema: ZodType<T>, url: URL): T {
   return schema.parse(Object.fromEntries(url.searchParams));
+}
+
+/**
+ * What a view endpoint works from: the config, the dashboard of `type` the URL names (404
+ * otherwise), the query, the app and the viewer, or null when it cannot be fetched.
+ */
+export async function viewRequest<T extends DashboardType>({ params, url }: APIContext, type: T) {
+  const config = loadConfig();
+  const dashboard = findDashboard(config, params.id ?? "");
+  const isType = (d: Dashboard | undefined): d is Extract<Dashboard, { type: T }> =>
+    d?.type === type;
+  if (!isType(dashboard)) throw new ApiError(404, `${type} not found`);
+  const query = parseQuery(ViewQuerySchema, url);
+  const { db, syncer } = getApp();
+  const viewer = await syncer.viewer().catch(() => null);
+  return { config, dashboard, query, db, syncer, viewer };
 }
 
 /** Wraps a handler so thrown errors become JSON responses with a fitting status. */

@@ -1,18 +1,21 @@
 import { useEffect, useState } from "react";
 
-import type { Board } from "../../lib/types";
+import type { Epic, Facets } from "../../lib/types";
 
 import { type Filters, TEXT_FILTER_KEYS } from "../../lib/schema";
 
 interface Props {
   filters: Filters;
-  board: Board;
+  /** Of the view it filters. */
+  facets: Facets;
+  /** The board's epics; none on an inbox. */
+  epics?: Epic[];
   onChange(patch: Partial<Filters>): void;
 }
 
 const select = "rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm text-neutral-800";
 
-export function FilterBar({ filters, board, onChange }: Props) {
+export function FilterBar({ filters, facets, epics, onChange }: Props) {
   const [text, setText] = useState(filters.q ?? "");
 
   useEffect(() => {
@@ -39,7 +42,7 @@ export function FilterBar({ filters, board, onChange }: Props) {
         className={select}
       >
         <option value="">Any assignee</option>
-        {board.assignees.map((login) => (
+        {facets.assignees.map((login) => (
           <option key={login} value={login}>
             {login}
           </option>
@@ -52,13 +55,13 @@ export function FilterBar({ filters, board, onChange }: Props) {
         className={select}
       >
         <option value="">Any label</option>
-        {board.labels.map((name) => (
+        {facets.labels.map((name) => (
           <option key={name} value={name}>
             {name}
           </option>
         ))}
       </select>
-      {board.epics.length > 0 && (
+      {epics && epics.length > 0 && (
         <select
           aria-label="Epic"
           value={filters.epic ?? ""}
@@ -66,14 +69,14 @@ export function FilterBar({ filters, board, onChange }: Props) {
           className={`${select} max-w-72 truncate`}
         >
           <option value="">Any epic</option>
-          {board.epics.map((epic) => (
+          {epics.map((epic) => (
             <option key={epic.key} value={epic.key}>
               {epic.title}
             </option>
           ))}
         </select>
       )}
-      {board.jobs.length > 0 && (
+      {facets.jobs.length > 0 && (
         <select
           aria-label="CI job"
           value={filters.job ?? ""}
@@ -81,7 +84,7 @@ export function FilterBar({ filters, board, onChange }: Props) {
           className={select}
         >
           <option value="">Any CI job</option>
-          {board.jobs.map((name) => (
+          {facets.jobs.map((name) => (
             <option key={name} value={name}>
               {name}
             </option>
@@ -91,7 +94,7 @@ export function FilterBar({ filters, board, onChange }: Props) {
       <span className="ml-auto flex items-center gap-1 text-sm text-neutral-600">
         Sort
         <select
-          value={board.sort.by}
+          value={facets.sort.by}
           onChange={(event) => onChange({ sort: event.target.value as Filters["sort"] })}
           className={select}
         >
@@ -100,11 +103,11 @@ export function FilterBar({ filters, board, onChange }: Props) {
         </select>
         <button
           type="button"
-          onClick={() => onChange({ dir: board.sort.dir === "asc" ? "desc" : "asc" })}
+          onClick={() => onChange({ dir: facets.sort.dir === "asc" ? "desc" : "asc" })}
           className={`${select} hover:bg-neutral-50`}
           title="Toggle direction"
         >
-          {board.sort.dir === "asc" ? "↑ oldest first" : "↓ newest first"}
+          {facets.sort.dir === "asc" ? "↑ oldest first" : "↓ newest first"}
         </button>
       </span>
       {active && (

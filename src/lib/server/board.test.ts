@@ -1,9 +1,19 @@
 import { describe, expect, it } from "vitest";
 
+import type { InboxDashboard } from "../schema";
+
 import { askedLabels, type FilterNode, parseFilter } from "../filter";
 import { type Card, cellKey } from "../types";
 import { DASHBOARD, label, makeIssue, makeJob, REPO } from "./__fixtures__/issues";
-import { buildBoard, compile, isBlocked, placeIn, scopedIssues, unmatchedItems } from "./board";
+import {
+  buildBoard,
+  buildInbox,
+  compile,
+  isBlocked,
+  placeIn,
+  scopedIssues,
+  unmatchedItems,
+} from "./board";
 
 /** An issue card's number, a CI job card's key. */
 const numberOf = (card: Card) => (card.kind === "ci-job" ? card.name : card.number);
@@ -139,6 +149,82 @@ describe("unmatchedItems", () => {
     const issues = [makeIssue({ number: 1 }), makeIssue({ number: 2, kind: "pr" })];
     const unmatched = unmatchedItems(issues, [dashboard], [], null, [], [], parseFilter("is:pr"));
     expect(unmatched.map(numberOf)).toEqual([2]);
+  });
+});
+
+const INBOX: InboxDashboard = {
+  type: "inbox",
+  id: "inbox",
+  name: "Inbox",
+  filter: "",
+  sort: { by: "updated", dir: "desc" },
+  groups: [
+    { id: "fix", name: "Fix", filter: "is:pr is:ci:failed", collapsed: false },
+    { id: "bugs", name: "Bugs", filter: "label:bug", collapsed: true },
+  ],
+};
+
+const grouped = (inbox: ReturnType<typeof buildInbox>) =>
+  Object.fromEntries(Object.entries(inbox.groups).map(([id, cards]) => [id, cards.map(numberOf)]));
+
+describe("buildInbox", () => {
+  const issues = [
+    makeIssue({ number: 1, kind: "pr", statuses: ["is:ci:failed"], labels: [label("bug")] }),
+    makeIssue({ number: 2, labels: [label("bug"), label("ui")] }),
+    makeIssue({ number: 3, labels: [label("bug")] }),
+    makeIssue({ number: 4 }),
+    makeIssue({ number: 5, labels: [label("bug")], state: "CLOSED" }),
+  ];
+
+  it("puts each item in the first group it matches, in sort order, dropping the rest", () => {
+    const inbox = buildInbox(issues, INBOX);
+    expect(grouped(inbox)).toEqual({ fix: [1], bugs: [3, 2] });
+    expect(inbox.total).toBe(3);
+  });
+
+  it("gives `other` whatever reaches its group", () => {
+    const groups = [
+      ...INBOX.groups,
+      { id: "rest", name: "Rest", filter: "other", collapsed: false },
+    ];
+    expect(grouped(buildInbox(issues, { ...INBOX, groups })).rest).toEqual([4]);
+  });
+
+  it("applies the dashboard filter, URL filters, sort and hidden repos", () => {
+    const lib = makeIssue({ number: 6, repo: "acme/lib", labels: [label("bug")] });
+    const all = [...issues, lib];
+    const scoped = { ...INBOX, filter: "-is:pr" };
+    expect(grouped(buildInbox(all, scoped))).toEqual({ fix: [], bugs: [6, 3, 2] });
+    expect(grouped(buildInbox(all, scoped, { label: "ui" }))).toEqual({ fix: [], bugs: [2] });
+    const hidden = buildInbox(all, scoped, { dir: "asc", hide: ["acme/lib"] });
+    expect(grouped(hidden).bugs).toEqual([2, 3]);
+    expect(hidden.repos).toEqual(["acme/app", "acme/lib"]);
+  });
+
+  it("strips the labels groups ask for from cards and filter options", () => {
+    const inbox = buildInbox(issues, INBOX);
+    expect(inbox.labels).toEqual(["ui"]);
+    expect(asIssue(inbox.groups.bugs?.find((card) => numberOf(card) === 2))?.labels).toEqual([
+      label("ui"),
+    ]);
+  });
+
+  it("groups failed CI jobs like issues and offers their names", () => {
+    const groups = [
+      { id: "ci", name: "CI", filter: "is:ci-job job:lint", collapsed: false },
+      ...INBOX.groups,
+    ];
+    const jobs = [makeJob({ name: "lint" }), makeJob({ name: "test" })];
+    const inbox = buildInbox(issues, { ...INBOX, groups }, {}, [], null, jobs);
+    expect(grouped(inbox)).toEqual({ ci: ["lint"], fix: [1], bugs: [3, 2] });
+    expect(inbox.jobs).toEqual(["lint", "test"]);
+    const filtered = buildInbox(issues, { ...INBOX, groups }, { job: "lint" }, [], null, jobs);
+    expect(grouped(filtered)).toEqual({ ci: ["lint"], fix: [], bugs: [] });
+  });
+
+  it("counts inbox groups as placing items in the unmatched view", () => {
+    expect(unmatchedItems(issues, [INBOX]).map(numberOf)).toEqual([4]);
+    expect(unmatchedItems(issues, [{ ...INBOX, groups: [] }])).toHaveLength(4);
   });
 });
 

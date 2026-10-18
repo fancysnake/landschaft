@@ -16,7 +16,7 @@ const COLUMNS: { kind: ItemKind; title: string }[] = [
   { kind: "ci-job", title: "CI jobs" },
 ];
 
-/** Open items in the repos switched on that no dashboard places in a cell. */
+/** Open items in the repos switched on that no dashboard places in a cell or inbox group. */
 export default function Unmatched() {
   const [hidden] = useHiddenRepos();
   const [text, setText] = useState(
