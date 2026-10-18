@@ -22,7 +22,7 @@ export default function Unmatched() {
   const [text, setText] = useState(
     () => new URLSearchParams(window.location.search).get("filter") ?? "",
   );
-  const [filter, setFilter] = useState(text);
+  const [filter, setFilter] = useState(() => (filterError(text) === null ? text : ""));
 
   // Only a filter that parses reaches the server.
   useEffect(() => {
@@ -42,13 +42,6 @@ export default function Unmatched() {
     return <p className="p-6 text-sm text-neutral-500">{error ?? "Loading…"}</p>;
   }
 
-  const issueCards = data.items.flatMap((card) => (card.kind === "ci-job" ? [] : [card]));
-  const offer = {
-    labels: [...new Set(issueCards.flatMap((card) => card.labels.map((label) => label.name)))],
-    repos: [...new Set(data.items.map((card) => card.repo))],
-    users: [...new Set(issueCards.flatMap((card) => card.assignees.map((a) => a.login)))],
-  };
-
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-3 p-6">
       <h1 className="text-lg font-semibold">
@@ -60,7 +53,7 @@ export default function Unmatched() {
       <FilterInput
         value={text}
         onChange={setText}
-        offer={offer}
+        offer={data.offer}
         validate={filterError}
         placeholder="Filter, e.g. is:pr label:bug -repo:acme/docs"
       />
