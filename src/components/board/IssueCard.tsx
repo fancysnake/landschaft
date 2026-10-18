@@ -1,16 +1,15 @@
-import type { StatusLabel } from "../../lib/status";
+import type { PullStatusLabel } from "../../lib/status";
 import type { Card, CiJobCard, IssueItemCard } from "../../lib/types";
 
 import { labelStyle, relativeTime, repoShortName } from "../../lib/client/labels";
 import { ProgressBar } from "./ProgressBar";
 import { TONE, type Tone } from "./tone";
 
-const STATUS_PILLS: Record<StatusLabel, { text: string; title: string; tone: Tone }> = {
+const STATUS_PILLS: Record<PullStatusLabel, { text: string; title: string; tone: Tone }> = {
   "is:conflicting": { text: "conflict", title: "Merge conflict", tone: "red" },
   "is:ci:failed": { text: "CI ✗", title: "CI failed", tone: "red" },
   "is:ci:running": { text: "CI …", title: "CI running", tone: "amber" },
   "is:unanswered": { text: "comments", title: "Unanswered review comments", tone: "orange" },
-  "has:pr": { text: "PR open", title: "An open PR closes it", tone: "sky" },
 };
 
 /** Card with a coloured bar on the left for its kind; white unless `surface` tints it. */
@@ -92,6 +91,11 @@ function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean 
             {STATUS_PILLS[status].text}
           </span>
         ))}
+        {card.hasPr && (
+          <span title="An open PR closes it" className={`pill ${TONE.sky}`}>
+            PR open
+          </span>
+        )}
         {card.assignees.length > 0 && (
           <span className="ml-auto flex -space-x-1.5">
             {card.assignees.map((assignee) => (

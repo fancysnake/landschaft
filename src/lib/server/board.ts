@@ -73,12 +73,12 @@ export function isBlocked(issue: Issue, byKey: Map<string, Issue>): boolean {
 const keyOf = (ref: { repo: string; number: number }): string => issueKey(ref.repo, ref.number);
 
 /** An issue with what filters test it on; see `itemsOf`. */
-type Item = Omit<Issue, "statuses"> & FilterItem;
+type Item = Issue & FilterItem;
 
 /**
- * An issue with what filters test it on: its statuses plus `has:pr` when an open PR closes
- * it, whether an open blocker holds it, and whether it blocks an open issue. Every open item in
- * `issues` counts, whoever's it is; one in a repo outside them is never seen.
+ * An issue with what filters test it on: whether an open PR closes it, whether an open blocker
+ * holds it, and whether it blocks an open issue. Every open item in `issues` counts, whoever's
+ * it is; one in a repo outside them is never seen.
  */
 export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Issue) => Item {
   const opened = issues.filter((issue) => issue.state === "OPEN");
@@ -87,7 +87,7 @@ export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Iss
   return (issue) => ({
     ...issue,
     authors: issue.author === null ? [] : [issue.author],
-    statuses: withPr.has(keyOf(issue)) ? [...issue.statuses, "has:pr"] : issue.statuses,
+    hasPr: withPr.has(keyOf(issue)),
     blocked: isBlocked(issue, byKey),
     blocking: blocking.has(keyOf(issue)),
     name: null,
@@ -102,7 +102,8 @@ const jobItem = (job: CiJob): FilterItem => ({
   authors: job.authors,
   assignees: [],
   labels: [],
-  statuses: job.pr ? ["has:pr"] : [],
+  statuses: [],
+  hasPr: job.pr !== null,
   parent: null,
   subIssues: { total: 0 },
   blocked: false,
@@ -320,6 +321,7 @@ const toCard = (item: Item, labels: LabelRef[], isEpic: boolean): Card => ({
   blocked: item.blocked,
   isEpic,
   statuses: item.statuses,
+  hasPr: item.hasPr,
   createdAt: item.createdAt,
   updatedAt: item.updatedAt,
 });

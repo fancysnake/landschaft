@@ -1,5 +1,5 @@
 import type { SortBy, SortDir } from "./schema";
-import type { PullStatusLabel, StatusLabel } from "./status";
+import type { PullStatusLabel } from "./status";
 
 export type IssueState = "OPEN" | "CLOSED";
 export type IssueKind = "issue" | "pr";
@@ -126,8 +126,9 @@ export interface IssueItemCard {
   progress: Progress | null;
   blocked: boolean;
   isEpic: boolean;
-  /** At most `has:pr` for issues. */
-  statuses: StatusLabel[];
+  statuses: PullStatusLabel[];
+  /** An open PR closes it. */
+  hasPr: boolean;
   createdAt: string;
   updatedAt: string;
 }

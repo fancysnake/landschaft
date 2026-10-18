@@ -20,6 +20,7 @@ const item = (extra: Partial<FilterItem> = {}): FilterItem => ({
   assignees: [],
   labels: [],
   statuses: [],
+  hasPr: false,
   parent: null,
   subIssues: { total: 0 },
   blocked: false,
@@ -120,7 +121,7 @@ describe("matchesFilter", () => {
     expect(fits("is:issue", pr)).toBe(false);
     expect(fits("is:CI:failed", pr)).toBe(true);
     expect(fits("is:conflicting", pr)).toBe(false);
-    expect(fits("has:pr", item({ statuses: ["has:pr"] }))).toBe(true);
+    expect(fits("has:pr", item({ hasPr: true }))).toBe(true);
     expect(filterError("is:has-pr")).toMatch(/is:has-pr is not valid/);
     expect(fits("is:blocked", item({ blocked: true }))).toBe(true);
     expect(fits("is:blocking", item({ blocking: true }))).toBe(true);
@@ -153,7 +154,7 @@ describe("matchesFilter", () => {
       kind: "ci-job",
       name: "Unit tests",
       branch: "feat/x",
-      statuses: ["has:pr"],
+      hasPr: true,
     });
     expect(fits("is:ci-job", job)).toBe(true);
     expect(fits("is:ci-job", item())).toBe(false);

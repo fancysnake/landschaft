@@ -473,8 +473,8 @@ describe("buildBoard", () => {
     ];
     const board = buildBoard(issues, dashboard, {}, ["alice"]);
     expect(
-      board.cells[cell("review", "todo")]?.map((c) => [numberOf(c), asIssue(c)?.statuses]),
-    ).toEqual([[1, ["has:pr"]]]);
+      board.cells[cell("review", "todo")]?.map((c) => [numberOf(c), asIssue(c)?.hasPr]),
+    ).toEqual([[1, true]]);
   });
 
   it("leaves out issues that fit no group when an axis has no catch-all", () => {
