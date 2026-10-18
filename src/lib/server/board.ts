@@ -107,7 +107,9 @@ const jobItem = (job: CiJob, byKey: Map<string, Issue>): JobItem => ({
   repo: job.repo,
   authors: job.authors,
   assignees: [],
-  labels: (job.pr && byKey.get(issueKey(job.repo, job.pr.number))?.labels) ?? [],
+  labels:
+    [job.pr && byKey.get(issueKey(job.repo, job.pr.number))].find((pr) => pr?.state === "OPEN")
+      ?.labels ?? [],
   statuses: [],
   hasPr: job.pr !== null,
   parent: null,

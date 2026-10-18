@@ -810,6 +810,14 @@ describe("CI jobs", () => {
     expect(filtered.total).toBe(1);
   });
 
+  it("takes no labels from a closed PR", () => {
+    const pr = makeIssue({ number: 7, kind: "pr", state: "CLOSED", labels: [label("bug")] });
+    const withPr = [makeJob({ name: "lint", pr: { number: 7, url: pr.url } })];
+    const dashboard = { ...DASHBOARD, filter: "is:ci-job" };
+    const board = buildBoard([pr], dashboard, {}, [], new Set(), null, withPr);
+    expect(board.labels).toEqual([]);
+  });
+
   it("lists a job no dashboard places as unmatched", () => {
     const issuesOnly = { ...DASHBOARD, filter: "-is:ci-job" };
     const unmatched = unmatchedItems([], [issuesOnly], ["bob"], null, [], jobs).items;
