@@ -34,32 +34,38 @@ interface CiBranchesData {
   } | null;
 }
 
-export interface FailingBranchesPage {
-  branches: string[];
-  defaultBranch: string | null;
+/** A branch to read failed jobs of; `suites` also reads its head commit's check suites. */
+export interface CiBranch {
+  name: string;
+  suites: boolean;
+}
+
+export interface CiBranchesPage {
+  branches: CiBranch[];
   hasNextPage: boolean;
   endCursor: string | null;
   rateRemaining: number;
 }
 
 /**
- * Branches whose head commit has the red X, plus the default branch, whose scheduled and
- * dispatched runs the red X leaves out; reads no commit history, so a page costs 1 point.
+ * Branches whose head commit has the red X, plus the default branch with its check suites, which
+ * hold the scheduled and dispatched runs the red X leaves out; reads no commit history, so a page
+ * costs 1 point.
  */
-export async function fetchFailingBranchesPage(
+export async function fetchCiBranchesPage(
   gh: GithubClient,
   repo: string,
   after: string | null,
-): Promise<FailingBranchesPage> {
+): Promise<CiBranchesPage> {
   const data = await gh.gql<CiBranchesData>(CI_BRANCHES_QUERY, { ...splitRepo(repo), after });
   if (!data.repository) throw new GithubError(`repository ${repo} not found or not accessible`);
   const { pageInfo, nodes } = data.repository.refs;
   const defaultBranch = data.repository.defaultBranchRef?.name ?? null;
   return {
-    branches: nodes
-      .filter((ref) => ref.name === defaultBranch || isRed(ref.target.statusCheckRollup?.state))
-      .map((ref) => ref.name),
-    defaultBranch,
+    branches: nodes.flatMap(({ name, target }) => {
+      const suites = name === defaultBranch;
+      return suites || isRed(target.statusCheckRollup?.state) ? [{ name, suites }] : [];
+    }),
     hasNextPage: pageInfo.hasNextPage,
     endCursor: pageInfo.endCursor,
     rateRemaining: data.rateLimit.remaining,
@@ -74,17 +80,19 @@ function webUrl(url: string | null): string | null {
 /** A cancelled, skipped or neutral job is no failure. */
 const FAILED_CONCLUSIONS = new Set(["FAILURE", "TIMED_OUT", "STARTUP_FAILURE"]);
 
+export interface CheckRunContext {
+  type: "CheckRun";
+  name: string;
+  conclusion: string | null;
+  detailsUrl: string | null;
+  url: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  checkSuite: { workflowRun: { workflow: { name: string } } | null };
+}
+
 export type CiContext =
-  | {
-      type: "CheckRun";
-      name: string;
-      conclusion: string | null;
-      detailsUrl: string | null;
-      url: string;
-      startedAt: string | null;
-      completedAt: string | null;
-      checkSuite: { workflowRun: { workflow: { name: string } } | null };
-    }
+  | CheckRunContext
   | {
       type: "StatusContext";
       context: string;
@@ -105,8 +113,8 @@ export interface CiBranchNode {
     url: string;
     history: CommitAuthors;
     statusCheckRollup: { contexts: { nodes: CiContext[] } } | null;
-    /** The default branch's alone: the suites of scheduled and dispatched runs, which the rollup lacks. */
-    checkSuites?: { nodes: { checkRuns: { nodes: CiContext[] } }[] };
+    /** With `suites` alone: the suites of scheduled and dispatched runs, which the rollup lacks. */
+    checkSuites?: { nodes: { checkRuns: { nodes: CheckRunContext[] } }[] };
   };
 }
 
@@ -247,20 +255,18 @@ export interface CiJobsPage {
 /**
  * The failed jobs on up to `CI_BATCH` branches, in one query. A branch deleted since it was
  * listed is skipped; one without a merge base gets no comparison, both as errors next to data.
- * `defaultBranch`, when among them, also gets its check suites read.
  * shortcut: the first 100 commits ahead and checks per branch.
  */
 export async function fetchCiJobs(
   gh: GithubClient,
   repo: string,
-  branches: string[],
-  defaultBranch: string | null,
+  branches: CiBranch[],
 ): Promise<CiJobsPage> {
   const params = branches.map((_, i) => `$ref${i}: String!, $branch${i}: String!`).join(", ");
   const variables = Object.fromEntries(
-    branches.flatMap((branch, i) => [
-      [`ref${i}`, `refs/heads/${branch}`],
-      [`branch${i}`, branch],
+    branches.flatMap(({ name }, i) => [
+      [`ref${i}`, `refs/heads/${name}`],
+      [`branch${i}`, name],
     ]),
   );
   const data = await gh.gql<{
@@ -271,16 +277,16 @@ export async function fetchCiJobs(
   }>(
     `query CiJobs($owner: String!, $name: String!, ${params}) {
       rateLimit { remaining }
-      repository(owner: $owner, name: $name) { ${branches.map((branch, i) => ciBranchFields(i, branch === defaultBranch)).join("\n")} }
+      repository(owner: $owner, name: $name) { ${branches.map((branch, i) => ciBranchFields(i, branch.suites)).join("\n")} }
     }`,
     { ...splitRepo(repo), ...variables },
     { partial: true },
   );
   if (!data.repository) throw new GithubError(`repository ${repo} not found or not accessible`);
   const fields = data.repository;
-  const jobs = branches.flatMap((branch, i) => {
+  const jobs = branches.flatMap(({ name }, i) => {
     const node = fields[`b${i}`];
-    return node ? toCiJobs(repo, branch, node, fields[`c${i}`] ?? null) : [];
+    return node ? toCiJobs(repo, name, node, fields[`c${i}`] ?? null) : [];
   });
   return { jobs, rateRemaining: data.rateLimit.remaining };
 }

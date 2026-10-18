@@ -2,7 +2,7 @@ import type { Config } from "../schema";
 import type { CiJob, SyncStatus } from "../types";
 import type { Db } from "./db";
 
-import { CI_BATCH, fetchCiJobs, fetchFailingBranchesPage } from "./ci";
+import { type CiBranch, CI_BATCH, fetchCiBranchesPage, fetchCiJobs } from "./ci";
 import {
   fetchIssuesPage,
   fetchPullStatuses,
@@ -185,22 +185,20 @@ export class Syncer {
    * default branch, then reads jobs and commit authors of those alone, `CI_BATCH` per query.
    */
   private async refreshCiJobs(repo: string): Promise<void> {
-    const failing: string[] = [];
-    let defaultBranch: string | null = null;
+    const watched: CiBranch[] = [];
     let after: string | null = null;
     do {
-      const page = await fetchFailingBranchesPage(this.gh, repo, after);
-      failing.push(...page.branches);
-      defaultBranch = page.defaultBranch;
+      const page = await fetchCiBranchesPage(this.gh, repo, after);
+      watched.push(...page.branches);
       after = page.hasNextPage ? page.endCursor : null;
-      this.spend(page.rateRemaining, Boolean(after) || failing.length > 0);
+      this.spend(page.rateRemaining, Boolean(after) || watched.length > 0);
     } while (after);
     const jobs: CiJob[] = [];
-    for (let start = 0; start < failing.length; start += CI_BATCH) {
-      const batch = failing.slice(start, start + CI_BATCH);
-      const page = await fetchCiJobs(this.gh, repo, batch, defaultBranch);
+    for (let start = 0; start < watched.length; start += CI_BATCH) {
+      const batch = watched.slice(start, start + CI_BATCH);
+      const page = await fetchCiJobs(this.gh, repo, batch);
       jobs.push(...page.jobs);
-      this.spend(page.rateRemaining, start + CI_BATCH < failing.length);
+      this.spend(page.rateRemaining, start + CI_BATCH < watched.length);
     }
     this.db.setCiJobs(repo, jobs);
   }
