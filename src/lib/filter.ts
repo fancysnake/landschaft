@@ -1,6 +1,6 @@
 import type { IssueRef, ItemKind } from "./types";
 
-import { STATUS_LABEL_NAMES, type StatusLabel } from "./status";
+import { PULL_STATUS_NAMES, type StatusLabel } from "./status";
 
 /**
  * Filter expressions for swimlanes and columns, in GitHub search syntax: `key:value` terms,
@@ -267,7 +267,7 @@ const KEYS = {
     pr: (item) => item.kind === "pr",
     "ci-job": (item) => item.kind === "ci-job",
     ...Object.fromEntries(
-      STATUS_LABEL_NAMES.map((status) => [
+      PULL_STATUS_NAMES.map((status) => [
         status.replace(/^is:/, ""),
         (item: FilterItem) => item.statuses.includes(status),
       ]),
@@ -276,6 +276,7 @@ const KEYS = {
     blocking: (item) => item.blocking,
   }),
   has: oneOf({
+    pr: (item) => item.statuses.includes("has:pr"),
     "parent-issue": (item) => item.parent !== null,
     "sub-issues": (item) => item.subIssues.total > 0,
   }),

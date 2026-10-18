@@ -76,7 +76,7 @@ const keyOf = (ref: { repo: string; number: number }): string => issueKey(ref.re
 type Item = Omit<Issue, "statuses"> & FilterItem;
 
 /**
- * An issue with what filters test it on: its statuses plus `is:has-pr` when an open PR closes
+ * An issue with what filters test it on: its statuses plus `has:pr` when an open PR closes
  * it, whether an open blocker holds it, and whether it blocks an open issue. Every open item in
  * `issues` counts, whoever's it is; one in a repo outside them is never seen.
  */
@@ -87,7 +87,7 @@ export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Iss
   return (issue) => ({
     ...issue,
     authors: issue.author === null ? [] : [issue.author],
-    statuses: withPr.has(keyOf(issue)) ? [...issue.statuses, "is:has-pr"] : issue.statuses,
+    statuses: withPr.has(keyOf(issue)) ? [...issue.statuses, "has:pr"] : issue.statuses,
     blocked: isBlocked(issue, byKey),
     blocking: blocking.has(keyOf(issue)),
     name: null,
@@ -102,7 +102,7 @@ const jobItem = (job: CiJob): FilterItem => ({
   authors: job.authors,
   assignees: [],
   labels: [],
-  statuses: job.pr ? ["is:has-pr"] : [],
+  statuses: job.pr ? ["has:pr"] : [],
   parent: null,
   subIssues: { total: 0 },
   blocked: false,
@@ -357,7 +357,7 @@ export function unmatchedItems(
   const placers = dashboards.map((dashboard) => placer(dashboard, viewer));
   const placed = (item: FilterItem) => placers.some((places) => places(item));
   const missed = ({ item }: { item: FilterItem }) => !hide.includes(item.repo) && !placed(item);
-  // Hidden repos are dropped last: their items still count for `is:has-pr` and blockers.
+  // Hidden repos are dropped last: their items still count for `has:pr` and blockers.
   const unmatched = (scope: FilterNode | null) => ({
     open: openItemsOf(issues, users, viewer, scope).open.filter(missed),
     openJobs: scopedJobs(jobs, users, viewer, scope).filter(missed),

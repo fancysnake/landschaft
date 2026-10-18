@@ -120,7 +120,7 @@ describe("unmatchedItems", () => {
       ...DASHBOARD,
       swimlanes: [{ id: "all", name: "All", filter: "", hideBlocked: false }],
       columns: [
-        { id: "review", name: "Review", filter: "is:has-pr" },
+        { id: "review", name: "Review", filter: "has:pr" },
         { id: "blocking", name: "Blocking", filter: "is:blocking" },
       ],
     };
@@ -175,21 +175,13 @@ describe("unmatchedItems", () => {
     expect(unmatched("-is:ci-job")).toEqual([1]);
   });
 
-  it("resolves `is:has-pr` against PRs the filter drops", () => {
+  it("resolves `has:pr` against PRs the filter drops", () => {
     const dashboard = { ...DASHBOARD, swimlanes: [] };
     const issues = [
       makeIssue({ number: 1 }),
       makeIssue({ number: 2, kind: "pr", linked: [{ repo: REPO, number: 1 }] }),
     ];
-    const unmatched = unmatchedItems(
-      issues,
-      [dashboard],
-      [],
-      null,
-      [],
-      [],
-      parseFilter("is:has-pr"),
-    );
+    const unmatched = unmatchedItems(issues, [dashboard], [], null, [], [], parseFilter("has:pr"));
     expect(unmatched.items.map(numberOf)).toEqual([1]);
   });
 
@@ -457,11 +449,11 @@ describe("buildBoard", () => {
     expect(numbers(board)).toEqual([5, 4]);
   });
 
-  it("matches is:has-pr on issues an open PR closes, whoever's the PR", () => {
+  it("matches has:pr on issues an open PR closes, whoever's the PR", () => {
     const dashboard = {
       ...DASHBOARD,
       swimlanes: [
-        { id: "review", name: "In review", filter: "is:issue is:has-pr", hideBlocked: false },
+        { id: "review", name: "In review", filter: "is:issue has:pr", hideBlocked: false },
         ...DASHBOARD.swimlanes,
       ],
     };
@@ -470,7 +462,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 1, ...alice }),
       makeIssue({ number: 2, ...alice }),
       makeIssue({ number: 3, ...alice }),
-      makeIssue({ number: 4, ...alice, labels: [label("is:has-pr")] }),
+      makeIssue({ number: 4, ...alice, labels: [label("has:pr")] }),
       makeIssue({ number: 10, kind: "pr", author: "bob", linked: [{ repo: REPO, number: 1 }] }),
       makeIssue({
         number: 11,
@@ -482,7 +474,7 @@ describe("buildBoard", () => {
     const board = buildBoard(issues, dashboard, {}, ["alice"]);
     expect(
       board.cells[cell("review", "todo")]?.map((c) => [numberOf(c), asIssue(c)?.statuses]),
-    ).toEqual([[1, ["is:has-pr"]]]);
+    ).toEqual([[1, ["has:pr"]]]);
   });
 
   it("leaves out issues that fit no group when an axis has no catch-all", () => {

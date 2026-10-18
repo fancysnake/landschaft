@@ -95,7 +95,7 @@ describe("parseFilter", () => {
     expect(filterError("repo:app")).toMatch(/owner\/repo/);
     expect(filterError("parent-issue:acme/app")).toMatch(/owner\/repo#number/);
     expect(filterError("author:@ann")).toMatch(/GitHub login/);
-    expect(filterError("has:children")).toMatch(/expected parent-issue, sub-issues/);
+    expect(filterError("has:children")).toMatch(/expected pr, parent-issue, sub-issues/);
   });
 
   it("rejects keys and values inherited from Object", () => {
@@ -120,7 +120,8 @@ describe("matchesFilter", () => {
     expect(fits("is:issue", pr)).toBe(false);
     expect(fits("is:CI:failed", pr)).toBe(true);
     expect(fits("is:conflicting", pr)).toBe(false);
-    expect(fits("is:has-pr", item({ statuses: ["is:has-pr"] }))).toBe(true);
+    expect(fits("has:pr", item({ statuses: ["has:pr"] }))).toBe(true);
+    expect(filterError("is:has-pr")).toMatch(/is:has-pr is not valid/);
     expect(fits("is:blocked", item({ blocked: true }))).toBe(true);
     expect(fits("is:blocking", item({ blocking: true }))).toBe(true);
     expect(fits("is:blocked|blocking", item())).toBe(false);
@@ -152,7 +153,7 @@ describe("matchesFilter", () => {
       kind: "ci-job",
       name: "Unit tests",
       branch: "feat/x",
-      statuses: ["is:has-pr"],
+      statuses: ["has:pr"],
     });
     expect(fits("is:ci-job", job)).toBe(true);
     expect(fits("is:ci-job", item())).toBe(false);
@@ -160,8 +161,8 @@ describe("matchesFilter", () => {
     expect(fits("job:lint", job)).toBe(false);
     expect(fits("branch:FEAT/x", job)).toBe(true);
     expect(fits("branch:main", item())).toBe(false);
-    expect(fits("is:has-pr", job)).toBe(true);
-    expect(fits("is:has-pr", item({ kind: "ci-job" }))).toBe(false);
+    expect(fits("has:pr", job)).toBe(true);
+    expect(fits("has:pr", item({ kind: "ci-job" }))).toBe(false);
     expect(fits("user:bob", item({ authors: ["ann", "bob"] }))).toBe(true);
   });
 
@@ -224,7 +225,11 @@ describe("suggestFilter", () => {
     expect(suggestFilter("(label:x|B", offer({ labels: ["bug", "x"] }))).toEqual(["(label:x|bug"]);
     expect(suggestFilter("is:ci", offer())).toEqual(["is:ci-job", "is:ci:failed", "is:ci:running"]);
     expect(suggestFilter("constructor:", offer())).toEqual([]);
-    expect(suggestFilter("has:", offer())).toEqual(["has:parent-issue", "has:sub-issues"]);
+    expect(suggestFilter("has:", offer())).toEqual([
+      "has:pr",
+      "has:parent-issue",
+      "has:sub-issues",
+    ]);
   });
 
   it("completes repos and users from the offer", () => {

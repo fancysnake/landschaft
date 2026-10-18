@@ -76,7 +76,8 @@ interval the shortest any dashboard had, and a dashboard narrower than that gets
 
 Each format change bumps `version`, and loading upgrades an older config step by step; the
 next save writes the result. Version 1 brought failed CI jobs: every dashboard gets a top
-`Failed CI` swimlane with the filter `is:ci-job`, so the jobs land somewhere. A config with a
+`Failed CI` swimlane with the filter `is:ci-job`, so the jobs land somewhere. Version 2
+renamed `is:has-pr` to `has:pr` and rewrites the filters that use it. A config with a
 version newer than the running landschaft fails validation.
 
 ## Files and environment

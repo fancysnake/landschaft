@@ -126,7 +126,7 @@ export interface IssueItemCard {
   progress: Progress | null;
   blocked: boolean;
   isEpic: boolean;
-  /** At most `is:has-pr` for issues. */
+  /** At most `has:pr` for issues. */
   statuses: StatusLabel[];
   createdAt: string;
   updatedAt: string;

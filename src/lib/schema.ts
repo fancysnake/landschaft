@@ -235,7 +235,7 @@ function migrateScope(config: unknown): unknown {
 }
 
 /** The config version this build writes; a config without `version` is version 0. */
-export const CONFIG_VERSION = 1;
+export const CONFIG_VERSION = 2;
 
 /** Puts a swimlane for failed CI jobs on top, under an id no lane there has. */
 function withCiLane(dashboard: unknown): unknown {
@@ -255,8 +255,55 @@ function addCiLane(config: Raw): Raw {
   return { ...config, dashboards: dashboards.map(withCiLane) };
 }
 
+/**
+ * `filter` with `is:has-pr` written as `has:pr`: `is:a|has-pr` turns into `(is:a OR has:pr)`.
+ * shortcut: rewrites a quoted value holding ` is:has-pr` too; parse the filter if one ever does.
+ */
+const hasPrFilter = (filter: string) =>
+  filter.replaceAll(/(?<=^|[\s(-])is:([\w:|-]+)/g, (term, values: string) => {
+    const rest = values.split("|").filter((value) => value.toLowerCase() !== "has-pr");
+    if (rest.length === values.split("|").length) return term;
+    return rest.length === 0 ? "has:pr" : `(is:${rest.join("|")} OR has:pr)`;
+  });
+
+/** `raw` with its filter, or its legacy `is:has-pr` label, in version-2 terms. */
+function hasPrFields(raw: Raw): Raw {
+  const { filter, labels } = raw;
+  return {
+    ...raw,
+    ...(typeof filter === "string" && { filter: hasPrFilter(filter) }),
+    ...(Array.isArray(labels) && {
+      labels: labels.map((name) => (name === "is:has-pr" ? "has:pr" : name)),
+    }),
+  };
+}
+
+const hasPrGroups = (value: unknown) =>
+  Array.isArray(value)
+    ? value.map((group: unknown) => (isRaw(group) ? hasPrFields(group) : group))
+    : value;
+
+/** Version 2 renamed `is:has-pr` to `has:pr`. */
+function renameHasPr(config: Raw): Raw {
+  if (!Array.isArray(config.dashboards)) return config;
+  const dashboards: unknown[] = config.dashboards;
+  return {
+    ...config,
+    dashboards: dashboards.map((dashboard) =>
+      isRaw(dashboard)
+        ? {
+            ...hasPrFields(dashboard),
+            swimlanes: hasPrGroups(dashboard.swimlanes),
+            columns: hasPrGroups(dashboard.columns),
+            groups: hasPrGroups(dashboard.groups),
+          }
+        : dashboard,
+    ),
+  };
+}
+
 /** `UPGRADES[n]` takes a version-n config to version n + 1. */
-const UPGRADES: ((config: Raw) => Raw)[] = [addCiLane];
+const UPGRADES: ((config: Raw) => Raw)[] = [addCiLane, renameHasPr];
 
 /**
  * Brings a config up to `CONFIG_VERSION` one step at a time. A version this build does not know
