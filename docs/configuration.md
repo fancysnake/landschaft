@@ -18,7 +18,7 @@ dashboard filters.
 | `repos`          | `owner/repo[]`       | `[]`    | Repositories to sync                                                 |
 | `users`          | `(login \| "@me")[]` | `[]`    | Only items these users created or are assigned to; `[]` = everyone's |
 | `refreshMinutes` | 1–1440               | `5`     | Background sync interval for every repository                        |
-| `dashboards`     | `Dashboard[]`        | `[]`    | Boards and inboxes                                                   |
+| `dashboards`     | `Dashboard[]`        | `[]`    | Boards and inboxes, in tab order                                     |
 
 `@me` stands for the account behind the token.
 

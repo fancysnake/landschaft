@@ -1,6 +1,6 @@
 {
   "name": "landschaft",
-  "version": "4.2.0",
+  "version": "4.3.0",
   "private": true,
   "description": "Local kanban dashboards over GitHub issues",
   "license": "MIT",
