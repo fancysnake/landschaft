@@ -303,6 +303,7 @@ describe("dashboard type", () => {
       name: "Inbox",
       filter: "",
       sort: { by: "updated", dir: "desc" },
+      closedDays: 0,
       groups: [
         { id: "fix", name: "Fix", filter: "is:pr is:ci:failed", collapsed: false },
         { id: "rest", name: "Rest", filter: "", collapsed: false },

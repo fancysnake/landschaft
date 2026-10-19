@@ -4,6 +4,7 @@ import type { LabelDef } from "../../lib/types";
 import {
   type BoardDashboard,
   type Dashboard,
+  type DashboardBase,
   dashboardFilterError,
   type DashboardType,
   type InboxDashboard,
@@ -26,7 +27,7 @@ interface Props {
 }
 
 export function DashboardEditor({ dashboard, onChange, catalog, offer }: Props) {
-  const patch = (changes: Partial<Pick<Dashboard, "name" | "filter" | "sort">>) =>
+  const patch = (changes: Partial<Omit<DashboardBase, "id">>) =>
     onChange({ ...dashboard, ...changes });
 
   return (
@@ -90,6 +91,20 @@ export function DashboardEditor({ dashboard, onChange, catalog, offer }: Props) 
             <option value="asc">oldest first</option>
           </select>
         </div>
+      </Field>
+
+      <Field
+        label="Closed items (days)"
+        hint="Keeps items closed within this many days, matched by is:closed; 0 shows open items only."
+      >
+        <input
+          type="number"
+          min={0}
+          max={365}
+          value={dashboard.closedDays}
+          onChange={(event) => patch({ closedDays: Number(event.target.value) || 0 })}
+          className="field w-32"
+        />
       </Field>
 
       {dashboard.type === "board" ? (

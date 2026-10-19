@@ -276,12 +276,17 @@ export interface IssuesPage {
   rateRemaining: number;
 }
 
-/** `openOnly` fetches open items only; otherwise every state. */
+/** Which states a page fetches; a closed PR is closed or merged. */
+export type PageStates = "open" | "closed" | "all";
+
 export interface PageOptions {
   since: string | null;
-  openOnly: boolean;
+  states: PageStates;
   after: string | null;
 }
+
+const ISSUE_STATES = { open: ["OPEN"], closed: ["CLOSED"], all: null } as const;
+const PULL_STATES = { open: ["OPEN"], closed: ["CLOSED", "MERGED"], all: null } as const;
 
 export async function fetchIssuesPage(
   gh: GithubClient,
@@ -291,7 +296,7 @@ export async function fetchIssuesPage(
   const data = await gh.gql<IssuesPageData>(ISSUES_PAGE_QUERY, {
     ...splitRepo(repo),
     since: options.since,
-    states: options.openOnly ? ["OPEN"] : null,
+    states: ISSUE_STATES[options.states],
     after: options.after,
   });
   if (!data.repository) throw new GithubError(`repository ${repo} not found or not accessible`);
@@ -312,7 +317,7 @@ export async function fetchPullsPage(
 ): Promise<IssuesPage> {
   const data = await gh.gql<PullsPageData>(PULLS_PAGE_QUERY, {
     ...splitRepo(repo),
-    states: options.openOnly ? ["OPEN"] : null,
+    states: PULL_STATES[options.states],
     after: options.after,
   });
   if (!data.repository) throw new GithubError(`repository ${repo} not found or not accessible`);

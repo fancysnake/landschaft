@@ -15,6 +15,7 @@ import {
 
 const item = (extra: Partial<FilterItem> = {}): FilterItem => ({
   kind: "issue",
+  state: "OPEN",
   repo: "acme/app",
   authors: [],
   assignees: [],
@@ -126,6 +127,9 @@ describe("matchesFilter", () => {
     expect(fits("is:blocked", item({ blocked: true }))).toBe(true);
     expect(fits("is:blocking", item({ blocking: true }))).toBe(true);
     expect(fits("is:blocked|blocking", item())).toBe(false);
+    expect(fits("is:closed", item({ state: "CLOSED" }))).toBe(true);
+    expect(fits("is:closed", item())).toBe(false);
+    expect(fits("-is:closed", item())).toBe(true);
   });
 
   it("matches parents and sub-issues", () => {

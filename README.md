@@ -109,7 +109,7 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
   - `label:`, `repo:`, `author:`, `assignee:` and `user:` (author or assignee), where `@me` is
     the account behind the token.
   - `is:issue`, `is:pr`, `is:blocked` (has an open blocker), `is:blocking` (blocks an open
-    issue).
+    issue), `is:closed` (closed or merged; see the dashboard's `closedDays`).
   - `has:parent-issue`, `has:sub-issues`, `parent-issue:owner/repo#12`.
   - PR statuses from GitHub: `is:conflicting` (merge conflicts), `is:ci:failed` (the last
     commit shows GitHub's red ✗), `is:ci:running` (a check has not finished) and

@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-10-19
+
+### Added
+
+- A dashboard keeps the issues and PRs closed within its `closedDays` (Settings: Closed items),
+  greyed with a `closed` pill; `is:closed` picks them, and raising the longest `closedDays`
+  starts a full sync.
+
 ## [4.1.0] - 2026-10-18
 
 ### Added
@@ -246,7 +254,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v4.1.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v4.2.0...HEAD
+[4.2.0]: https://github.com/fancysnake/landschaft/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/fancysnake/landschaft/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/fancysnake/landschaft/compare/v3.0.0...v4.0.0
 [3.0.0]: https://github.com/fancysnake/landschaft/compare/v2.0.0...v3.0.0

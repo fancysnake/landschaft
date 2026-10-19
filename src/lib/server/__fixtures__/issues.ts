@@ -41,6 +41,7 @@ export const DASHBOARD: BoardDashboard = {
   filter: "",
   epicLabel: "epic",
   sort: { by: "updated", dir: "desc" },
+  closedDays: 0,
   swimlanes: [
     { id: "high", name: "High", filter: "label:prio:high", hideBlocked: false },
     { id: "low", name: "Low", filter: "label:prio:low", hideBlocked: true },

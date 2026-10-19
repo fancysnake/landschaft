@@ -11,6 +11,7 @@ import {
   type BoardDashboard,
   type ViewQuery,
   type Dashboard,
+  closedSince,
   type Filters,
   type InboxDashboard,
   OTHER_LOOKS_AT,
@@ -77,8 +78,9 @@ type Item = Issue & FilterItem;
 
 /**
  * An issue with what filters test it on: whether an open PR closes it, whether an open blocker
- * holds it, and whether it blocks an open issue. Every open item in `issues` counts, whoever's
- * it is; one in a repo outside them is never seen.
+ * holds it, and whether it blocks an open issue. A closed item is none of these, and has no
+ * statuses since only open PRs' refresh. Every open item in `issues` counts, whoever's it is;
+ * one in a repo outside them is never seen.
  */
 export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Issue) => Item {
   const opened = issues.filter((issue) => issue.state === "OPEN");
@@ -87,9 +89,10 @@ export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Iss
   return (issue) => ({
     ...issue,
     authors: issue.author === null ? [] : [issue.author],
-    hasPr: withPr.has(keyOf(issue)),
-    blocked: isBlocked(issue, byKey),
-    blocking: blocking.has(keyOf(issue)),
+    hasPr: issue.state === "OPEN" && withPr.has(keyOf(issue)),
+    statuses: issue.state === "OPEN" ? issue.statuses : [],
+    blocked: issue.state === "OPEN" && isBlocked(issue, byKey),
+    blocking: issue.state === "OPEN" && blocking.has(keyOf(issue)),
     name: null,
     branch: null,
   });
@@ -104,6 +107,7 @@ type JobItem = Omit<FilterItem, "labels"> & { labels: LabelRef[] };
  */
 const jobItem = (job: CiJob, byKey: Map<string, Issue>): JobItem => ({
   kind: "ci-job",
+  state: "OPEN",
   repo: job.repo,
   authors: job.authors,
   assignees: [],
@@ -197,8 +201,9 @@ function inScope(
 }
 
 /**
- * `issues` by key, plus the open ones and the failed CI `jobs` that one of the global `users`
- * (empty for everyone) is in and that pass `scope`, each with its item.
+ * `issues` by key, plus the open ones, those closed at or after `cutoff` (ms), and the failed
+ * CI `jobs` that one of the global `users` (empty for everyone) is in and that pass `scope`,
+ * each with its item.
  */
 function scopedItems(
   issues: Issue[],
@@ -206,25 +211,28 @@ function scopedItems(
   users: string[],
   viewer: string | null,
   scope: FilterNode | null = null,
+  cutoff = Number.POSITIVE_INFINITY,
 ): {
   byKey: Map<string, Issue>;
-  open: { issue: Issue; item: Item }[];
-  openJobs: { job: CiJob; item: JobItem }[];
+  listed: { issue: Issue; item: Item }[];
+  jobItems: { job: CiJob; item: JobItem }[];
 } {
   const byKey = new Map(issues.map((issue) => [keyOf(issue), issue]));
   // From all of `issues`, not just the open ones.
   const itemOf = itemsOf(issues, byKey);
   const passes = inScope(users, viewer, scope);
-  const open = issues.flatMap((issue) => {
-    if (issue.state !== "OPEN") return [];
+  const shows = (issue: Issue) =>
+    issue.state === "OPEN" || (issue.closedAt !== null && Date.parse(issue.closedAt) >= cutoff);
+  const listed = issues.flatMap((issue) => {
+    if (!shows(issue)) return [];
     const item = itemOf(issue);
     return passes(item) ? [{ issue, item }] : [];
   });
-  const openJobs = jobs.flatMap((job) => {
+  const jobItems = jobs.flatMap((job) => {
     const item = jobItem(job, byKey);
     return passes(item) ? [{ job, item }] : [];
   });
-  return { byKey, open, openJobs };
+  return { byKey, listed, jobItems };
 }
 
 /** The dashboard's filter, swimlanes, columns and `epicLabel` (as a `labelKey`), parsed. */
@@ -325,6 +333,7 @@ const toCard = (item: Item, labels: LabelRef[], isEpic: boolean): Card => ({
   number: item.number,
   title: item.title,
   url: item.url,
+  state: item.state,
   assignees: item.assignees,
   labels,
   progress: item.subIssues.total > 0 ? item.subIssues : null,
@@ -348,8 +357,11 @@ export function scopedRepos(
   viewer: string | null = null,
 ): Set<string> {
   const scope = parseFilter(dashboard.filter);
-  const { open, openJobs } = scopedItems(issues, jobs, users, viewer, scope);
-  return new Set([...open.map(({ issue }) => issue.repo), ...openJobs.map(({ job }) => job.repo)]);
+  const { listed, jobItems } = scopedItems(issues, jobs, users, viewer, scope);
+  return new Set([
+    ...listed.map(({ issue }) => issue.repo),
+    ...jobItems.map(({ job }) => job.repo),
+  ]);
 }
 
 /**
@@ -372,22 +384,22 @@ export function unmatchedItems(
   const missed = ({ item }: { item: FilterItem }) => !hide.includes(item.repo) && !placed(item);
   // Hidden repos are dropped last: their items still count for `has:pr` and blockers.
   const unmatched = (scope: FilterNode | null) => {
-    const { open, openJobs } = scopedItems(issues, jobs, users, viewer, scope);
-    return { open: open.filter(missed), openJobs: openJobs.filter(missed) };
+    const { listed, jobItems } = scopedItems(issues, jobs, users, viewer, scope);
+    return { listed: listed.filter(missed), jobItems: jobItems.filter(missed) };
   };
   const shown = unmatched(filter);
   const all = filter ? unmatched(null) : shown;
   const sort = { by: "updated", dir: "desc" } as const;
   const { repos, assignees, labels } = facetsOf(
-    [...all.open, ...all.openJobs].map(({ item }) => item),
+    [...all.listed, ...all.jobItems].map(({ item }) => item),
     () => true,
     {},
     sort,
   );
   return {
     items: [
-      ...shown.open.map(({ item }) => toCard(item, item.labels, false)),
-      ...shown.openJobs.map(({ job, item }) => jobCard(job, item.labels)),
+      ...shown.listed.map(({ item }) => toCard(item, item.labels, false)),
+      ...shown.jobItems.map(({ job, item }) => jobCard(job, item.labels)),
     ].toSorted(compareBy(sort.by, sort.dir)),
     offer: { labels, repos, users: assignees },
   };
@@ -405,17 +417,25 @@ export function buildBoard(
   starred: ReadonlySet<string> = new Set(),
   viewer: string | null = null,
   jobs: CiJob[] = [],
+  now: Date = new Date(),
 ): Board {
   const axes = compileGrid(dashboard);
   const { scope } = axes;
-  const { byKey, open, openJobs } = scopedItems(issues, jobs, users, viewer, scope);
+  const { byKey, listed, jobItems } = scopedItems(
+    issues,
+    jobs,
+    users,
+    viewer,
+    scope,
+    closedSince(dashboard.closedDays, now),
+  );
   const wanted = barFilter(filters, byKey);
   const shown = labelShown(
     [scope, ...[...axes.swimlanes, ...axes.columns].map((group) => group.node)],
     axes.epicLabel,
   );
   const facets = facetsOf(
-    [...open, ...openJobs].map(({ item }) => item),
+    [...listed, ...jobItems].map(({ item }) => item),
     shown,
     filters,
     dashboard.sort,
@@ -461,7 +481,7 @@ export function buildBoard(
       board.columnTotals[column.id] = (board.columnTotals[column.id] ?? 0) + 1;
   };
 
-  for (const { issue, item } of open) {
+  for (const { issue, item } of listed) {
     if (filters.hide?.includes(issue.repo)) continue;
 
     const isEpic = axes.isEpic(item);
@@ -470,7 +490,7 @@ export function buildBoard(
     if (wanted(item, keyOf(issue), `${issue.number} ${issue.title}`))
       put(item, toCard(item, issue.labels.filter(shown), isEpic));
   }
-  for (const { job, item } of openJobs) {
+  for (const { job, item } of jobItems) {
     if (
       !filters.hide?.includes(job.repo) &&
       wanted(item, ciJobKey(job), `${job.name} ${job.branch}`)
@@ -507,14 +527,22 @@ export function buildInbox(
   users: string[] = [],
   viewer: string | null = null,
   jobs: CiJob[] = [],
+  now: Date = new Date(),
 ): Inbox {
   const scope = parseFilter(dashboard.filter);
   const groups = compile(dashboard.groups);
-  const { byKey, open, openJobs } = scopedItems(issues, jobs, users, viewer, scope);
+  const { byKey, listed, jobItems } = scopedItems(
+    issues,
+    jobs,
+    users,
+    viewer,
+    scope,
+    closedSince(dashboard.closedDays, now),
+  );
   const wanted = barFilter(filters, byKey);
   const shown = labelShown([scope, ...groups.map((group) => group.node)]);
   const facets = facetsOf(
-    [...open, ...openJobs].map(({ item }) => item),
+    [...listed, ...jobItems].map(({ item }) => item),
     shown,
     filters,
     dashboard.sort,
@@ -527,14 +555,14 @@ export function buildInbox(
     cards.get(group.id)!.push(card);
     total += 1;
   };
-  for (const { issue, item } of open) {
+  for (const { issue, item } of listed) {
     if (
       !filters.hide?.includes(issue.repo) &&
       wanted(item, keyOf(issue), `${issue.number} ${issue.title}`)
     )
       put(item, toCard(item, issue.labels.filter(shown), false));
   }
-  for (const { job, item } of openJobs) {
+  for (const { job, item } of jobItems) {
     if (
       !filters.hide?.includes(job.repo) &&
       wanted(item, ciJobKey(job), `${job.name} ${job.branch}`)
