@@ -104,7 +104,7 @@ function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean 
         {card.kind === "pr" && <span className={`pill ${TONE.sky}`}>PR</span>}
         {card.isEpic && <span className={`pill ${TONE.violet}`}>epic</span>}
         {closed && <span className={`pill ${TONE.neutral}`}>closed</span>}
-        {card.blocked && !closed && <span className={`pill ${TONE.red}`}>blocked</span>}
+        {card.blocked && <span className={`pill ${TONE.red}`}>blocked</span>}
         {/* Statuses refresh for open PRs only, so a closed one's are stale. */}
         {!closed &&
           card.statuses.map((status) => (

@@ -77,7 +77,7 @@ type Item = Issue & FilterItem;
 
 /**
  * An issue with what filters test it on: whether an open PR closes it, whether an open blocker
- * holds it, and whether it blocks an open issue. Every open item in `issues` counts, whoever's
+ * holds it while it is open, and whether it blocks an open issue. Every open item in `issues` counts, whoever's
  * it is; one in a repo outside them is never seen.
  */
 export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Issue) => Item {
@@ -88,7 +88,7 @@ export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Iss
     ...issue,
     authors: issue.author === null ? [] : [issue.author],
     hasPr: withPr.has(keyOf(issue)),
-    blocked: isBlocked(issue, byKey),
+    blocked: issue.state === "OPEN" && isBlocked(issue, byKey),
     blocking: blocking.has(keyOf(issue)),
     name: null,
     branch: null,

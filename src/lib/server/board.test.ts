@@ -571,6 +571,25 @@ describe("buildBoard", () => {
     expect(board.hiddenBlocked).toEqual({ high: 0, low: 1, rest: 0 });
   });
 
+  it("never counts a closed issue as blocked", () => {
+    const now = new Date("2026-05-10T00:00:00Z");
+    const issues = [
+      makeIssue({
+        number: 1,
+        labels: [label("prio:low")],
+        state: "CLOSED",
+        closedAt: "2026-05-09T00:00:00Z",
+        blockedBy: waitsOn(9),
+        blockedByTotal: 1,
+      }),
+      makeIssue({ number: 9 }),
+    ];
+    const dashboard = { ...DASHBOARD, closedDays: 7 };
+    const board = buildBoard(issues, dashboard, {}, [], new Set(), null, [], now);
+    expect(board.cells[cell("low", "todo")]?.[0]).toMatchObject({ number: 1, blocked: false });
+    expect(board.hiddenBlocked.low).toBe(0);
+  });
+
   it("shows an issue whose blocker is closed in the cache", () => {
     const issues = [
       makeIssue({
