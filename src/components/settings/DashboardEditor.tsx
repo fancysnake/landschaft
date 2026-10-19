@@ -4,6 +4,7 @@ import type { LabelDef } from "../../lib/types";
 import {
   type BoardDashboard,
   type Dashboard,
+  type DashboardBase,
   dashboardFilterError,
   type DashboardType,
   type InboxDashboard,
@@ -26,7 +27,7 @@ interface Props {
 }
 
 export function DashboardEditor({ dashboard, onChange, catalog, offer }: Props) {
-  const patch = (changes: Partial<Pick<Dashboard, "name" | "filter" | "sort" | "closedDays">>) =>
+  const patch = (changes: Partial<Omit<DashboardBase, "id">>) =>
     onChange({ ...dashboard, ...changes });
 
   return (

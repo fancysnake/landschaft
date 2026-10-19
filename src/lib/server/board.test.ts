@@ -590,6 +590,61 @@ describe("buildBoard", () => {
     expect(board.hiddenBlocked.low).toBe(0);
   });
 
+  it("never counts a closed issue as blocking or as having a PR", () => {
+    const now = new Date("2026-05-10T00:00:00Z");
+    const recently = { state: "CLOSED" as const, closedAt: "2026-05-09T00:00:00Z" };
+    const issues = [
+      makeIssue({ number: 1, blockedBy: waitsOn(2), blockedByTotal: 1 }),
+      makeIssue({ number: 2, ...recently }),
+      makeIssue({ number: 3, ...recently }),
+      makeIssue({ number: 4, kind: "pr", linked: [{ repo: REPO, number: 3 }] }),
+    ];
+    const dashboard = {
+      ...DASHBOARD,
+      closedDays: 7,
+      columns: [
+        { id: "blocking", name: "Blocking", filter: "is:blocking" },
+        { id: "review", name: "Review", filter: "has:pr" },
+        { id: "rest", name: "Rest", filter: "other" },
+      ],
+    };
+    const board = buildBoard(issues, dashboard, {}, [], new Set(), null, [], now);
+    expect(board.cells[cell("rest", "blocking")]).toEqual([]);
+    expect(board.cells[cell("rest", "review")]).toEqual([]);
+    expect(board.cells[cell("rest", "rest")]?.map(numberOf)).toEqual(
+      expect.arrayContaining([2, 3]),
+    );
+  });
+
+  it("drops a closed PR's statuses, which no longer refresh", () => {
+    const now = new Date("2026-05-10T00:00:00Z");
+    const statuses = ["is:ci:failed" as const];
+    const issues = [
+      makeIssue({ number: 1, kind: "pr", statuses }),
+      makeIssue({
+        number: 2,
+        kind: "pr",
+        statuses,
+        state: "CLOSED",
+        closedAt: "2026-05-09T00:00:00Z",
+      }),
+    ];
+    const dashboard = {
+      ...DASHBOARD,
+      closedDays: 7,
+      columns: [
+        { id: "failing", name: "Failing", filter: "is:ci:failed" },
+        { id: "rest", name: "Rest", filter: "other" },
+      ],
+    };
+    const board = buildBoard(issues, dashboard, {}, [], new Set(), null, [], now);
+    expect(board.cells[cell("rest", "failing")]?.map(numberOf)).toEqual([1]);
+    expect(asIssue(board.cells[cell("rest", "rest")]?.[0])).toMatchObject({
+      number: 2,
+      statuses: [],
+    });
+  });
+
   it("shows an issue whose blocker is closed in the cache", () => {
     const issues = [
       makeIssue({

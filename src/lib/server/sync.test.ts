@@ -205,16 +205,25 @@ describe("Syncer", () => {
     });
   });
 
-  it("also fetches every item updated within the closed window on a full sync", async () => {
+  it("also fetches the items closed within the window on a full sync", async () => {
     const { gh, calls } = fakeGithub([[toNode(1)]]);
-    const syncer = new Syncer({ db, gh, now: () => now });
+    const syncer = new Syncer({ db, gh, now: () => now, closedDays: () => 7 });
 
-    await syncer.syncRepo(REPO, { closedDays: 7 });
+    await syncer.syncRepo(REPO);
 
     expect(pageCalls(calls).map((c) => c.variables)).toEqual([
       { owner: "acme", name: "app", since: null, states: ["OPEN"], after: null },
-      { owner: "acme", name: "app", since: "2026-04-24T12:00:00.000Z", states: null, after: null },
+      {
+        owner: "acme",
+        name: "app",
+        since: "2026-04-24T12:00:00.000Z",
+        states: ["CLOSED"],
+        after: null,
+      },
     ]);
+    expect(
+      calls.filter((c) => c.query.includes("query PullsPage")).map((c) => c.variables.states),
+    ).toEqual([["OPEN"], ["CLOSED", "MERGED"]]);
   });
 
   it("syncs incrementally afterwards with an overlapping since and all states", async () => {

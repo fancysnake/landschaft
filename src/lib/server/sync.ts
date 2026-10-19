@@ -1,7 +1,7 @@
 import type { CiJob, SyncStatus } from "../types";
 import type { Db } from "./db";
 
-import { closedDays, type Config } from "../schema";
+import { closedSince, type Config } from "../schema";
 import { type CiBranch, CI_BATCH, fetchCiBranchesPage, fetchCiJobs } from "./ci";
 import {
   fetchIssuesPage,
@@ -14,8 +14,7 @@ import {
   STATUS_BATCH,
 } from "./github";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-const FULL_SYNC_MAX_AGE_MS = DAY_MS;
+const FULL_SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const SINCE_OVERLAP_MS = 2 * 60 * 1000;
 const RATE_FLOOR = 200;
 
@@ -23,6 +22,8 @@ export interface SyncDeps {
   db: Db;
   gh: GithubClient;
   now?: () => Date;
+  /** How many days of closed items a full sync fetches besides the open ones. */
+  closedDays?: () => number;
 }
 
 export interface SyncResult {
@@ -34,8 +35,6 @@ export interface SyncResult {
 
 export interface SyncOptions {
   full?: boolean;
-  /** How many days of closed items a full sync fetches besides the open ones. */
-  closedDays?: number;
 }
 
 export class SyncBusyError extends Error {
@@ -59,12 +58,14 @@ export class Syncer {
   readonly db: Db;
   private readonly gh: GithubClient;
   private readonly now: () => Date;
+  private readonly closedDays: () => number;
   private viewerPromise: Promise<string> | null = null;
 
   constructor(deps: SyncDeps) {
     this.db = deps.db;
     this.gh = deps.gh;
     this.now = deps.now ?? (() => new Date());
+    this.closedDays = deps.closedDays ?? (() => 0);
   }
 
   status(): SyncStatus {
@@ -121,26 +122,24 @@ export class Syncer {
           : new Date(Date.parse(state.lastSyncAt) - SINCE_OVERLAP_MS).toISOString();
 
       const seen = new Set<number>();
-      const query = { since, openOnly: full };
+      const query: Omit<PageOptions, "after"> = { since, states: full ? "open" : "all" };
       let upserted = 0;
-      const closedSince =
-        full && options.closedDays
-          ? new Date(startedAt.getTime() - options.closedDays * DAY_MS).toISOString()
-          : null;
+      const cutoff = closedSince(full ? this.closedDays() : 0, startedAt);
+      const closedFrom = Number.isFinite(cutoff) ? new Date(cutoff).toISOString() : null;
       for (const fetchPage of [fetchIssuesPage, fetchPullsPage]) {
         upserted += await this.drain(fetchPage, repo, query, seen);
         // An open-only full sync misses what closed lately, which boards still show.
-        if (closedSince) {
+        if (closedFrom) {
           upserted += await this.drain(
             fetchPage,
             repo,
-            { since: closedSince, openOnly: false },
+            { since: closedFrom, states: "closed" },
             seen,
           );
         }
       }
 
-      const closed = full ? this.db.closeMissing(repo, seen, startedAt.toISOString()) : 0;
+      const closed = full ? this.db.closeMissing(repo, seen) : 0;
       await this.refreshPullStatuses(repo);
       await this.refreshCiJobs(repo);
       this.db.upsertLabels(repo, await fetchRepoLabels(this.gh, repo));
@@ -260,7 +259,7 @@ export function startScheduler(
         !state?.lastSyncAt ||
         Date.now() - Date.parse(state.lastSyncAt) >= config.refreshMinutes * 60_000;
       if (!due) continue;
-      await syncer.syncRepo(repo, { closedDays: closedDays(config) }).catch(() => undefined);
+      await syncer.syncRepo(repo).catch(() => undefined);
     }
   };
   const first = setTimeout(() => void tick(), options.firstDelayMs ?? 1000);

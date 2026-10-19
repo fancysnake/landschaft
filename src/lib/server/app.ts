@@ -1,3 +1,4 @@
+import { closedDays } from "../schema";
 import { loadConfig } from "./config";
 import { Db } from "./db";
 import { createGithubClient, getToken, type GithubClient } from "./github";
@@ -17,7 +18,7 @@ export function getApp(): App {
   if (!registry.landschaftApp) {
     const db = new Db();
     const gh = createGithubClient(getToken);
-    const syncer = new Syncer({ db, gh });
+    const syncer = new Syncer({ db, gh, closedDays: () => closedDays(loadConfig()) });
     const stopScheduler = startScheduler(syncer, loadConfig);
     registry.landschaftApp = {
       db,

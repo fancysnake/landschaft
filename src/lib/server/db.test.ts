@@ -111,14 +111,11 @@ describe("Db", () => {
       makeIssue({ number: 3, state: "CLOSED" }),
       makeIssue({ number: 1, repo: "acme/lib" }),
     ]);
-    expect(db.closeMissing(REPO, new Set([2]), "2026-05-01T00:00:00.000Z")).toBe(1);
-    expect(cachedIssue(db, REPO, 1)).toMatchObject({
-      state: "CLOSED",
-      closedAt: "2026-05-01T00:00:00.000Z",
-    });
+    expect(db.closeMissing(REPO, new Set([2]))).toBe(1);
+    expect(cachedIssue(db, REPO, 1)?.state).toBe("CLOSED");
     expect(cachedIssue(db, REPO, 2)?.state).toBe("OPEN");
     expect(cachedIssue(db, "acme/lib", 1)?.state).toBe("OPEN");
-    expect(db.closeMissing(REPO, new Set([2]), "2026-05-02T00:00:00.000Z")).toBe(0);
+    expect(db.closeMissing(REPO, new Set([2]))).toBe(0);
   });
 
   it("replaces the label catalogue per repo", () => {

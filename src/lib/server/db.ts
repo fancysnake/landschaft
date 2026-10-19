@@ -308,21 +308,18 @@ export class Db {
     return rows.map((row) => rowToIssue(row, blockers.get(`${row.repo}#${row.number}`) ?? []));
   }
 
-  /**
-   * After a full sync: anything still OPEN that GitHub did not list is closed, at `closedAt`
-   * unless it has a close time. Returns the count.
-   */
-  closeMissing(repo: string, seen: Set<number>, closedAt: string): number {
+  /** After a full sync: anything still OPEN that GitHub did not list is closed. Returns the count. */
+  closeMissing(repo: string, seen: Set<number>): number {
     const open = this.db
       .prepare("SELECT number FROM issues WHERE repo = ? AND state = 'OPEN'")
       .all(repo) as unknown as { number: number }[];
     const stale = open.map((r) => r.number).filter((n) => !seen.has(n));
     if (stale.length === 0) return 0;
     const close = this.db.prepare(
-      "UPDATE issues SET state = 'CLOSED', closed_at = COALESCE(closed_at, ?) WHERE repo = ? AND number = ?",
+      "UPDATE issues SET state = 'CLOSED' WHERE repo = ? AND number = ?",
     );
     this.transaction(() => {
-      for (const number of stale) close.run(closedAt, repo, number);
+      for (const number of stale) close.run(repo, number);
     });
     return stale.length;
   }

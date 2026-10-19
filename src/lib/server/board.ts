@@ -11,6 +11,7 @@ import {
   type BoardDashboard,
   type ViewQuery,
   type Dashboard,
+  closedSince,
   type Filters,
   type InboxDashboard,
   OTHER_LOOKS_AT,
@@ -77,8 +78,9 @@ type Item = Issue & FilterItem;
 
 /**
  * An issue with what filters test it on: whether an open PR closes it, whether an open blocker
- * holds it while it is open, and whether it blocks an open issue. Every open item in `issues` counts, whoever's
- * it is; one in a repo outside them is never seen.
+ * holds it, and whether it blocks an open issue. A closed item is none of these, and has no
+ * statuses since only open PRs' refresh. Every open item in `issues` counts, whoever's it is;
+ * one in a repo outside them is never seen.
  */
 export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Issue) => Item {
   const opened = issues.filter((issue) => issue.state === "OPEN");
@@ -87,9 +89,10 @@ export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Iss
   return (issue) => ({
     ...issue,
     authors: issue.author === null ? [] : [issue.author],
-    hasPr: withPr.has(keyOf(issue)),
+    hasPr: issue.state === "OPEN" && withPr.has(keyOf(issue)),
+    statuses: issue.state === "OPEN" ? issue.statuses : [],
     blocked: issue.state === "OPEN" && isBlocked(issue, byKey),
-    blocking: blocking.has(keyOf(issue)),
+    blocking: issue.state === "OPEN" && blocking.has(keyOf(issue)),
     name: null,
     branch: null,
   });
@@ -198,7 +201,7 @@ function inScope(
 }
 
 /**
- * `issues` by key, plus the open ones, those closed at or after `closedSince`, and the failed
+ * `issues` by key, plus the open ones, those closed at or after `cutoff` (ms), and the failed
  * CI `jobs` that one of the global `users` (empty for everyone) is in and that pass `scope`,
  * each with its item.
  */
@@ -208,7 +211,7 @@ function scopedItems(
   users: string[],
   viewer: string | null,
   scope: FilterNode | null = null,
-  closedSince: Date | null = null,
+  cutoff = Number.POSITIVE_INFINITY,
 ): {
   byKey: Map<string, Issue>;
   listed: { issue: Issue; item: Item }[];
@@ -219,10 +222,7 @@ function scopedItems(
   const itemOf = itemsOf(issues, byKey);
   const passes = inScope(users, viewer, scope);
   const shows = (issue: Issue) =>
-    issue.state === "OPEN" ||
-    (closedSince !== null &&
-      issue.closedAt !== null &&
-      Date.parse(issue.closedAt) >= closedSince.getTime());
+    issue.state === "OPEN" || (issue.closedAt !== null && Date.parse(issue.closedAt) >= cutoff);
   const listed = issues.flatMap((issue) => {
     if (!shows(issue)) return [];
     const item = itemOf(issue);
@@ -234,12 +234,6 @@ function scopedItems(
   });
   return { byKey, listed, jobItems };
 }
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** How far back the dashboard keeps closed items, from `now`; null when it shows open ones only. */
-const closedCutoff = (dashboard: Dashboard, now: Date): Date | null =>
-  dashboard.closedDays > 0 ? new Date(now.getTime() - dashboard.closedDays * DAY_MS) : null;
 
 /** The dashboard's filter, swimlanes, columns and `epicLabel` (as a `labelKey`), parsed. */
 function compileGrid(dashboard: BoardDashboard) {
@@ -433,7 +427,7 @@ export function buildBoard(
     users,
     viewer,
     scope,
-    closedCutoff(dashboard, now),
+    closedSince(dashboard.closedDays, now),
   );
   const wanted = barFilter(filters, byKey);
   const shown = labelShown(
@@ -543,7 +537,7 @@ export function buildInbox(
     users,
     viewer,
     scope,
-    closedCutoff(dashboard, now),
+    closedSince(dashboard.closedDays, now),
   );
   const wanted = barFilter(filters, byKey);
   const shown = labelShown([scope, ...groups.map((group) => group.node)]);

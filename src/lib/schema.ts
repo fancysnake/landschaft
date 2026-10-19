@@ -341,12 +341,12 @@ export type SortDir = z.infer<typeof SortDirSchema>;
 export type Config = z.infer<typeof ConfigSchema>;
 export type Dashboard = Config["dashboards"][number];
 
+/** The fields every dashboard type has. */
+export type DashboardBase = Pick<Dashboard, keyof typeof shared>;
+
 /** A fresh dashboard of `type` keeping `base`, the fields every type has. */
-export function withType(
-  type: DashboardType,
-  from: Pick<Dashboard, "id" | "name" | "filter" | "sort" | "closedDays">,
-): Dashboard {
-  const base = {
+export function withType(type: DashboardType, from: DashboardBase): Dashboard {
+  const base: DashboardBase = {
     id: from.id,
     name: from.name,
     filter: from.filter,
@@ -364,8 +364,27 @@ export function withType(
 }
 
 /** The longest window any dashboard shows closed items for, in days; what a full sync fetches. */
-export const closedDays = (config: Pick<Config, "dashboards">): number =>
+export const closedDays = (config: { dashboards: Pick<Dashboard, "closedDays">[] }): number =>
   Math.max(0, ...config.dashboards.map((dashboard) => dashboard.closedDays));
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** The earliest close time, in ms, a window of `days` back from `now` keeps; Infinity for 0. */
+export const closedSince = (days: number, now: Date): number =>
+  days > 0 ? now.getTime() - days * DAY_MS : Number.POSITIVE_INFINITY;
+
+/**
+ * The repos a full sync must fetch once the config goes from `previous` to `next`: every one when
+ * the closed window grew, since the older closed items are missing, otherwise the added ones.
+ */
+export function reposToResync(
+  previous: { repos: string[]; dashboards: Pick<Dashboard, "closedDays">[] },
+  next: { repos: string[]; dashboards: Pick<Dashboard, "closedDays">[] },
+): string[] {
+  if (closedDays(next) > closedDays(previous)) return next.repos;
+  const before = new Set(previous.repos);
+  return next.repos.filter((repo) => !before.has(repo));
+}
 
 export const StarEpicRequestSchema = z.object({ epic: issueRef, starred: z.boolean() });
 export type StarEpicRequest = z.infer<typeof StarEpicRequestSchema>;
