@@ -1,7 +1,7 @@
-import type { Config } from "../schema";
 import type { CiJob, SyncStatus } from "../types";
 import type { Db } from "./db";
 
+import { closedDays, type Config } from "../schema";
 import { type CiBranch, CI_BATCH, fetchCiBranchesPage, fetchCiJobs } from "./ci";
 import {
   fetchIssuesPage,
@@ -14,7 +14,8 @@ import {
   STATUS_BATCH,
 } from "./github";
 
-const FULL_SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const FULL_SYNC_MAX_AGE_MS = DAY_MS;
 const SINCE_OVERLAP_MS = 2 * 60 * 1000;
 const RATE_FLOOR = 200;
 
@@ -29,6 +30,12 @@ export interface SyncResult {
   full: boolean;
   upserted: number;
   closed: number;
+}
+
+export interface SyncOptions {
+  full?: boolean;
+  /** How many days of closed items a full sync fetches besides the open ones. */
+  closedDays?: number;
 }
 
 export class SyncBusyError extends Error {
@@ -87,7 +94,7 @@ export class Syncer {
   }
 
   /** Sequential; a failing repo is recorded and skipped, the rest still sync. */
-  async syncAll(repos: string[], options: { full?: boolean } = {}): Promise<void> {
+  async syncAll(repos: string[], options: SyncOptions = {}): Promise<void> {
     for (const repo of repos) {
       if (this.inFlight.has(repo)) continue;
       try {
@@ -98,7 +105,7 @@ export class Syncer {
     }
   }
 
-  async syncRepo(repo: string, options: { full?: boolean } = {}): Promise<SyncResult> {
+  async syncRepo(repo: string, options: SyncOptions = {}): Promise<SyncResult> {
     if (this.inFlight.has(repo)) throw new SyncBusyError(repo);
     this.inFlight.add(repo);
     const startedAt = this.now();
@@ -116,11 +123,24 @@ export class Syncer {
       const seen = new Set<number>();
       const query = { since, openOnly: full };
       let upserted = 0;
+      const closedSince =
+        full && options.closedDays
+          ? new Date(startedAt.getTime() - options.closedDays * DAY_MS).toISOString()
+          : null;
       for (const fetchPage of [fetchIssuesPage, fetchPullsPage]) {
         upserted += await this.drain(fetchPage, repo, query, seen);
+        // An open-only full sync misses what closed lately, which boards still show.
+        if (closedSince) {
+          upserted += await this.drain(
+            fetchPage,
+            repo,
+            { since: closedSince, openOnly: false },
+            seen,
+          );
+        }
       }
 
-      const closed = full ? this.db.closeMissing(repo, seen) : 0;
+      const closed = full ? this.db.closeMissing(repo, seen, startedAt.toISOString()) : 0;
       await this.refreshPullStatuses(repo);
       await this.refreshCiJobs(repo);
       this.db.upsertLabels(repo, await fetchRepoLabels(this.gh, repo));
@@ -240,7 +260,7 @@ export function startScheduler(
         !state?.lastSyncAt ||
         Date.now() - Date.parse(state.lastSyncAt) >= config.refreshMinutes * 60_000;
       if (!due) continue;
-      await syncer.syncRepo(repo).catch(() => undefined);
+      await syncer.syncRepo(repo, { closedDays: closedDays(config) }).catch(() => undefined);
     }
   };
   const first = setTimeout(() => void tick(), options.firstDelayMs ?? 1000);

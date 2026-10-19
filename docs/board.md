@@ -12,8 +12,9 @@ Sync is sequential per repository, on purpose: GitHub's GraphQL rate limit is sh
 everything the token does. Two kinds of pass:
 
 - **Incremental** — issues updated since the last run, every `refreshMinutes`.
-- **Full** — every open issue, once a day, for repositories just added in settings, and on
-  demand from the full resync button in the top bar.
+- **Full** — every open issue, plus every item updated within the longest `closedDays` of
+  any dashboard, once a day, for repositories just added in settings, after a dashboard's
+  `closedDays` grows past the longest, and on demand from the full resync button in the top bar.
 
 The top bar shows the sync status on every page, with the remaining rate-limit budget and the
 Refresh and full resync buttons. It polls `/api/version`, and an open board reloads itself when a
@@ -45,6 +46,15 @@ A PR card shows a pill for each status that holds, whatever lane it is in: `conf
 `has:pr` picks issues that an open PR closes (GitHub's "linked pull requests"), whoever
 opened the PR, as long as the PR is in one of the global repos; such an issue card shows a
 `PR open` pill. It drops once the PR is merged or closed.
+
+## Closed items
+
+A dashboard with `closedDays` above 0 keeps the issues and PRs closed (or merged) within that
+many days, placed by the same filters. `is:closed` picks them, so a `Done` column with
+`is:closed` gathers them and `-is:closed` keeps them out of a lane. Their cards are greyed
+with a `closed` pill, without PR status pills. Epics follow the same window. A closed item
+never counts for `has:pr`, `is:blocked` or `is:blocking`, and the unmatched view lists open
+items only.
 
 ## Failed CI jobs
 

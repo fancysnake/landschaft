@@ -205,6 +205,18 @@ describe("Syncer", () => {
     });
   });
 
+  it("also fetches every item updated within the closed window on a full sync", async () => {
+    const { gh, calls } = fakeGithub([[toNode(1)]]);
+    const syncer = new Syncer({ db, gh, now: () => now });
+
+    await syncer.syncRepo(REPO, { closedDays: 7 });
+
+    expect(pageCalls(calls).map((c) => c.variables)).toEqual([
+      { owner: "acme", name: "app", since: null, states: ["OPEN"], after: null },
+      { owner: "acme", name: "app", since: "2026-04-24T12:00:00.000Z", states: null, after: null },
+    ]);
+  });
+
   it("syncs incrementally afterwards with an overlapping since and all states", async () => {
     db.setSyncState(REPO, {
       lastSyncAt: "2026-05-01T11:00:00.000Z",

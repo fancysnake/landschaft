@@ -1,4 +1,4 @@
-import { SyncRequestSchema } from "../../lib/schema";
+import { closedDays, SyncRequestSchema } from "../../lib/schema";
 import { ApiError, json, route } from "../../lib/server/api";
 import { getApp } from "../../lib/server/app";
 import { loadConfig } from "../../lib/server/config";
@@ -16,9 +16,11 @@ export const POST = route(async ({ request }) => {
   }
   const body = SyncRequestSchema.parse(raw);
   const { syncer } = getApp();
+  const config = loadConfig();
+  const options = { full: body.full, closedDays: closedDays(config) };
   if (body.repo) {
     try {
-      const result = await syncer.syncRepo(body.repo, { full: body.full });
+      const result = await syncer.syncRepo(body.repo, options);
       return json({ results: [result], status: syncer.status() });
     } catch (error) {
       if (error instanceof SyncBusyError) throw new ApiError(409, error.message);
@@ -26,6 +28,6 @@ export const POST = route(async ({ request }) => {
     }
   }
   // Failures land in status.lastError; clients follow progress through /api/version.
-  void syncer.syncAll(loadConfig().repos, { full: body.full });
+  void syncer.syncAll(config.repos, options);
   return json({ status: syncer.status() }, 202);
 });

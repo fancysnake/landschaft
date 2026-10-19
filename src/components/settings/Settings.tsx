@@ -17,6 +17,7 @@ function newDashboard(): Dashboard {
     name: "New dashboard",
     filter: "",
     sort: { by: "updated", dir: "desc" },
+    closedDays: 0,
   });
 }
 

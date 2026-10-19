@@ -123,6 +123,7 @@ export interface IssueItemCard {
   number: number;
   title: string;
   url: string;
+  state: IssueState;
   assignees: Assignee[];
   labels: LabelRef[];
   progress: Progress | null;

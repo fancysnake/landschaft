@@ -79,18 +79,21 @@ export function CardView({ card, showRepo }: { card: Card; showRepo: boolean }) 
 }
 
 function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean }) {
+  const closed = card.state === "CLOSED";
   return (
     <article
       className={
-        card.blocked
-          ? cardClass("border-l-red-500", "border-red-200 bg-red-50/60")
-          : cardClass(
-              card.isEpic
-                ? "border-l-violet-500"
-                : card.kind === "pr"
-                  ? "border-l-sky-500"
-                  : "border-l-emerald-500",
-            )
+        closed
+          ? cardClass("border-l-neutral-400", "border-neutral-200 bg-neutral-50 opacity-70")
+          : card.blocked
+            ? cardClass("border-l-red-500", "border-red-200 bg-red-50/60")
+            : cardClass(
+                card.isEpic
+                  ? "border-l-violet-500"
+                  : card.kind === "pr"
+                    ? "border-l-sky-500"
+                    : "border-l-emerald-500",
+              )
       }
     >
       <div className={metaRow}>
@@ -100,16 +103,19 @@ function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean 
         </span>
         {card.kind === "pr" && <span className={`pill ${TONE.sky}`}>PR</span>}
         {card.isEpic && <span className={`pill ${TONE.violet}`}>epic</span>}
-        {card.blocked && <span className={`pill ${TONE.red}`}>blocked</span>}
-        {card.statuses.map((status) => (
-          <span
-            key={status}
-            title={STATUS_PILLS[status].title}
-            className={`pill ${TONE[STATUS_PILLS[status].tone]}`}
-          >
-            {STATUS_PILLS[status].text}
-          </span>
-        ))}
+        {closed && <span className={`pill ${TONE.neutral}`}>closed</span>}
+        {card.blocked && !closed && <span className={`pill ${TONE.red}`}>blocked</span>}
+        {/* Statuses refresh for open PRs only, so a closed one's are stale. */}
+        {!closed &&
+          card.statuses.map((status) => (
+            <span
+              key={status}
+              title={STATUS_PILLS[status].title}
+              className={`pill ${TONE[STATUS_PILLS[status].tone]}`}
+            >
+              {STATUS_PILLS[status].text}
+            </span>
+          ))}
         {card.hasPr && (
           <span title="An open PR closes it" className={`pill ${TONE.sky}`}>
             PR open

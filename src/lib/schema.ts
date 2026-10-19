@@ -139,6 +139,8 @@ const shared = {
   /** Narrows the global base set; empty takes all of it. */
   filter: dashboardFilter.default(""),
   sort: SortSchema.default({ by: "updated", dir: "desc" }),
+  /** Items closed within this many days stay on the dashboard; 0 shows open items only. */
+  closedDays: z.number().int().min(0).max(365).default(0),
 };
 
 const BoardDashboardSchema = z
@@ -342,9 +344,15 @@ export type Dashboard = Config["dashboards"][number];
 /** A fresh dashboard of `type` keeping `base`, the fields every type has. */
 export function withType(
   type: DashboardType,
-  from: Pick<Dashboard, "id" | "name" | "filter" | "sort">,
+  from: Pick<Dashboard, "id" | "name" | "filter" | "sort" | "closedDays">,
 ): Dashboard {
-  const base = { id: from.id, name: from.name, filter: from.filter, sort: from.sort };
+  const base = {
+    id: from.id,
+    name: from.name,
+    filter: from.filter,
+    sort: from.sort,
+    closedDays: from.closedDays,
+  };
   return type === "board"
     ? {
         type,
@@ -354,6 +362,10 @@ export function withType(
       }
     : { type, ...base, groups: [] };
 }
+
+/** The longest window any dashboard shows closed items for, in days; what a full sync fetches. */
+export const closedDays = (config: Pick<Config, "dashboards">): number =>
+  Math.max(0, ...config.dashboards.map((dashboard) => dashboard.closedDays));
 
 export const StarEpicRequestSchema = z.object({ epic: issueRef, starred: z.boolean() });
 export type StarEpicRequest = z.infer<typeof StarEpicRequestSchema>;

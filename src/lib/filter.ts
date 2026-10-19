@@ -1,4 +1,4 @@
-import type { IssueRef, ItemKind } from "./types";
+import type { IssueRef, IssueState, ItemKind } from "./types";
 
 import { PULL_STATUS_NAMES, type PullStatusLabel } from "./status";
 
@@ -187,6 +187,8 @@ export function askedLabels(node: FilterNode | null): string[] {
 /** What a filter tests an item on. */
 export interface FilterItem {
   kind: ItemKind;
+  /** A CI job's is always OPEN. */
+  state: IssueState;
   repo: string;
   /** An issue's or PR's author; a CI job's commit authors (see `CiJob`). */
   authors: string[];
@@ -276,6 +278,7 @@ const KEYS = {
     ),
     blocked: (item) => item.blocked,
     blocking: (item) => item.blocking,
+    closed: (item) => item.state === "CLOSED",
   }),
   has: oneOf({
     pr: (item) => item.hasPr,

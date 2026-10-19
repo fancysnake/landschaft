@@ -217,6 +217,7 @@ const INBOX: InboxDashboard = {
   name: "Inbox",
   filter: "",
   sort: { by: "updated", dir: "desc" },
+  closedDays: 0,
   groups: [
     { id: "fix", name: "Fix", filter: "is:pr is:ci:failed", collapsed: false },
     { id: "bugs", name: "Bugs", filter: "label:bug", collapsed: true },
@@ -239,6 +240,21 @@ describe("buildInbox", () => {
     const inbox = buildInbox(issues, INBOX);
     expect(grouped(inbox)).toEqual({ fix: [1], bugs: [3, 2] });
     expect(inbox.total).toBe(3);
+  });
+
+  it("keeps items closed within the window, matched by is:closed", () => {
+    const now = new Date("2026-05-10T00:00:00Z");
+    const all = [
+      ...issues,
+      makeIssue({ number: 6, state: "CLOSED", closedAt: "2026-05-08T00:00:00Z" }),
+      makeIssue({ number: 7, state: "CLOSED", closedAt: "2026-05-01T00:00:00Z" }),
+    ];
+    const groups = [{ id: "done", name: "Done", filter: "is:closed", collapsed: false }];
+    const inbox = buildInbox(all, { ...INBOX, closedDays: 7, groups }, {}, [], null, [], now);
+    expect(grouped(inbox)).toEqual({ done: [6] });
+    expect(grouped(buildInbox(all, { ...INBOX, groups }, {}, [], null, [], now))).toEqual({
+      done: [],
+    });
   });
 
   it("gives `other` whatever reaches its group", () => {
@@ -489,6 +505,47 @@ describe("buildBoard", () => {
     expect(
       board.cells[cell("review", "todo")]?.map((c) => [numberOf(c), asIssue(c)?.hasPr]),
     ).toEqual([[1, true]]);
+  });
+
+  it("shows items closed within the window, which count for nothing open", () => {
+    const now = new Date("2026-05-10T00:00:00Z");
+    const recently = { state: "CLOSED" as const, closedAt: "2026-05-09T00:00:00Z" };
+    const issues = [
+      makeIssue({ number: 1 }),
+      makeIssue({ number: 2, ...recently }),
+      makeIssue({ number: 3, state: "CLOSED", closedAt: "2026-04-01T00:00:00Z" }),
+      makeIssue({ number: 4, state: "CLOSED", closedAt: null }),
+      makeIssue({ number: 5, kind: "pr", ...recently, linked: [{ repo: REPO, number: 1 }] }),
+    ];
+    const dashboard = {
+      ...DASHBOARD,
+      closedDays: 7,
+      columns: [
+        { id: "todo", name: "Todo", filter: "other" },
+        { id: "done", name: "Done", filter: "is:closed" },
+      ],
+    };
+    const board = buildBoard(issues, dashboard, {}, [], new Set(), null, [], now);
+    expect(board.cells[cell("rest", "done")]?.map(numberOf)).toEqual([5, 2]);
+    expect(board.cells[cell("rest", "done")]?.map((c) => asIssue(c)?.state)).toEqual([
+      "CLOSED",
+      "CLOSED",
+    ]);
+    expect(asIssue(board.cells[cell("rest", "todo")]?.[0])).toMatchObject({
+      number: 1,
+      hasPr: false,
+    });
+    const openOnly = buildBoard(
+      issues,
+      { ...dashboard, closedDays: 0 },
+      {},
+      [],
+      new Set(),
+      null,
+      [],
+      now,
+    );
+    expect(openOnly.total).toBe(1);
   });
 
   it("leaves out issues that fit no group when an axis has no catch-all", () => {
