@@ -85,6 +85,12 @@ export default function Settings() {
     update({ ...config, dashboards });
     if (selected === id) setSelected(dashboards[0]?.id ?? null);
   };
+  const moveDashboard = (from: number, to: number) => {
+    const dashboards = [...config.dashboards];
+    const [dashboard] = dashboards.splice(from, 1);
+    dashboards.splice(to, 0, dashboard!);
+    update({ ...config, dashboards });
+  };
 
   const save = async () => {
     setSaving(true);
@@ -110,7 +116,8 @@ export default function Settings() {
     }
   };
 
-  const current = config.dashboards.find((d) => d.id === selected) ?? null;
+  const index = config.dashboards.findIndex((d) => d.id === selected);
+  const current = config.dashboards[index] ?? null;
   const offer = {
     labels: [...new Set(catalog.map((label) => label.name))],
     repos: config.repos,
@@ -187,6 +194,24 @@ export default function Settings() {
               {current ? (
                 <>
                   <div className="mb-4 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      aria-label="Move up"
+                      disabled={index === 0}
+                      onClick={() => moveDashboard(index, index - 1)}
+                      className="btn"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Move down"
+                      disabled={index === config.dashboards.length - 1}
+                      onClick={() => moveDashboard(index, index + 1)}
+                      className="btn"
+                    >
+                      ↓
+                    </button>
                     <button type="button" onClick={() => addDashboard(current)} className="btn">
                       Duplicate
                     </button>
