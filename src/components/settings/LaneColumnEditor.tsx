@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 
 import { filterError, type Offer } from "../../lib/filter";
+import { move } from "../../lib/move";
 import { FilterInput } from "./FilterInput";
+import { MoveButtons } from "./MoveButtons";
 
 interface Group {
   id: string;
@@ -50,12 +52,6 @@ export function LaneColumnEditor<T extends Group>({
 }: Props<T>) {
   const replace = (index: number, item: T) =>
     onChange(items.map((current, i) => (i === index ? item : current)));
-  const swap = (a: number, b: number) => {
-    const next = [...items];
-    const [item] = next.splice(a, 1);
-    next.splice(b, 0, item!);
-    onChange(next);
-  };
 
   return (
     <section>
@@ -94,22 +90,12 @@ export function LaneColumnEditor<T extends Group>({
               placeholder="empty = all, e.g. label:bug -is:pr, other label:bug"
             />
             <div className="flex gap-1">
-              <button
-                type="button"
-                className="btn btn-sm"
-                disabled={index === 0}
-                onClick={() => swap(index, index - 1)}
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                className="btn btn-sm"
-                disabled={index === items.length - 1}
-                onClick={() => swap(index, index + 1)}
-              >
-                ↓
-              </button>
+              <MoveButtons
+                index={index}
+                count={items.length}
+                name={item.name || item.id}
+                onMove={(from, to) => onChange(move(items, from, to))}
+              />
               <button
                 type="button"
                 className="btn btn-sm"
