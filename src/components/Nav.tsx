@@ -30,10 +30,15 @@ export default function Nav({ path, nav }: Props) {
   const { status, error, syncing, sync, dismissError } = useSyncStatus();
 
   useEffect(() => {
+    // A response is dropped once a newer reload has started.
+    let seq = 0;
     const reload = () => {
+      const mine = ++seq;
       api
         .nav()
-        .then(setNav)
+        .then((next) => {
+          if (mine === seq) setNav(next);
+        })
         .catch(() => undefined);
     };
     window.addEventListener(CONFIG_SAVED, reload);
