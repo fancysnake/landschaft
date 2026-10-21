@@ -3,8 +3,10 @@ import { useEffect, useState } from "react";
 import type { LabelDef } from "../../lib/types";
 
 import { api, errorMessage } from "../../lib/client/api";
+import { move } from "../../lib/move";
 import { type Config, type Dashboard, withType } from "../../lib/schema";
 import { DashboardEditor } from "./DashboardEditor";
+import { MoveButtons } from "./MoveButtons";
 import { ScopeEditor } from "./ScopeEditor";
 
 function newId(): string {
@@ -24,7 +26,7 @@ function newDashboard(): Dashboard {
 type Notice = { kind: "ok" | "error"; text: string } | null;
 
 const entry =
-  "nav-item block w-full truncate px-2 py-1 text-left text-neutral-700 hover:bg-neutral-200/70";
+  "nav-item min-w-0 flex-1 truncate px-2 py-1 text-left text-neutral-700 hover:bg-neutral-200/70";
 
 export default function Settings() {
   const [config, setConfig] = useState<Config | null>(null);
@@ -164,16 +166,25 @@ export default function Settings() {
           <div className="grid gap-4 sm:grid-cols-[14rem_1fr]">
             <aside className="space-y-1">
               <h2 className="px-2 pb-1 eyebrow">Dashboards</h2>
-              {config.dashboards.map((dashboard) => (
-                <button
-                  key={dashboard.id}
-                  type="button"
-                  onClick={() => setSelected(dashboard.id)}
-                  aria-current={dashboard.id === selected ? "true" : undefined}
-                  className={entry}
-                >
-                  {dashboard.name}
-                </button>
+              {config.dashboards.map((dashboard, index) => (
+                <div key={dashboard.id} className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setSelected(dashboard.id)}
+                    aria-current={dashboard.id === selected ? "true" : undefined}
+                    className={entry}
+                  >
+                    {dashboard.name}
+                  </button>
+                  <MoveButtons
+                    index={index}
+                    count={config.dashboards.length}
+                    name={dashboard.name}
+                    onMove={(from, to) =>
+                      update({ ...config, dashboards: move(config.dashboards, from, to) })
+                    }
+                  />
+                </div>
               ))}
               <button
                 type="button"

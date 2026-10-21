@@ -197,3 +197,11 @@ export interface SyncStatus {
   /** Login the token belongs to; what `@me` in a dashboard's users stands for. */
   viewer: string | null;
 }
+
+/** What the nav shows. */
+export interface NavData {
+  /** Each with the repos among its items. */
+  dashboards: { id: string; name: string; repos: string[] }[];
+  /** The global repos. */
+  repos: string[];
+}

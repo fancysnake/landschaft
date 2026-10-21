@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [4.3.0] - 2026-10-21
+
+### Added
+
+- Each dashboard in the Settings list moves with ↑ and ↓; the nav tabs follow that order.
+- The nav refreshes its tabs after a config save or a sync, from `GET /api/nav`.
+
 ## [4.2.0] - 2026-10-19
 
 ### Added
@@ -254,7 +261,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v4.2.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v4.3.0...HEAD
+[4.3.0]: https://github.com/fancysnake/landschaft/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/fancysnake/landschaft/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/fancysnake/landschaft/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/fancysnake/landschaft/compare/v3.0.0...v4.0.0
