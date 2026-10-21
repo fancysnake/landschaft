@@ -8,7 +8,10 @@ import type {
   StarEpicRequest,
   SyncRequest,
 } from "../schema";
-import type { Board, Card, Inbox, LabelDef, SyncStatus } from "../types";
+import type { Board, Card, Inbox, LabelDef, NavData, SyncStatus } from "../types";
+
+/** Tells the islands on this page that the config was saved. */
+export const CONFIG_SAVED = "landschaft:config-saved";
 
 export interface BoardResponse {
   dashboard: BoardDashboard;
@@ -103,8 +106,15 @@ export const api = {
       { method: "POST", body: JSON.stringify(body) },
     ),
   config: () => request<Config>("/api/config"),
-  saveConfig: (config: unknown) =>
-    request<Config>("/api/config", { method: "PUT", body: JSON.stringify(config) }),
+  saveConfig: async (config: unknown) => {
+    const saved = await request<Config>("/api/config", {
+      method: "PUT",
+      body: JSON.stringify(config),
+    });
+    window.dispatchEvent(new Event(CONFIG_SAVED));
+    return saved;
+  },
+  nav: () => request<NavData>("/api/nav"),
   labels: (repos: string[]) =>
     request<LabelDef[]>(`/api/labels?repos=${encodeURIComponent(repos.join(","))}`),
 };

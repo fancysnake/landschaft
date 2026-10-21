@@ -1,15 +1,18 @@
+import { useEffect, useState } from "react";
+
+import type { NavData } from "../lib/types";
+
+import { api, CONFIG_SAVED } from "../lib/client/api";
 import { repoShortName } from "../lib/client/labels";
 import { useHiddenRepos } from "../lib/client/useHiddenRepos";
-import { useSyncStatus } from "../lib/client/useSyncStatus";
+import { SYNCED, useSyncStatus } from "../lib/client/useSyncStatus";
 import { SyncStatus } from "./board/SyncStatus";
 import { Toggles } from "./board/Toggles";
 
 interface Props {
   path: string;
-  /** Each with the repos among its items. */
-  dashboards: { id: string; name: string; repos: string[] }[];
-  /** The global repos. */
-  repos: string[];
+  /** As rendered on the server; refetched when the config is saved or a sync lands. */
+  nav: NavData;
 }
 
 const link = (inactive = false) =>
@@ -21,11 +24,28 @@ const current = (active: boolean) => (active ? "page" : undefined);
  * The dashboards, the repo chips every board follows, and the sync status with its buttons. A
  * dashboard with no items in the repos switched on is dimmed.
  */
-export default function Nav({ path, dashboards, repos }: Props) {
+export default function Nav({ path, nav }: Props) {
+  const [{ dashboards, repos }, setNav] = useState(nav);
   const [hidden, setHidden] = useHiddenRepos();
   const { status, error, syncing, sync, dismissError } = useSyncStatus();
+
+  useEffect(() => {
+    const reload = () => {
+      api
+        .nav()
+        .then(setNav)
+        .catch(() => undefined);
+    };
+    window.addEventListener(CONFIG_SAVED, reload);
+    window.addEventListener(SYNCED, reload);
+    return () => {
+      window.removeEventListener(CONFIG_SAVED, reload);
+      window.removeEventListener(SYNCED, reload);
+    };
+  }, []);
+
   const shown = repos.filter((repo) => !hidden.includes(repo));
-  const inactive = (dashboard: Props["dashboards"][number]) =>
+  const inactive = (dashboard: NavData["dashboards"][number]) =>
     dashboard.repos.every((repo) => !shown.includes(repo));
 
   return (
