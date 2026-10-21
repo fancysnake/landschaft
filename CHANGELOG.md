@@ -7,11 +7,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
-## [4.3.0] - 2026-10-19
+## [4.3.0] - 2026-10-21
 
 ### Added
 
-- Settings moves the selected dashboard with ↑ and ↓; the nav tabs follow that order.
+- Each dashboard in the Settings list moves with ↑ and ↓; the nav tabs follow that order.
+- The nav refreshes its tabs after a config save or a sync, from `GET /api/nav`.
 
 ## [4.2.0] - 2026-10-19
 
