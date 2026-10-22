@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 import type { ItemKind } from "../lib/types";
 
@@ -28,14 +28,18 @@ function writeUrl(filter: string) {
 export default function Unmatched() {
   const [hidden] = useHiddenRepos();
   // Only a filter that parses reaches the server.
-  const {
-    text,
-    setText,
-    committed: filter,
-  } = useDebouncedText(new URLSearchParams(window.location.search).get("filter") ?? "", {
-    valid: parses,
-    onCommit: writeUrl,
+  const [filter, setFilter] = useState(() => {
+    const initial = new URLSearchParams(window.location.search).get("filter") ?? "";
+    return parses(initial) ? initial : "";
   });
+  const [text, setText] = useDebouncedText(
+    filter,
+    (next) => {
+      setFilter(next);
+      writeUrl(next);
+    },
+    { valid: parses },
+  );
 
   const get = useCallback(() => api.unmatched(hidden, filter), [hidden, filter]);
   const { data, error, setError } = useSynced(get);

@@ -1,5 +1,3 @@
-import { useCallback } from "react";
-
 import type { Epic, Facets } from "../../lib/types";
 
 import { useDebouncedText } from "../../lib/client/useDebouncedText";
@@ -15,8 +13,7 @@ interface Props {
 }
 
 export function FilterBar({ filters, facets, epics, onChange }: Props) {
-  const commit = useCallback((q: string) => onChange({ q: q || undefined }), [onChange]);
-  const { text, setText, reset } = useDebouncedText(filters.q ?? "", { onCommit: commit });
+  const [text, setText] = useDebouncedText(filters.q ?? "", (q) => onChange({ q: q || undefined }));
 
   const active = TEXT_FILTER_KEYS.some((key) => filters[key]);
 
@@ -110,10 +107,9 @@ export function FilterBar({ filters, facets, epics, onChange }: Props) {
       {active && (
         <button
           type="button"
-          onClick={() => {
-            reset("");
-            onChange(Object.fromEntries(TEXT_FILTER_KEYS.map((key) => [key, undefined])));
-          }}
+          onClick={() =>
+            onChange(Object.fromEntries(TEXT_FILTER_KEYS.map((key) => [key, undefined])))
+          }
           className="text-sm font-medium text-sky-700 hover:underline"
         >
           Clear filters

@@ -2,29 +2,34 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
-import { type DebouncedText, useDebouncedText } from "./useDebouncedText";
+import { useDebouncedText } from "./useDebouncedText";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const valid = (text: string) => !text.includes("!");
 const onCommit = vi.fn();
 let root: Root;
+const result: { current: ReturnType<typeof useDebouncedText> | null } = { current: null };
+const report = (value: ReturnType<typeof useDebouncedText>) => {
+  result.current = value;
+};
 
-async function render(initial: string) {
-  root = createRoot(document.createElement("div"));
-  const result: { current: DebouncedText | null } = { current: null };
-  const report = (value: DebouncedText) => {
-    result.current = value;
-  };
-  function Probe() {
-    report(useDebouncedText(initial, { valid, onCommit }));
-    return null;
-  }
-  await act(async () => root.render(createElement(Probe)));
-  return result;
+type Options = Parameters<typeof useDebouncedText>[2];
+
+function Probe({ committed, options }: { committed: string; options: Options }) {
+  report(useDebouncedText(committed, onCommit, options));
+  return null;
 }
 
-beforeEach(() => vi.useFakeTimers());
+const show = (committed: string, options: Options = { valid }) =>
+  act(async () => root.render(createElement(Probe, { committed, options })));
+const type = (text: string) => act(async () => result.current![1](text));
+const wait = (ms: number) => act(async () => vi.advanceTimersByTime(ms));
+
+beforeEach(async () => {
+  vi.useFakeTimers();
+  root = createRoot(document.createElement("div"));
+});
 
 afterEach(async () => {
   await act(async () => root.unmount());
@@ -32,35 +37,36 @@ afterEach(async () => {
   vi.resetAllMocks();
 });
 
-test("an invalid initial text shows but does not commit", async () => {
-  const result = await render("bad!");
-  expect(result.current).toMatchObject({ text: "bad!", committed: "" });
-});
-
 test("text commits once typing pauses", async () => {
-  const result = await render("");
-  await act(async () => result.current!.setText("a"));
-  await act(async () => vi.advanceTimersByTime(100));
-  await act(async () => result.current!.setText("ab"));
-  await act(async () => vi.advanceTimersByTime(249));
-  expect(result.current!.committed).toBe("");
-  await act(async () => vi.advanceTimersByTime(1));
-  expect(result.current!.committed).toBe("ab");
+  await show("");
+  await type("a");
+  await wait(100);
+  await type("ab");
+  await wait(249);
+  expect(onCommit).not.toHaveBeenCalled();
+  await wait(1);
   expect(onCommit.mock.calls).toEqual([["ab"]]);
 });
 
+test("without valid, clearing the text commits it", async () => {
+  await show("ab", {});
+  await type("");
+  await wait(250);
+  expect(onCommit.mock.calls).toEqual([[""]]);
+});
+
 test("invalid text never commits", async () => {
-  const result = await render("ok");
-  await act(async () => result.current!.setText("ok!"));
-  await act(async () => vi.advanceTimersByTime(1000));
-  expect(result.current!.committed).toBe("ok");
+  await show("ok");
+  await type("ok!");
+  await wait(1000);
   expect(onCommit).not.toHaveBeenCalled();
 });
 
-test("reset sets both at once without a commit", async () => {
-  const result = await render("ab");
-  await act(async () => result.current!.reset(""));
-  expect(result.current).toMatchObject({ text: "", committed: "" });
-  await act(async () => vi.advanceTimersByTime(1000));
+test("text follows committed without a commit", async () => {
+  await show("ab");
+  await type("abc");
+  await show("");
+  expect(result.current![0]).toBe("");
+  await wait(1000);
   expect(onCommit).not.toHaveBeenCalled();
 });
