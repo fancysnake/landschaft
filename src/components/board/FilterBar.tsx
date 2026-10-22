@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
-
 import type { Epic, Facets } from "../../lib/types";
 
+import { useDebouncedText } from "../../lib/client/useDebouncedText";
 import { type Filters, TEXT_FILTER_KEYS } from "../../lib/schema";
 
 interface Props {
@@ -14,13 +13,7 @@ interface Props {
 }
 
 export function FilterBar({ filters, facets, epics, onChange }: Props) {
-  const [text, setText] = useState(filters.q ?? "");
-
-  useEffect(() => {
-    if (text === (filters.q ?? "")) return;
-    const timer = setTimeout(() => onChange({ q: text || undefined }), 250);
-    return () => clearTimeout(timer);
-  }, [text, filters.q, onChange]);
+  const [text, setText] = useDebouncedText(filters.q ?? "", (q) => onChange({ q: q || undefined }));
 
   const active = TEXT_FILTER_KEYS.some((key) => filters[key]);
 
@@ -114,10 +107,9 @@ export function FilterBar({ filters, facets, epics, onChange }: Props) {
       {active && (
         <button
           type="button"
-          onClick={() => {
-            setText("");
-            onChange(Object.fromEntries(TEXT_FILTER_KEYS.map((key) => [key, undefined])));
-          }}
+          onClick={() =>
+            onChange(Object.fromEntries(TEXT_FILTER_KEYS.map((key) => [key, undefined])))
+          }
           className="text-sm font-medium text-sky-700 hover:underline"
         >
           Clear filters
