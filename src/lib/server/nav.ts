@@ -1,21 +1,18 @@
 import type { NavData } from "../types";
 
-import { getApp } from "./app";
+import { viewData } from "./api";
 import { scopedRepos } from "./board";
 import { loadConfig } from "./config";
 
 export async function navData(): Promise<NavData> {
-  const { dashboards, repos, users } = loadConfig();
-  const { db, syncer } = getApp();
-  const viewer = await syncer.viewer().catch(() => null);
-  const issues = db.listIssues(repos);
-  const jobs = db.listCiJobs(repos);
+  const config = loadConfig();
+  const { snapshot, ...audience } = await viewData(config);
   return {
-    dashboards: dashboards.map(({ id, name, filter }) => ({
+    dashboards: config.dashboards.map(({ id, name, filter }) => ({
       id,
       name,
-      repos: [...scopedRepos(issues, jobs, { filter }, users, viewer)],
+      repos: [...scopedRepos(snapshot, { filter }, audience)],
     })),
-    repos,
+    repos: config.repos,
   };
 }

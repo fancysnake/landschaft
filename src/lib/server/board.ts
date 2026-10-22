@@ -17,6 +17,7 @@ import {
   OTHER_LOOKS_AT,
   type SortBy,
   type SortDir,
+  type UnmatchedQuery,
 } from "../schema";
 import {
   type Board,
@@ -346,16 +347,20 @@ const toCard = (item: Item, labels: LabelRef[], isEpic: boolean): Card => ({
   updatedAt: item.updatedAt,
 });
 
+/** Who a view is for: the global `users` (empty for everyone) and the login `@me` stands for. */
+export interface Audience {
+  users: string[];
+  viewer: string | null;
+}
+
 /**
- * The repos of the open `issues` and failed CI `jobs` that one of the global `users` (empty for
- * everyone) is in and that pass the dashboard's filter. `viewer` is what `@me` stands for.
+ * The repos of the open `issues` and failed CI `jobs` that one of the global `users` is in and
+ * that pass the dashboard's filter.
  */
 export function scopedRepos(
-  issues: Issue[],
-  jobs: CiJob[],
+  { issues, jobs }: Snapshot,
   dashboard: Pick<Dashboard, "filter">,
-  users: string[] = [],
-  viewer: string | null = null,
+  { users, viewer }: Audience,
 ): Set<string> {
   const scope = parseFilter(dashboard.filter);
   const { listed, jobItems } = scopedItems(issues, jobs, users, viewer, scope);
@@ -365,27 +370,24 @@ export function scopedRepos(
   ]);
 }
 
+/** The inputs of the unmatched view. */
+interface UnmatchedOptions extends Audience {
+  query?: UnmatchedQuery;
+}
+
 /**
  * Cards for the open items of the global `users` in `issues` that no dashboard places in a
- * cell or group, and of their failed CI `jobs`, outside the `hide` repos and passing `filter`, most
- * recently updated first. One a swimlane hides as blocked counts as placed. `offer` completes
- * the filter from all those items, whether they pass `filter` or not.
+ * cell or group, and of their failed CI `jobs`, outside the query's `hide` repos and passing its
+ * `filter`, most recently updated first. One a swimlane hides as blocked counts as placed.
+ * `offer` completes the filter from all those items, whether they pass `filter` or not.
  */
 export function unmatchedItems(
   { issues, jobs }: Snapshot,
   dashboards: Dashboard[],
-  {
-    users = [],
-    viewer = null,
-    hide = [],
-    filter = null,
-  }: {
-    users?: string[];
-    viewer?: string | null;
-    hide?: readonly string[];
-    filter?: FilterNode | null;
-  } = {},
+  { users, viewer, query = {} }: UnmatchedOptions,
 ): { items: Card[]; offer: Offer } {
+  const { hide = [] } = query;
+  const filter = parseFilter(query.filter ?? "");
   const placers = dashboards.map((dashboard) => placer(dashboard, viewer));
   const placed = (item: FilterItem) => placers.some((places) => places(item));
   const missed = ({ item }: { item: FilterItem }) => !hide.includes(item.repo) && !placed(item);
@@ -412,28 +414,25 @@ export function unmatchedItems(
   };
 }
 
-/** The optional inputs of a board or inbox; `now` dates the window of recently closed items. */
-interface ViewOptions {
-  filters?: ViewQuery;
-  users?: string[];
-  viewer?: string | null;
+/** The inputs of a board or inbox; `now` dates the window of recently closed items. */
+interface ViewOptions extends Audience {
+  query?: ViewQuery;
   now?: Date;
+}
+
+/** The inputs of a board; `starred` epic keys lead the epic strip. */
+interface BoardOptions extends ViewOptions {
+  starred?: ReadonlySet<string>;
 }
 
 /**
  * Lays the dashboard's `scopedIssues`, and the failed CI `jobs` that pass the same scope, out on
- * its grid. `starred` epic keys lead the epic strip.
+ * its grid.
  */
 export function buildBoard(
   { issues, jobs }: Snapshot,
   dashboard: BoardDashboard,
-  {
-    filters = {},
-    users = [],
-    starred = new Set(),
-    viewer = null,
-    now = new Date(),
-  }: ViewOptions & { starred?: ReadonlySet<string> } = {},
+  { query = {}, users, viewer, starred = new Set(), now = new Date() }: BoardOptions,
 ): Board {
   const axes = compileGrid(dashboard);
   const { scope } = axes;
@@ -445,7 +444,7 @@ export function buildBoard(
     scope,
     closedSince(dashboard.closedDays, now),
   );
-  const wanted = barFilter(filters, byKey);
+  const wanted = barFilter(query, byKey);
   const shown = labelShown(
     [scope, ...[...axes.swimlanes, ...axes.columns].map((group) => group.node)],
     axes.epicLabel,
@@ -453,7 +452,7 @@ export function buildBoard(
   const facets = facetsOf(
     [...listed, ...jobItems].map(({ item }) => item),
     shown,
-    filters,
+    query,
     dashboard.sort,
   );
   const { sort } = facets;
@@ -498,7 +497,7 @@ export function buildBoard(
   };
 
   for (const { issue, item } of listed) {
-    if (filters.hide?.includes(issue.repo)) continue;
+    if (query.hide?.includes(issue.repo)) continue;
 
     const isEpic = axes.isEpic(item);
     if (isEpic) epicIssues.push(issue);
@@ -507,10 +506,7 @@ export function buildBoard(
       put(item, toCard(item, issue.labels.filter(shown), isEpic));
   }
   for (const { job, item } of jobItems) {
-    if (
-      !filters.hide?.includes(job.repo) &&
-      wanted(item, ciJobKey(job), `${job.name} ${job.branch}`)
-    )
+    if (!query.hide?.includes(job.repo) && wanted(item, ciJobKey(job), `${job.name} ${job.branch}`))
       put(item, jobCard(job, item.labels.filter(shown)));
   }
 
@@ -539,7 +535,7 @@ export function buildBoard(
 export function buildInbox(
   { issues, jobs }: Snapshot,
   dashboard: InboxDashboard,
-  { filters = {}, users = [], viewer = null, now = new Date() }: ViewOptions = {},
+  { query = {}, users, viewer, now = new Date() }: ViewOptions,
 ): Inbox {
   const scope = parseFilter(dashboard.filter);
   const groups = compile(dashboard.groups);
@@ -551,12 +547,12 @@ export function buildInbox(
     scope,
     closedSince(dashboard.closedDays, now),
   );
-  const wanted = barFilter(filters, byKey);
+  const wanted = barFilter(query, byKey);
   const shown = labelShown([scope, ...groups.map((group) => group.node)]);
   const facets = facetsOf(
     [...listed, ...jobItems].map(({ item }) => item),
     shown,
-    filters,
+    query,
     dashboard.sort,
   );
   const cards = new Map<string, Card[]>(groups.map((group) => [group.id, []]));
@@ -569,16 +565,13 @@ export function buildInbox(
   };
   for (const { issue, item } of listed) {
     if (
-      !filters.hide?.includes(issue.repo) &&
+      !query.hide?.includes(issue.repo) &&
       wanted(item, keyOf(issue), `${issue.number} ${issue.title}`)
     )
       put(item, toCard(item, issue.labels.filter(shown), false));
   }
   for (const { job, item } of jobItems) {
-    if (
-      !filters.hide?.includes(job.repo) &&
-      wanted(item, ciJobKey(job), `${job.name} ${job.branch}`)
-    )
+    if (!query.hide?.includes(job.repo) && wanted(item, ciJobKey(job), `${job.name} ${job.branch}`))
       put(item, jobCard(job, item.labels.filter(shown)));
   }
   const compare = compareBy(facets.sort.by, facets.sort.dir);
