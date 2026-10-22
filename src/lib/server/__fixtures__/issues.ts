@@ -1,5 +1,5 @@
 import type { BoardDashboard } from "../../schema";
-import type { CiJob, Issue } from "../../types";
+import type { CiJob, Issue, Snapshot } from "../../types";
 import type { Db } from "../db";
 
 export const REPO = "acme/app";
@@ -70,4 +70,8 @@ export function makeJob(overrides: Partial<CiJob> & { name: string }): CiJob {
     pr: null,
     ...overrides,
   };
+}
+
+export function snapshot(issues: Issue[], jobs: CiJob[] = []): Snapshot {
+  return { issues, jobs };
 }

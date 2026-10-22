@@ -102,6 +102,12 @@ export interface CiJob {
   pr: { number: number; url: string } | null;
 }
 
+/** What a board is built from: the cached items and failed CI jobs of the configured repos. */
+export interface Snapshot {
+  issues: Issue[];
+  jobs: CiJob[];
+}
+
 export function ciJobKey(job: Pick<CiJob, "repo" | "branch" | "workflow" | "name">): string {
   // Fields apart, since a workflow or job name may hold any separator.
   return JSON.stringify([job.repo, job.branch, job.workflow, job.name]);

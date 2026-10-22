@@ -3,14 +3,11 @@ import { buildBoard } from "../../../../lib/server/board";
 
 export const GET = route(async (context) => {
   const { config, dashboard, query, db, syncer, viewer } = await viewRequest(context, "board");
-  const board = buildBoard(
-    db.listIssues(config.repos),
-    dashboard,
-    query,
-    config.users,
-    db.starredEpics(dashboard.id),
+  const board = buildBoard(db.snapshot(config.repos), dashboard, {
+    filters: query,
+    users: config.users,
+    starred: db.starredEpics(dashboard.id),
     viewer,
-    db.listCiJobs(config.repos),
-  );
+  });
   return json({ dashboard, board, status: syncer.status() });
 });

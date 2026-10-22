@@ -31,6 +31,7 @@ import {
   issueKey,
   type IssueRef,
   type LabelRef,
+  type Snapshot,
 } from "../types";
 
 /** A swimlane or column with its filter parsed; a null `node` matches everything. */
@@ -371,13 +372,19 @@ export function scopedRepos(
  * the filter from all those items, whether they pass `filter` or not.
  */
 export function unmatchedItems(
-  issues: Issue[],
+  { issues, jobs }: Snapshot,
   dashboards: Dashboard[],
-  users: string[] = [],
-  viewer: string | null = null,
-  hide: readonly string[] = [],
-  jobs: CiJob[] = [],
-  filter: FilterNode | null = null,
+  {
+    users = [],
+    viewer = null,
+    hide = [],
+    filter = null,
+  }: {
+    users?: string[];
+    viewer?: string | null;
+    hide?: readonly string[];
+    filter?: FilterNode | null;
+  } = {},
 ): { items: Card[]; offer: Offer } {
   const placers = dashboards.map((dashboard) => placer(dashboard, viewer));
   const placed = (item: FilterItem) => placers.some((places) => places(item));
@@ -405,19 +412,28 @@ export function unmatchedItems(
   };
 }
 
+/** The optional inputs of a board or inbox; `now` dates the window of recently closed items. */
+interface ViewOptions {
+  filters?: ViewQuery;
+  users?: string[];
+  viewer?: string | null;
+  now?: Date;
+}
+
 /**
  * Lays the dashboard's `scopedIssues`, and the failed CI `jobs` that pass the same scope, out on
  * its grid. `starred` epic keys lead the epic strip.
  */
 export function buildBoard(
-  issues: Issue[],
+  { issues, jobs }: Snapshot,
   dashboard: BoardDashboard,
-  filters: ViewQuery = {},
-  users: string[] = [],
-  starred: ReadonlySet<string> = new Set(),
-  viewer: string | null = null,
-  jobs: CiJob[] = [],
-  now: Date = new Date(),
+  {
+    filters = {},
+    users = [],
+    starred = new Set(),
+    viewer = null,
+    now = new Date(),
+  }: ViewOptions & { starred?: ReadonlySet<string> } = {},
 ): Board {
   const axes = compileGrid(dashboard);
   const { scope } = axes;
@@ -521,13 +537,9 @@ export function buildBoard(
  * in the first group it matches, in sort order.
  */
 export function buildInbox(
-  issues: Issue[],
+  { issues, jobs }: Snapshot,
   dashboard: InboxDashboard,
-  filters: ViewQuery = {},
-  users: string[] = [],
-  viewer: string | null = null,
-  jobs: CiJob[] = [],
-  now: Date = new Date(),
+  { filters = {}, users = [], viewer = null, now = new Date() }: ViewOptions = {},
 ): Inbox {
   const scope = parseFilter(dashboard.filter);
   const groups = compile(dashboard.groups);
