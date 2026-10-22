@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 
 import type { ItemKind } from "../lib/types";
 
 import { api } from "../lib/client/api";
+import { useDebouncedText } from "../lib/client/useDebouncedText";
 import { useHiddenRepos } from "../lib/client/useHiddenRepos";
 import { useSynced } from "../lib/client/useSynced";
 import { filterError } from "../lib/filter";
@@ -16,24 +17,25 @@ const COLUMNS: { kind: ItemKind; title: string }[] = [
   { kind: "ci-job", title: "CI jobs" },
 ];
 
+const parses = (text: string) => filterError(text) === null;
+
+function writeUrl(filter: string) {
+  const query = filter ? `?${new URLSearchParams({ filter })}` : "";
+  window.history.replaceState(null, "", query || window.location.pathname);
+}
+
 /** Open items in the repos switched on that no dashboard places in a cell or inbox group. */
 export default function Unmatched() {
   const [hidden] = useHiddenRepos();
-  const [text, setText] = useState(
-    () => new URLSearchParams(window.location.search).get("filter") ?? "",
-  );
-  const [filter, setFilter] = useState(() => (filterError(text) === null ? text : ""));
-
   // Only a filter that parses reaches the server.
-  useEffect(() => {
-    if (text === filter || filterError(text) !== null) return;
-    const timer = setTimeout(() => {
-      setFilter(text);
-      const query = text ? `?${new URLSearchParams({ filter: text })}` : "";
-      window.history.replaceState(null, "", query || window.location.pathname);
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [text, filter]);
+  const {
+    text,
+    setText,
+    committed: filter,
+  } = useDebouncedText(new URLSearchParams(window.location.search).get("filter") ?? "", {
+    valid: parses,
+    onCommit: writeUrl,
+  });
 
   const get = useCallback(() => api.unmatched(hidden, filter), [hidden, filter]);
   const { data, error, setError } = useSynced(get);
