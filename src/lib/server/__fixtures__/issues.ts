@@ -1,5 +1,6 @@
 import type { BoardDashboard } from "../../schema";
-import type { CiJob, Issue } from "../../types";
+import type { CiJob, Issue, Snapshot } from "../../types";
+import type { Audience } from "../board";
 import type { Db } from "../db";
 
 export const REPO = "acme/app";
@@ -71,3 +72,10 @@ export function makeJob(overrides: Partial<CiJob> & { name: string }): CiJob {
     ...overrides,
   };
 }
+
+export function snapshot(issues: Issue[], jobs: CiJob[] = []): Snapshot {
+  return { issues, jobs };
+}
+
+/** No global users and no known viewer: every item is in scope and `@me` matches nothing. */
+export const EVERYONE: Audience = { users: [], viewer: null };

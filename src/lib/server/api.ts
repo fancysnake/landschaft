@@ -2,7 +2,10 @@ import type { APIContext, APIRoute } from "astro";
 
 import { ZodError, type ZodType } from "zod";
 
-import { type Dashboard, type DashboardType, ViewQuerySchema } from "../schema";
+import type { Snapshot } from "../types";
+import type { Audience } from "./board";
+
+import { type Config, type Dashboard, type DashboardType, ViewQuerySchema } from "../schema";
 import { getApp } from "./app";
 import { findDashboard, loadConfig } from "./config";
 
@@ -41,8 +44,20 @@ export function parseQuery<T>(schema: ZodType<T>, url: URL): T {
 }
 
 /**
- * What a view endpoint works from: the config, the dashboard of `type` the URL names (404
- * otherwise), the query, the app and the viewer, or null when it cannot be fetched.
+ * The cached issues and jobs of the configured repos and who views them; `viewer` is null when it
+ * cannot be fetched.
+ */
+export async function viewData({
+  repos,
+  users,
+}: Pick<Config, "repos" | "users">): Promise<Audience & { snapshot: Snapshot }> {
+  const { db, syncer } = getApp();
+  return { snapshot: db.snapshot(repos), users, viewer: await syncer.viewer().catch(() => null) };
+}
+
+/**
+ * What a view endpoint works from: the dashboard of `type` the URL names (404 otherwise), the
+ * query, and `viewData`.
  */
 export async function viewRequest<T extends DashboardType>({ params, url }: APIContext, type: T) {
   const config = loadConfig();
@@ -51,9 +66,7 @@ export async function viewRequest<T extends DashboardType>({ params, url }: APIC
     d?.type === type;
   if (!isType(dashboard)) throw new ApiError(404, `${type} not found`);
   const query = parseQuery(ViewQuerySchema, url);
-  const { db, syncer } = getApp();
-  const viewer = await syncer.viewer().catch(() => null);
-  return { config, dashboard, query, db, syncer, viewer };
+  return { dashboard, query, ...(await viewData(config)) };
 }
 
 /** Wraps a handler so thrown errors become JSON responses with a fitting status. */

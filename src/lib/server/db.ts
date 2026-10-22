@@ -12,6 +12,7 @@ import type {
   LabelDef,
   LabelRef,
   PullStatus,
+  Snapshot,
   SyncState,
 } from "../types";
 
@@ -360,6 +361,10 @@ export class Db {
         );
       }
     });
+  }
+
+  snapshot(repos: string[]): Snapshot {
+    return { issues: this.listIssues(repos), jobs: this.listCiJobs(repos) };
   }
 
   listCiJobs(repos: string[]): CiJob[] {

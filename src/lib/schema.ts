@@ -432,5 +432,14 @@ export const ViewQuerySchema: z.ZodType<ViewQuery, Record<string, unknown>> = z.
   dir: SortDirSchema.optional(),
 });
 
-/** The unmatched view's query string: the repos hidden in this browser and a filter on the items. */
-export const UnmatchedQuerySchema = z.object({ hide: repoList, filter: filterText.optional() });
+/** What the unmatched view takes: the repos hidden in this browser and a filter on the items. */
+export interface UnmatchedQuery {
+  hide?: string[];
+  filter?: string;
+}
+
+/** The unmatched view's query string. */
+export const UnmatchedQuerySchema: z.ZodType<UnmatchedQuery, Record<string, unknown>> = z.object({
+  hide: repoList,
+  filter: filterText.optional(),
+});

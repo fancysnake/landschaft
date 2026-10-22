@@ -1,16 +1,14 @@
 import { json, route, viewRequest } from "../../../../lib/server/api";
+import { getApp } from "../../../../lib/server/app";
 import { buildBoard } from "../../../../lib/server/board";
 
 export const GET = route(async (context) => {
-  const { config, dashboard, query, db, syncer, viewer } = await viewRequest(context, "board");
-  const board = buildBoard(
-    db.listIssues(config.repos),
-    dashboard,
+  const { dashboard, query, snapshot, ...audience } = await viewRequest(context, "board");
+  const { db, syncer } = getApp();
+  const board = buildBoard(snapshot, dashboard, {
+    ...audience,
     query,
-    config.users,
-    db.starredEpics(dashboard.id),
-    viewer,
-    db.listCiJobs(config.repos),
-  );
+    starred: db.starredEpics(dashboard.id),
+  });
   return json({ dashboard, board, status: syncer.status() });
 });

@@ -1,10 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import type { InboxDashboard } from "../schema";
+import type { InboxDashboard, ViewQuery } from "../schema";
 
-import { askedLabels, type FilterNode, parseFilter } from "../filter";
-import { type Card, cellKey } from "../types";
-import { DASHBOARD, label, makeIssue, makeJob, REPO } from "./__fixtures__/issues";
+import { askedLabels, type FilterNode } from "../filter";
+import { type Card, cellKey, type Issue } from "../types";
+import {
+  DASHBOARD,
+  EVERYONE,
+  label,
+  makeIssue,
+  makeJob,
+  REPO,
+  snapshot,
+} from "./__fixtures__/issues";
 import {
   buildBoard,
   buildInbox,
@@ -22,6 +30,9 @@ const asIssue = (card: Card | undefined) => (card?.kind === "ci-job" ? undefined
 const cell = (laneId: string, colId: string) => cellKey(laneId, colId);
 const numbers = (board: ReturnType<typeof buildBoard>) =>
   board.cells[cell("rest", "todo")]?.map(numberOf);
+/** `numbers` of a `DASHBOARD` board over `issues` under `query`. */
+const shown = (issues: Issue[], query: ViewQuery) =>
+  numbers(buildBoard(snapshot(issues), DASHBOARD, { ...EVERYONE, query }));
 
 /** A filter hits when it asks for one of the labels `hits`. */
 const hitting =
@@ -79,7 +90,7 @@ describe("scopedRepos", () => {
     ];
     const jobs = [makeJob({ name: "lint", repo: "a/6", authors: ["me"] })];
     const scoped = (filter: string, users: string[]) => [
-      ...scopedRepos(issues, jobs, { filter }, users, "me"),
+      ...scopedRepos(snapshot(issues, jobs), { filter }, { users, viewer: "me" }),
     ];
     expect(scoped("label:team", ["@me", "ann"])).toEqual(["a/1", "a/2"]);
     expect(scoped("label:team", [])).toEqual(["a/1", "a/2", "a/5"]);
@@ -115,7 +126,10 @@ describe("unmatchedItems", () => {
       }),
       makeIssue({ number: 8, author: "bob" }),
     ];
-    const unmatched = unmatchedItems(issues, [narrow, wide], ["@me"], "me").items;
+    const unmatched = unmatchedItems(snapshot(issues), [narrow, wide], {
+      users: ["@me"],
+      viewer: "me",
+    }).items;
     expect(unmatched.map(numberOf)).toEqual([4, 2]);
   });
 
@@ -126,7 +140,7 @@ describe("unmatchedItems", () => {
       makeIssue({ number: 2, kind: "pr", labels: [label("epic")] }),
       makeIssue({ number: 3 }),
     ];
-    expect(unmatchedItems(issues, [board]).items.map(numberOf)).toEqual([3, 2]);
+    expect(unmatchedItems(snapshot(issues), [board], EVERYONE).items.map(numberOf)).toEqual([3, 2]);
   });
 
   it("drops hidden repos after placement, so their items still count", () => {
@@ -147,29 +161,30 @@ describe("unmatchedItems", () => {
       makeIssue({ number: 11, ...lib, blockedBy: waitsOn(2), blockedByTotal: 1 }),
     ];
     const unmatched = (hide: string[]) =>
-      unmatchedItems(issues, [dashboard], [], null, hide).items.map(numberOf);
+      unmatchedItems(snapshot(issues), [dashboard], { ...EVERYONE, query: { hide } }).items.map(
+        numberOf,
+      );
     expect(unmatched([])).toEqual([11, 10, 3]);
     expect(unmatched(["acme/lib"])).toEqual([3]);
   });
 
   it("lists every open item when no dashboard has a swimlane", () => {
     const dashboard = { ...DASHBOARD, swimlanes: [] };
-    const unmatched = unmatchedItems([makeIssue({ number: 1 })], [dashboard]).items;
+    const unmatched = unmatchedItems(
+      snapshot([makeIssue({ number: 1 })]),
+      [dashboard],
+      EVERYONE,
+    ).items;
     expect(unmatched.map(numberOf)).toEqual([1]);
   });
 
   it("keeps only the items that pass the filter", () => {
     const dashboard = { ...DASHBOARD, swimlanes: [] };
     const issues = [makeIssue({ number: 1 }), makeIssue({ number: 2, kind: "pr" })];
-    const unmatched = unmatchedItems(
-      issues,
-      [dashboard],
-      [],
-      null,
-      [],
-      [],
-      parseFilter("is:pr"),
-    ).items;
+    const unmatched = unmatchedItems(snapshot(issues), [dashboard], {
+      ...EVERYONE,
+      query: { filter: "is:pr" },
+    }).items;
     expect(unmatched.map(numberOf)).toEqual([2]);
   });
 
@@ -177,13 +192,9 @@ describe("unmatchedItems", () => {
     const dashboard = { ...DASHBOARD, swimlanes: [] };
     const unmatched = (filter: string) =>
       unmatchedItems(
-        [makeIssue({ number: 1 })],
+        snapshot([makeIssue({ number: 1 })], [makeJob({ name: "lint" })]),
         [dashboard],
-        [],
-        null,
-        [],
-        [makeJob({ name: "lint" })],
-        parseFilter(filter),
+        { ...EVERYONE, query: { filter } },
       ).items.map(numberOf);
     expect(unmatched("is:ci-job")).toEqual(["lint"]);
     expect(unmatched("-is:ci-job")).toEqual([1]);
@@ -195,7 +206,10 @@ describe("unmatchedItems", () => {
       makeIssue({ number: 1 }),
       makeIssue({ number: 2, kind: "pr", linked: [{ repo: REPO, number: 1 }] }),
     ];
-    const unmatched = unmatchedItems(issues, [dashboard], [], null, [], [], parseFilter("has:pr"));
+    const unmatched = unmatchedItems(snapshot(issues), [dashboard], {
+      ...EVERYONE,
+      query: { filter: "has:pr" },
+    });
     expect(unmatched.items.map(numberOf)).toEqual([1]);
   });
 
@@ -205,7 +219,10 @@ describe("unmatchedItems", () => {
       makeIssue({ number: 1, repo: "acme/lib", labels: [label("Bug")] }),
       makeIssue({ number: 2, kind: "pr", labels: [label("bug")] }),
     ];
-    const { offer } = unmatchedItems(issues, [dashboard], [], null, [], [], parseFilter("is:pr"));
+    const { offer } = unmatchedItems(snapshot(issues), [dashboard], {
+      ...EVERYONE,
+      query: { filter: "is:pr" },
+    });
     expect(offer.labels).toEqual(["Bug"]);
     expect(offer.repos).toEqual(["acme/app", "acme/lib"]);
   });
@@ -237,7 +254,7 @@ describe("buildInbox", () => {
   ];
 
   it("puts each item in the first group it matches, in sort order, dropping the rest", () => {
-    const inbox = buildInbox(issues, INBOX);
+    const inbox = buildInbox(snapshot(issues), INBOX, EVERYONE);
     expect(grouped(inbox)).toEqual({ fix: [1], bugs: [3, 2] });
     expect(inbox.total).toBe(3);
   });
@@ -250,9 +267,13 @@ describe("buildInbox", () => {
       makeIssue({ number: 7, state: "CLOSED", closedAt: "2026-05-01T00:00:00Z" }),
     ];
     const groups = [{ id: "done", name: "Done", filter: "is:closed", collapsed: false }];
-    const inbox = buildInbox(all, { ...INBOX, closedDays: 7, groups }, {}, [], null, [], now);
+    const inbox = buildInbox(
+      snapshot(all),
+      { ...INBOX, closedDays: 7, groups },
+      { ...EVERYONE, now },
+    );
     expect(grouped(inbox)).toEqual({ done: [6] });
-    expect(grouped(buildInbox(all, { ...INBOX, groups }, {}, [], null, [], now))).toEqual({
+    expect(grouped(buildInbox(snapshot(all), { ...INBOX, groups }, { ...EVERYONE, now }))).toEqual({
       done: [],
     });
   });
@@ -262,22 +283,33 @@ describe("buildInbox", () => {
       ...INBOX.groups,
       { id: "rest", name: "Rest", filter: "other", collapsed: false },
     ];
-    expect(grouped(buildInbox(issues, { ...INBOX, groups })).rest).toEqual([4]);
+    expect(grouped(buildInbox(snapshot(issues), { ...INBOX, groups }, EVERYONE)).rest).toEqual([4]);
   });
 
   it("applies the dashboard filter, URL filters, sort and hidden repos", () => {
     const lib = makeIssue({ number: 6, repo: "acme/lib", labels: [label("bug")] });
     const all = [...issues, lib];
     const scoped = { ...INBOX, filter: "-is:pr" };
-    expect(grouped(buildInbox(all, scoped))).toEqual({ fix: [], bugs: [6, 3, 2] });
-    expect(grouped(buildInbox(all, scoped, { label: "ui" }))).toEqual({ fix: [], bugs: [2] });
-    const hidden = buildInbox(all, scoped, { dir: "asc", hide: ["acme/lib"] });
+    expect(grouped(buildInbox(snapshot(all), scoped, EVERYONE))).toEqual({
+      fix: [],
+      bugs: [6, 3, 2],
+    });
+    expect(
+      grouped(buildInbox(snapshot(all), scoped, { ...EVERYONE, query: { label: "ui" } })),
+    ).toEqual({
+      fix: [],
+      bugs: [2],
+    });
+    const hidden = buildInbox(snapshot(all), scoped, {
+      ...EVERYONE,
+      query: { dir: "asc", hide: ["acme/lib"] },
+    });
     expect(grouped(hidden).bugs).toEqual([2, 3]);
     expect(hidden.repos).toEqual(["acme/app", "acme/lib"]);
   });
 
   it("strips the labels groups ask for from cards and filter options", () => {
-    const inbox = buildInbox(issues, INBOX);
+    const inbox = buildInbox(snapshot(issues), INBOX, EVERYONE);
     expect(inbox.labels).toEqual(["ui"]);
     expect(asIssue(inbox.groups.bugs?.find((card) => numberOf(card) === 2))?.labels).toEqual([
       label("ui"),
@@ -290,16 +322,22 @@ describe("buildInbox", () => {
       ...INBOX.groups,
     ];
     const jobs = [makeJob({ name: "lint" }), makeJob({ name: "test" })];
-    const inbox = buildInbox(issues, { ...INBOX, groups }, {}, [], null, jobs);
+    const inbox = buildInbox(snapshot(issues, jobs), { ...INBOX, groups }, EVERYONE);
     expect(grouped(inbox)).toEqual({ ci: ["lint"], fix: [1], bugs: [3, 2] });
     expect(inbox.jobs).toEqual(["lint", "test"]);
-    const filtered = buildInbox(issues, { ...INBOX, groups }, { job: "lint" }, [], null, jobs);
+    const filtered = buildInbox(
+      snapshot(issues, jobs),
+      { ...INBOX, groups },
+      { ...EVERYONE, query: { job: "lint" } },
+    );
     expect(grouped(filtered)).toEqual({ ci: ["lint"], fix: [], bugs: [] });
   });
 
   it("counts inbox groups as placing items in the unmatched view", () => {
-    expect(unmatchedItems(issues, [INBOX]).items.map(numberOf)).toEqual([4]);
-    expect(unmatchedItems(issues, [{ ...INBOX, groups: [] }]).items).toHaveLength(4);
+    expect(unmatchedItems(snapshot(issues), [INBOX], EVERYONE).items.map(numberOf)).toEqual([4]);
+    expect(
+      unmatchedItems(snapshot(issues), [{ ...INBOX, groups: [] }], EVERYONE).items,
+    ).toHaveLength(4);
   });
 });
 
@@ -312,7 +350,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 4 }),
       makeIssue({ number: 5, state: "CLOSED", labels: [label("prio:high")] }),
     ];
-    const board = buildBoard(issues, DASHBOARD);
+    const board = buildBoard(snapshot(issues), DASHBOARD, EVERYONE);
     expect(board.cells[cell("high", "doing")]?.map(numberOf)).toEqual([1]);
     expect(board.cells[cell("low", "todo")]?.map(numberOf)).toEqual([2]);
     expect(board.cells[cell("rest", "done")]?.map(numberOf)).toEqual([3]);
@@ -334,7 +372,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 2, labels: [label("phase:doing")] }),
       makeIssue({ number: 3, labels: [label("wait")] }),
     ];
-    const board = buildBoard(issues, dashboard);
+    const board = buildBoard(snapshot(issues), dashboard, EVERYONE);
     expect(board.cells[cell("rest", "waiting")]?.map(numberOf)).toEqual([1]);
     expect(board.cells[cell("rest", "doing")]?.map(numberOf)).toEqual([2, 1]);
     expect(board.cells[cell("rest", "todo")]?.map(numberOf)).toEqual([3]);
@@ -349,7 +387,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 4, author: "renovate" }),
     ];
     const users = (list: string[], viewer: string | null = null) =>
-      numbers(buildBoard(issues, DASHBOARD, {}, list, new Set(), viewer));
+      numbers(buildBoard(snapshot(issues), DASHBOARD, { users: list, viewer }));
     expect(users(["ann", "cid"])).toEqual([2, 1]);
     expect(users(["@ME", "ann"], "dan")).toEqual([3, 1]);
     expect(users(["@me", "ann"])).toEqual([1]);
@@ -367,7 +405,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 3, author: "ann", labels: [label("epic")] }),
       makeIssue({ number: 4, author: null }),
     ];
-    const mine = buildBoard(issues, dashboard, {}, ["@me"], new Set(), "me");
+    const mine = buildBoard(snapshot(issues), dashboard, { users: ["@me"], viewer: "me" });
     expect(numbers(mine)).toEqual([2, 1]);
     expect(mine.epics).toEqual([]);
     expect(mine.assignees).toEqual(["me"]);
@@ -387,7 +425,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 2, labels: [label("b")] }),
       makeIssue({ number: 3 }),
     ];
-    const board = buildBoard(issues, dashboard);
+    const board = buildBoard(snapshot(issues), dashboard, EVERYONE);
     const lane = (id: string) => board.cells[cell(id, "todo")]?.map(numberOf);
     expect(lane("a")).toEqual([1]);
     expect(lane("b")).toEqual([2]);
@@ -408,7 +446,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 2, labels: [label("b")] }),
       makeIssue({ number: 3 }),
     ];
-    const board = buildBoard(issues, dashboard);
+    const board = buildBoard(snapshot(issues), dashboard, EVERYONE);
     const column = (id: string) => board.cells[cell("rest", id)]?.map(numberOf);
     expect(column("a")).toEqual([1]);
     expect(column("b")).toEqual([2]);
@@ -427,7 +465,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 1, kind: "pr", labels: [label("prio:high")] }),
       makeIssue({ number: 2, labels: [label("prio:high")] }),
     ];
-    const board = buildBoard(issues, dashboard);
+    const board = buildBoard(snapshot(issues), dashboard, EVERYONE);
     expect(board.cells[cell("prs", "todo")]?.map(numberOf)).toEqual([1]);
     expect(board.cells[cell("high", "todo")]?.map(numberOf)).toEqual([2, 1]);
   });
@@ -439,7 +477,7 @@ describe("buildBoard", () => {
         labels: [label("prio:high"), label("prio:low"), label("phase:doing"), label("phase:done")],
       }),
     ];
-    const board = buildBoard(issues, DASHBOARD);
+    const board = buildBoard(snapshot(issues), DASHBOARD, EVERYONE);
     for (const lane of ["high", "low"])
       for (const column of ["doing", "done"])
         expect(board.cells[cell(lane, column)]?.map(numberOf)).toEqual([1]);
@@ -469,7 +507,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 4, kind: "pr" }),
       makeIssue({ number: 5, kind: "pr", labels: [label("is:conflicting")] }),
     ];
-    const board = buildBoard(issues, dashboard);
+    const board = buildBoard(snapshot(issues), dashboard, EVERYONE);
     expect(board.cells[cell("fix", "todo")]?.map(numberOf)).toEqual([3, 2, 1]);
     expect(board.cells[cell("fix", "todo")]?.map((c) => asIssue(c)?.statuses)).toEqual([
       ["is:unanswered"],
@@ -501,7 +539,7 @@ describe("buildBoard", () => {
         linked: [{ repo: REPO, number: 2 }],
       }),
     ];
-    const board = buildBoard(issues, dashboard, {}, ["alice"]);
+    const board = buildBoard(snapshot(issues), dashboard, { ...EVERYONE, users: ["alice"] });
     expect(
       board.cells[cell("review", "todo")]?.map((c) => [numberOf(c), asIssue(c)?.hasPr]),
     ).toEqual([[1, true]]);
@@ -525,7 +563,7 @@ describe("buildBoard", () => {
         { id: "done", name: "Done", filter: "is:closed" },
       ],
     };
-    const board = buildBoard(issues, dashboard, {}, [], new Set(), null, [], now);
+    const board = buildBoard(snapshot(issues), dashboard, { ...EVERYONE, now });
     expect(board.cells[cell("rest", "done")]?.map(numberOf)).toEqual([5, 2]);
     expect(board.cells[cell("rest", "done")]?.map((c) => asIssue(c)?.state)).toEqual([
       "CLOSED",
@@ -536,14 +574,9 @@ describe("buildBoard", () => {
       hasPr: false,
     });
     const openOnly = buildBoard(
-      issues,
+      snapshot(issues),
       { ...dashboard, closedDays: 0 },
-      {},
-      [],
-      new Set(),
-      null,
-      [],
-      now,
+      { ...EVERYONE, now },
     );
     expect(openOnly.total).toBe(1);
   });
@@ -553,7 +586,7 @@ describe("buildBoard", () => {
       ...DASHBOARD,
       columns: [{ id: "doing", name: "Doing", filter: "label:phase:doing" }],
     };
-    const board = buildBoard([makeIssue({ number: 1 })], dashboard);
+    const board = buildBoard(snapshot([makeIssue({ number: 1 })]), dashboard, EVERYONE);
     expect(board.total).toBe(0);
     expect(board.laneTotals.rest).toBe(0);
   });
@@ -565,7 +598,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 2, labels: [label("prio:low")], blockedBy, blockedByTotal: 1 }),
       makeIssue({ number: 9 }),
     ];
-    const board = buildBoard(issues, DASHBOARD);
+    const board = buildBoard(snapshot(issues), DASHBOARD, EVERYONE);
     expect(board.cells[cell("high", "todo")]?.[0]).toMatchObject({ number: 1, blocked: true });
     expect(board.cells[cell("low", "todo")]).toEqual([]);
     expect(board.hiddenBlocked).toEqual({ high: 0, low: 1, rest: 0 });
@@ -585,7 +618,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 9 }),
     ];
     const dashboard = { ...DASHBOARD, closedDays: 7 };
-    const board = buildBoard(issues, dashboard, {}, [], new Set(), null, [], now);
+    const board = buildBoard(snapshot(issues), dashboard, { ...EVERYONE, now });
     expect(board.cells[cell("low", "todo")]?.[0]).toMatchObject({ number: 1, blocked: false });
     expect(board.hiddenBlocked.low).toBe(0);
   });
@@ -608,7 +641,7 @@ describe("buildBoard", () => {
         { id: "rest", name: "Rest", filter: "other" },
       ],
     };
-    const board = buildBoard(issues, dashboard, {}, [], new Set(), null, [], now);
+    const board = buildBoard(snapshot(issues), dashboard, { ...EVERYONE, now });
     expect(board.cells[cell("rest", "blocking")]).toEqual([]);
     expect(board.cells[cell("rest", "review")]).toEqual([]);
     expect(board.cells[cell("rest", "rest")]?.map(numberOf)).toEqual(
@@ -637,7 +670,7 @@ describe("buildBoard", () => {
         { id: "rest", name: "Rest", filter: "other" },
       ],
     };
-    const board = buildBoard(issues, dashboard, {}, [], new Set(), null, [], now);
+    const board = buildBoard(snapshot(issues), dashboard, { ...EVERYONE, now });
     expect(board.cells[cell("rest", "failing")]?.map(numberOf)).toEqual([1]);
     expect(asIssue(board.cells[cell("rest", "rest")]?.[0])).toMatchObject({
       number: 2,
@@ -655,7 +688,7 @@ describe("buildBoard", () => {
       }),
       makeIssue({ number: 1, state: "CLOSED" }),
     ];
-    const board = buildBoard(issues, DASHBOARD);
+    const board = buildBoard(snapshot(issues), DASHBOARD, EVERYONE);
     expect(board.cells[cell("low", "todo")]?.[0]).toMatchObject({ number: 2, blocked: false });
   });
 
@@ -665,7 +698,7 @@ describe("buildBoard", () => {
       labels: [label("prio:high"), label("phase:doing"), label("bug"), label("epic")],
       assignees: [{ login: "ann", avatarUrl: "" }],
     });
-    const board = buildBoard([issue], DASHBOARD);
+    const board = buildBoard(snapshot([issue]), DASHBOARD, EVERYONE);
     const card = asIssue(board.cells[cell("high", "doing")]?.[0]);
     expect(card?.labels.map((l) => l.name)).toEqual(["bug"]);
     expect(card?.isEpic).toBe(true);
@@ -679,13 +712,13 @@ describe("buildBoard", () => {
       makeIssue({ number: 2, labels: [label("epic"), label("Prio:High"), label("Bug")] }),
       makeIssue({ number: 3, labels: [label("bug")] }),
     ];
-    const board = buildBoard(issues, DASHBOARD);
+    const board = buildBoard(snapshot(issues), DASHBOARD, EVERYONE);
     expect(board.epics.map((epic) => epic.number)).toEqual([2, 1]);
     expect(asIssue(board.cells[cell("high", "todo")]?.[0])?.labels.map((l) => l.name)).toEqual([
       "Bug",
     ]);
     expect(board.labels).toEqual(["Bug"]);
-    expect(numbers(buildBoard(issues, DASHBOARD, { label: "BUG" }))).toEqual([3]);
+    expect(shown(issues, { label: "BUG" })).toEqual([3]);
   });
 
   it("matches is:blocking on items an open issue waits on, and @me as the viewer", () => {
@@ -704,7 +737,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 4, state: "CLOSED", blockedBy: waitsOn(3), blockedByTotal: 1 }),
       makeIssue({ number: 5, author: "me" }),
     ];
-    const board = buildBoard(issues, dashboard, {}, [], new Set(), "me");
+    const board = buildBoard(snapshot(issues), dashboard, { ...EVERYONE, viewer: "me" });
     expect(board.cells[cell("blocking", "todo")]?.map(numberOf)).toEqual([1]);
     expect(board.cells[cell("mine", "todo")]?.map(numberOf)).toEqual([5]);
     expect(numbers(board)).toEqual([3, 2]);
@@ -712,9 +745,12 @@ describe("buildBoard", () => {
 
   it("sorts cells by the dashboard sort, overridable per request", () => {
     const issues = [makeIssue({ number: 1 }), makeIssue({ number: 3 }), makeIssue({ number: 2 })];
-    const byDefault = buildBoard(issues, DASHBOARD);
+    const byDefault = buildBoard(snapshot(issues), DASHBOARD, EVERYONE);
     expect(byDefault.cells[cell("rest", "todo")]?.map(numberOf)).toEqual([3, 2, 1]);
-    const asc = buildBoard(issues, DASHBOARD, { sort: "created", dir: "asc" });
+    const asc = buildBoard(snapshot(issues), DASHBOARD, {
+      ...EVERYONE,
+      query: { sort: "created", dir: "asc" },
+    });
     expect(asc.cells[cell("rest", "todo")]?.map(numberOf)).toEqual([1, 2, 3]);
     expect(asc.sort).toEqual({ by: "created", dir: "asc" });
   });
@@ -731,20 +767,20 @@ describe("buildBoard", () => {
       makeIssue({ number: 2, title: "Login page", labels: [label("bug")] }),
       makeIssue({ number: 3, title: "Logout", assignees: [{ login: "ann", avatarUrl: "" }] }),
     ];
-    expect(numbers(buildBoard(issues, DASHBOARD, { q: "login" }))).toEqual([2, 1]);
-    expect(numbers(buildBoard(issues, DASHBOARD, { q: "3" }))).toEqual([3]);
-    expect(numbers(buildBoard(issues, DASHBOARD, { assignee: "ann" }))).toEqual([3, 1]);
-    expect(numbers(buildBoard(issues, DASHBOARD, { label: "bug" }))).toEqual([2, 1]);
-    expect(numbers(buildBoard(issues, DASHBOARD, { epic: "acme/app#10" }))).toEqual([1]);
-    expect(numbers(buildBoard(issues, DASHBOARD, { q: "login", assignee: "ann" }))).toEqual([1]);
+    expect(shown(issues, { q: "login" })).toEqual([2, 1]);
+    expect(shown(issues, { q: "3" })).toEqual([3]);
+    expect(shown(issues, { assignee: "ann" })).toEqual([3, 1]);
+    expect(shown(issues, { label: "bug" })).toEqual([2, 1]);
+    expect(shown(issues, { epic: "acme/app#10" })).toEqual([1]);
+    expect(shown(issues, { q: "login", assignee: "ann" })).toEqual([1]);
   });
 
   it("places pull requests next to issues and never lists them as epics", () => {
     const issues = [makeIssue({ number: 1 }), makeIssue({ number: 2, kind: "pr" })];
-    const board = buildBoard(issues, DASHBOARD);
+    const board = buildBoard(snapshot(issues), DASHBOARD, EVERYONE);
     expect(board.cells[cell("rest", "todo")]?.map((c) => c.kind)).toEqual(["pr", "issue"]);
     const epicPr = makeIssue({ number: 3, kind: "pr", labels: [label("epic")] });
-    expect(buildBoard([epicPr], DASHBOARD).epics).toEqual([]);
+    expect(buildBoard(snapshot([epicPr]), DASHBOARD, EVERYONE).epics).toEqual([]);
   });
 
   it("epic filter keeps PRs linked to the epic or to an issue related to it", () => {
@@ -757,7 +793,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 5 }),
       makeIssue({ number: 10, labels: [label("epic")] }),
     ];
-    expect(numbers(buildBoard(issues, DASHBOARD, { epic: "acme/app#10" }))).toEqual([3, 2, 1]);
+    expect(shown(issues, { epic: "acme/app#10" })).toEqual([3, 2, 1]);
   });
 
   it("epic filter keeps sub-issues and issues blocking or blocked by the epic", () => {
@@ -774,7 +810,7 @@ describe("buildBoard", () => {
         blockedByTotal: 1,
       }),
     ];
-    expect(numbers(buildBoard(issues, DASHBOARD, { epic: "acme/app#10" }))).toEqual([3, 2, 1]);
+    expect(shown(issues, { epic: "acme/app#10" })).toEqual([3, 2, 1]);
   });
 
   it("lists epics with progress regardless of non-repo filters", () => {
@@ -787,7 +823,10 @@ describe("buildBoard", () => {
       }),
       makeIssue({ number: 11, labels: [label("epic")] }),
     ];
-    const board = buildBoard(issues, DASHBOARD, { q: "nothing matches" });
+    const board = buildBoard(snapshot(issues), DASHBOARD, {
+      ...EVERYONE,
+      query: { q: "nothing matches" },
+    });
     expect(board.epics).toEqual([
       expect.objectContaining({ key: "acme/app#11", progress: null }),
       expect.objectContaining({
@@ -801,7 +840,7 @@ describe("buildBoard", () => {
   it("lists starred epics first, each group in sort order", () => {
     const issues = [10, 11, 12, 13].map((number) => makeIssue({ number, labels: [label("epic")] }));
     const starred = new Set(["acme/app#10", "acme/app#12", "acme/app#99"]);
-    const epics = buildBoard(issues, DASHBOARD, {}, [], starred).epics;
+    const epics = buildBoard(snapshot(issues), DASHBOARD, { ...EVERYONE, starred }).epics;
     expect(epics.map((epic) => [epic.number, epic.starred])).toEqual([
       [12, true],
       [10, true],
@@ -815,7 +854,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 10, labels: [label("epic")] }),
       makeIssue({ number: 11, repo: "acme/other", labels: [label("epic")] }),
     ];
-    const board = buildBoard(issues, DASHBOARD, { hide: [REPO] });
+    const board = buildBoard(snapshot(issues), DASHBOARD, { ...EVERYONE, query: { hide: [REPO] } });
     expect(board.epics.map((epic) => epic.key)).toEqual(["acme/other#11"]);
   });
 
@@ -824,7 +863,10 @@ describe("buildBoard", () => {
       makeIssue({ number: 1 }),
       makeIssue({ number: 10, repo: "acme/other", labels: [label("epic")] }),
     ];
-    const board = buildBoard(issues, DASHBOARD, { hide: ["acme/gone"] });
+    const board = buildBoard(snapshot(issues), DASHBOARD, {
+      ...EVERYONE,
+      query: { hide: ["acme/gone"] },
+    });
     expect(numbers(board)).toEqual([10, 1]);
     expect(board.epics.map((epic) => epic.key)).toEqual(["acme/other#10"]);
   });
@@ -838,7 +880,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 4, author: "me" }),
       makeIssue({ number: 10, labels: [label("epic")] }),
     ];
-    const board = buildBoard(issues, dashboard, {}, [], new Set(), "me");
+    const board = buildBoard(snapshot(issues), dashboard, { ...EVERYONE, viewer: "me" });
     expect(numbers(board)).toEqual([3, 2]);
     expect(board.epics.map((epic) => epic.key)).toEqual(["acme/other#3"]);
     expect(asIssue(board.cells[cell("rest", "todo")]?.[1])?.labels).toEqual([]);
@@ -851,19 +893,25 @@ describe("buildBoard", () => {
       makeIssue({ number: 2, repo: "acme/a" }),
       makeIssue({ number: 3, repo: "acme/c", state: "CLOSED" }),
     ];
-    expect(buildBoard(issues, DASHBOARD, { hide: ["acme/b"] }).repos).toEqual(["acme/a", "acme/b"]);
+    expect(
+      buildBoard(snapshot(issues), DASHBOARD, { ...EVERYONE, query: { hide: ["acme/b"] } }).repos,
+    ).toEqual(["acme/a", "acme/b"]);
   });
 
   it("hides repos switched off in the nav", () => {
     const issues = [makeIssue({ number: 1 }), makeIssue({ number: 2, repo: "acme/other" })];
     const hide = ["acme/other", "acme/gone"];
-    expect(numbers(buildBoard(issues, DASHBOARD, { hide }))).toEqual([1]);
-    expect(numbers(buildBoard(issues, DASHBOARD, { hide: [REPO, "acme/other"] }))).toEqual([]);
+    expect(shown(issues, { hide })).toEqual([1]);
+    expect(shown(issues, { hide: [REPO, "acme/other"] })).toEqual([]);
   });
 
   it("skips epics when no epic label is configured", () => {
     const dashboard = { ...DASHBOARD, epicLabel: undefined };
-    const board = buildBoard([makeIssue({ number: 1, labels: [label("epic")] })], dashboard);
+    const board = buildBoard(
+      snapshot([makeIssue({ number: 1, labels: [label("epic")] })]),
+      dashboard,
+      EVERYONE,
+    );
     expect(board.epics).toEqual([]);
     expect(asIssue(board.cells[cell("rest", "todo")]?.[0])?.labels.map((l) => l.name)).toEqual([
       "epic",
@@ -875,15 +923,15 @@ const jobs = [
   makeJob({ name: "test" }),
   makeJob({ name: "lint", branch: "fix/y", authors: ["bob"] }),
 ];
-/** Names of the job cards in the catch-all cell under `filters`. */
-const shownJobs = (filters: Parameters<typeof buildBoard>[2]) =>
-  buildBoard([], DASHBOARD, filters, [], new Set(), null, jobs).cells[cell("rest", "todo")]?.map(
-    numberOf,
-  );
+/** Names of the job cards in the catch-all cell under `query`. */
+const shownJobs = (query: ViewQuery) =>
+  buildBoard(snapshot([], jobs), DASHBOARD, { ...EVERYONE, query }).cells[
+    cell("rest", "todo")
+  ]?.map(numberOf);
 
 describe("CI jobs", () => {
   it("lands on the grid like an issue, sorted with the issues", () => {
-    const board = buildBoard([makeIssue({ number: 1 })], DASHBOARD, {}, [], new Set(), null, jobs);
+    const board = buildBoard(snapshot([makeIssue({ number: 1 })], jobs), DASHBOARD, EVERYONE);
     expect(board.cells[cell("rest", "todo")]?.map(numberOf)).toEqual(["test", "lint", 1]);
     expect(board.total).toBe(3);
     expect(board.cells[cell("rest", "todo")]?.[0]).toMatchObject({
@@ -894,7 +942,7 @@ describe("CI jobs", () => {
   });
 
   it("shows only the jobs of branches the global users have commits in", () => {
-    const mine = buildBoard([], DASHBOARD, {}, ["@me"], new Set(), "bob", jobs);
+    const mine = buildBoard(snapshot([], jobs), DASHBOARD, { users: ["@me"], viewer: "bob" });
     expect(mine.cells[cell("rest", "todo")]?.map(numberOf)).toEqual(["lint"]);
   });
 
@@ -903,10 +951,10 @@ describe("CI jobs", () => {
       { id: "ci", name: "CI", filter: "is:ci-job job:lint", hideBlocked: false },
       { id: "rest", name: "Rest", filter: "other", hideBlocked: false },
     ];
-    const board = buildBoard([], { ...DASHBOARD, swimlanes: lanes }, {}, [], new Set(), null, jobs);
+    const board = buildBoard(snapshot([], jobs), { ...DASHBOARD, swimlanes: lanes }, EVERYONE);
     expect(board.cells[cell("ci", "todo")]?.map(numberOf)).toEqual(["lint"]);
     const scoped = { ...DASHBOARD, filter: "-is:ci-job" };
-    expect(buildBoard([], scoped, {}, [], new Set(), null, jobs).total).toBe(0);
+    expect(buildBoard(snapshot([], jobs), scoped, EVERYONE).total).toBe(0);
   });
 
   it("matches the text filter on job and branch names, and no other filter", () => {
@@ -920,7 +968,10 @@ describe("CI jobs", () => {
 
   it("filters by job name in any case, which hides every issue, and lists the names", () => {
     const issues = [makeIssue({ number: 1 })];
-    const board = buildBoard(issues, DASHBOARD, { job: "LINT" }, [], new Set(), null, jobs);
+    const board = buildBoard(snapshot(issues, jobs), DASHBOARD, {
+      ...EVERYONE,
+      query: { job: "LINT" },
+    });
     expect(board.cells[cell("rest", "todo")]?.map(numberOf)).toEqual(["lint"]);
     expect(board.jobs).toEqual(["lint", "test"]);
   });
@@ -933,11 +984,14 @@ describe("CI jobs", () => {
       { id: "rest", name: "Rest", filter: "other", hideBlocked: false },
     ];
     const dashboard = { ...DASHBOARD, swimlanes: lanes, filter: "is:ci-job" };
-    const board = buildBoard([pr], dashboard, {}, [], new Set(), null, withPr);
+    const board = buildBoard(snapshot([pr], withPr), dashboard, EVERYONE);
     expect(board.cells[cell("a", "todo")]?.map(numberOf)).toEqual(["lint"]);
     expect(board.cells[cell("a", "todo")]?.[0]?.labels.map((l) => l.name)).toEqual(["bug"]);
     expect(board.labels).toEqual(["bug"]);
-    const filtered = buildBoard([pr], dashboard, { label: "BUG" }, [], new Set(), null, withPr);
+    const filtered = buildBoard(snapshot([pr], withPr), dashboard, {
+      ...EVERYONE,
+      query: { label: "BUG" },
+    });
     expect(filtered.total).toBe(1);
   });
 
@@ -945,13 +999,16 @@ describe("CI jobs", () => {
     const pr = makeIssue({ number: 7, kind: "pr", state: "CLOSED", labels: [label("bug")] });
     const withPr = [makeJob({ name: "lint", pr: { number: 7, url: pr.url } })];
     const dashboard = { ...DASHBOARD, filter: "is:ci-job" };
-    const board = buildBoard([pr], dashboard, {}, [], new Set(), null, withPr);
+    const board = buildBoard(snapshot([pr], withPr), dashboard, EVERYONE);
     expect(board.labels).toEqual([]);
   });
 
   it("lists a job no dashboard places as unmatched", () => {
     const issuesOnly = { ...DASHBOARD, filter: "-is:ci-job" };
-    const unmatched = unmatchedItems([], [issuesOnly], ["bob"], null, [], jobs).items;
+    const unmatched = unmatchedItems(snapshot([], jobs), [issuesOnly], {
+      ...EVERYONE,
+      users: ["bob"],
+    }).items;
     expect(unmatched.map(numberOf)).toEqual(["lint"]);
   });
 });
