@@ -252,16 +252,18 @@ describe("createGithubClient", () => {
   });
 
   it("maps a page of issues and passes pagination variables", async () => {
-    const fetchImpl = vi.fn(async () =>
-      jsonResponse({
+    let variables: unknown;
+    const fetchImpl = vi.fn(async (_: string, init: RequestInit) => {
+      ({ variables } = JSON.parse(init.body as string) as { variables: unknown });
+      return jsonResponse({
         data: {
           rateLimit: { remaining: 4900 },
           repository: {
             issues: { pageInfo: { hasNextPage: true, endCursor: "c2" }, nodes: [node] },
           },
         },
-      }),
-    );
+      });
+    });
     const gh = createGithubClient(async () => "tok", fetchImpl);
     const page = await fetchIssuesPage(gh, "acme/app", {
       since: "2026-01-01T00:00:00Z",
@@ -270,12 +272,7 @@ describe("createGithubClient", () => {
     });
     expect(page).toMatchObject({ hasNextPage: true, endCursor: "c2", rateRemaining: 4900 });
     expect(page.issues[0]?.number).toBe(12);
-    const body = JSON.parse(
-      (fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as string,
-    ) as {
-      variables: Record<string, unknown>;
-    };
-    expect(body.variables).toEqual({
+    expect(variables).toEqual({
       owner: "acme",
       name: "app",
       since: "2026-01-01T00:00:00Z",
@@ -284,21 +281,20 @@ describe("createGithubClient", () => {
     });
   });
 
-  it("asks for GitHub's maximum of 50 blockers so the list is never truncated", async () => {
-    const fetchImpl = vi.fn(async () =>
-      jsonResponse({
+  it("asks for GitHub's maximum of 50 blockers", async () => {
+    let query = "";
+    const fetchImpl = vi.fn(async (_: string, init: RequestInit) => {
+      ({ query } = JSON.parse(init.body as string) as { query: string });
+      return jsonResponse({
         data: {
           rateLimit: { remaining: 4900 },
           repository: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } },
         },
-      }),
-    );
+      });
+    });
     const gh = createGithubClient(async () => "tok", fetchImpl);
     await fetchIssuesPage(gh, "acme/app", { since: null, states: "all", after: null });
-    const body = JSON.parse(
-      (fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as string,
-    ) as { query: string };
-    expect(body.query).toContain("blockedBy(first: 50)");
+    expect(query).toContain("blockedBy(first: 50)");
   });
 
   it("fails clearly when the repository is not accessible", async () => {
