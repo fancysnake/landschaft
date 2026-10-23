@@ -206,7 +206,7 @@ export function toCiJobs(
   }
   return [...newest.values()]
     .filter((run) => run.failed)
-    .map(({ job }) => ({ repo, branch, authors, pr, ...job }));
+    .map(({ job }) => Object.assign(job, { repo, branch, authors, pr }));
 }
 
 /** Branches per CI job query. */
