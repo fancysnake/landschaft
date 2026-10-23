@@ -237,9 +237,9 @@ describe("createGithubClient", () => {
       async () => jsonResponse({ data: { ok: true }, errors }),
     );
     await expect(gh.gql("q", {})).rejects.toThrow("Could not resolve head ref");
-    await expect(gh.gql("q", {}, { partial: () => true })).resolves.toEqual({ ok: true });
+    await expect(gh.gql("q", {}, { acceptError: () => true })).resolves.toEqual({ ok: true });
     await expect(
-      gh.gql("q", {}, { partial: (error) => error.type === "NOT_FOUND" }),
+      gh.gql("q", {}, { acceptError: (error) => error.type === "NOT_FOUND" }),
     ).rejects.toThrow("Something went wrong");
   });
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CiBranchNode } from "./ci";
-import type { GithubClient, IssueNode, PullNode } from "./github";
+import type { GithubClient, GqlOptions, IssueNode, PullNode } from "./github";
 
 import { CONFIG_VERSION, type Config } from "../schema";
 import { cachedIssue, makeIssue, REPO } from "./__fixtures__/issues";
@@ -359,7 +359,7 @@ describe("Syncer", () => {
     ]);
   });
 
-  it("keeps the cached jobs when a job query fails", async () => {
+  it("keeps the cached jobs of a branch the job query failed on and finishes", async () => {
     const cached = {
       repo: REPO,
       branch: "feat/x",
@@ -370,18 +370,20 @@ describe("Syncer", () => {
       authors: [],
       pr: null,
     };
-    db.setCiJobs(REPO, [cached]);
+    db.setCiJobs(REPO, [cached, { ...cached, branch: "old" }]);
     const { gh: fake } = fakeGithub([[]], 5000, [], [], { "feat/x": redBranch("lint") });
+    const error = { message: "Something went wrong", type: "INTERNAL", path: ["repository", "b1"] };
     const gh: GithubClient = {
-      gql: <T>(query: string, variables: Record<string, unknown>): Promise<T> =>
-        query.includes("query CiJobs")
-          ? Promise.reject(new Error("Something went wrong"))
-          : fake.gql<T>(query, variables),
+      async gql<T>(query: string, variables: Record<string, unknown>, options?: GqlOptions) {
+        if (query.includes("query CiJobs") && !options?.acceptError?.(error)) {
+          throw new Error(error.message);
+        }
+        return fake.gql<T>(query, variables);
+      },
     };
-    await expect(new Syncer({ db, gh, now: () => now }).syncRepo(REPO)).rejects.toThrow(
-      "Something went wrong",
-    );
+    await new Syncer({ db, gh, now: () => now }).syncRepo(REPO);
     expect(db.listCiJobs([REPO])).toEqual([cached]);
+    expect(db.getSyncState(REPO)?.lastSyncAt).toBe(now.toISOString());
   });
 
   it("keeps a PR's status when a page upserts it again", async () => {

@@ -7,7 +7,7 @@ import {
   fetchCiJobs,
   toCiJobs,
 } from "./ci";
-import { createGithubClient } from "./github";
+import { createGithubClient, type GqlError } from "./github";
 
 const commits = (...logins: (string | null)[]) => ({
   nodes: logins.map((login) => ({ author: { user: login === null ? null : { login } } })),
@@ -163,42 +163,57 @@ describe("toCiJobs", () => {
   });
 });
 
-/** A client whose one response carries `error` and nulls the field it hits. */
-const respond = (error: { type: string; path: string[]; message: string }) =>
+/** A client whose one response carries `repository` and `errors`. */
+const respond = (repository: Record<string, unknown>, ...errors: GqlError[]) =>
   createGithubClient(
     async () => "tok",
-    async () =>
-      Response.json({
-        data: {
-          rateLimit: { remaining: 4000 },
-          repository: {
-            b0: error.path[1] === "b0" ? null : branch([checkRun("lint", "FAILURE")]),
-            c0: error.path[1] === "c0" ? { name: "main", compare: null } : base(1),
-          },
-        },
-        errors: [error],
-      }),
+    async () => Response.json({ data: { rateLimit: { remaining: 4000 }, repository }, errors }),
   );
 
-describe("fetchCiJobs", () => {
-  const branches = [{ name: "feat/x", suites: false }];
+const red = branch([checkRun("lint", "FAILURE")]);
+const gone = (field: string, type = "NOT_FOUND"): GqlError => ({
+  message: "x",
+  type,
+  path: ["repository", field],
+});
 
-  it("fails the batch on an unexpected error on a branch", async () => {
-    const gh = respond({ type: "INTERNAL", path: ["repository", "b0"], message: "timeout" });
-    await expect(fetchCiJobs(gh, "acme/app", branches)).rejects.toThrow("timeout");
-  });
+describe("fetchCiJobs", () => {
+  const branches = [
+    { name: "feat/x", suites: false },
+    { name: "feat/y", suites: false },
+  ];
 
   it("skips a branch gone since it was listed", async () => {
-    const gh = respond({ type: "NOT_FOUND", path: ["repository", "b0"], message: "gone" });
+    const gh = respond({ b0: null, c0: base(1), b1: red, c1: base(1) }, gone("b0"));
     await expect(fetchCiJobs(gh, "acme/app", branches)).resolves.toEqual({
-      jobs: [],
+      jobs: [expect.objectContaining({ branch: "feat/y" })],
+      failed: [],
       rateRemaining: 4000,
     });
   });
 
-  it("keeps the jobs when the default branch comparison fails", async () => {
-    const gh = respond({ type: "INTERNAL", path: ["repository", "c0", "compare"], message: "x" });
+  it("reads a branch without a comparison once its ref is gone", async () => {
+    const comparison = { name: "main", compare: null };
+    const gh = respond({ b0: red, c0: comparison, b1: red, c1: base(1) }, gone("c0"));
     const page = await fetchCiJobs(gh, "acme/app", branches);
-    expect(page.jobs.map((job) => job.name)).toEqual(["lint"]);
+    expect(page.jobs.map((job) => job.branch)).toEqual(["feat/x", "feat/y"]);
+    expect(page.failed).toEqual([]);
+  });
+
+  it("fails the branch any other error hits", async () => {
+    const data = { b0: red, c0: base(1), b1: null, c1: { name: "main", compare: null } };
+    for (const field of ["b1", "c1"]) {
+      const page = await fetchCiJobs(respond(data, gone(field, "INTERNAL")), "acme/app", branches);
+      expect(page.jobs.map((job) => job.branch)).toEqual(["feat/x"]);
+      expect(page.failed).toEqual(["feat/y"]);
+    }
+  });
+
+  it("fails every branch on an error that hits none", async () => {
+    const gh = respond({ b0: red, c0: base(1), b1: red, c1: base(1) }, { message: "x" });
+    await expect(fetchCiJobs(gh, "acme/app", branches)).resolves.toMatchObject({
+      jobs: [],
+      failed: ["feat/x", "feat/y"],
+    });
   });
 });

@@ -33,16 +33,16 @@ export interface GqlError {
   path?: (string | number)[];
 }
 
-export interface GithubClient {
+export interface GqlOptions {
   /**
-   * With `partial`, errors next to data that it accepts are dropped and the fields they hit
-   * come back null; any other error throws.
+   * Errors next to data that it accepts are dropped and the fields they hit come back null; any
+   * other error throws.
    */
-  gql<T>(
-    query: string,
-    variables: Record<string, unknown>,
-    options?: { partial?: (error: GqlError) => boolean },
-  ): Promise<T>;
+  acceptError?: (error: GqlError) => boolean;
+}
+
+export interface GithubClient {
+  gql<T>(query: string, variables: Record<string, unknown>, options?: GqlOptions): Promise<T>;
 }
 
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
@@ -66,7 +66,7 @@ export function createGithubClient(
     async gql<T>(
       query: string,
       variables: Record<string, unknown>,
-      options: { partial?: (error: GqlError) => boolean } = {},
+      options: GqlOptions = {},
     ): Promise<T> {
       const response = await fetchImpl("https://api.github.com/graphql", {
         method: "POST",
@@ -81,8 +81,11 @@ export function createGithubClient(
         throw new GithubError(`GraphQL HTTP ${response.status}: ${await response.text()}`);
       }
       const payload = (await response.json()) as { data?: T; errors?: GqlError[] };
-      const { partial } = options;
-      if (payload.errors?.length && !(partial && payload.data && payload.errors.every(partial))) {
+      const { acceptError } = options;
+      if (
+        payload.errors?.length &&
+        !(acceptError && payload.data && payload.errors.every(acceptError))
+      ) {
         throw new GithubError(payload.errors.map((e) => e.message).join("; "));
       }
       if (!payload.data) throw new GithubError("GraphQL response without data");
