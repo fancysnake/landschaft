@@ -359,6 +359,31 @@ describe("Syncer", () => {
     ]);
   });
 
+  it("keeps the cached jobs when a job query fails", async () => {
+    const cached = {
+      repo: REPO,
+      branch: "feat/x",
+      workflow: null,
+      name: "lint",
+      url: "",
+      failedAt: "",
+      authors: [],
+      pr: null,
+    };
+    db.setCiJobs(REPO, [cached]);
+    const { gh: fake } = fakeGithub([[]], 5000, [], [], { "feat/x": redBranch("lint") });
+    const gh: GithubClient = {
+      gql: <T>(query: string, variables: Record<string, unknown>): Promise<T> =>
+        query.includes("query CiJobs")
+          ? Promise.reject(new Error("Something went wrong"))
+          : fake.gql<T>(query, variables),
+    };
+    await expect(new Syncer({ db, gh, now: () => now }).syncRepo(REPO)).rejects.toThrow(
+      "Something went wrong",
+    );
+    expect(db.listCiJobs([REPO])).toEqual([cached]);
+  });
+
   it("keeps a PR's status when a page upserts it again", async () => {
     db.upsertIssues([makeIssue({ number: 7, kind: "pr" })]);
     db.setPullStatuses(REPO, [{ number: 7, statuses: ["is:conflicting", "is:unanswered"] }]);

@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { type CiBranchNode, type CiContext, type DefaultBranchNode, toCiJobs } from "./ci";
+import {
+  type CiBranchNode,
+  type CiContext,
+  type DefaultBranchNode,
+  fetchCiJobs,
+  toCiJobs,
+} from "./ci";
+import { createGithubClient } from "./github";
 
 const commits = (...logins: (string | null)[]) => ({
   nodes: logins.map((login) => ({ author: { user: login === null ? null : { login } } })),
@@ -153,5 +160,45 @@ describe("toCiJobs", () => {
     const pushedSince = { ...head, mergedPullRequests: { nodes: [{ headRefOid: "old" }] } };
     expect(toCiJobs("acme/app", "x", pushedSince, base(2))).toHaveLength(1);
     expect(toCiJobs("acme/app", "x", head, { name: "main", compare: null })).toHaveLength(1);
+  });
+});
+
+/** A client whose one response carries `error` and nulls the field it hits. */
+const respond = (error: { type: string; path: string[]; message: string }) =>
+  createGithubClient(
+    async () => "tok",
+    async () =>
+      Response.json({
+        data: {
+          rateLimit: { remaining: 4000 },
+          repository: {
+            b0: error.path[1] === "b0" ? null : branch([checkRun("lint", "FAILURE")]),
+            c0: error.path[1] === "c0" ? { name: "main", compare: null } : base(1),
+          },
+        },
+        errors: [error],
+      }),
+  );
+
+describe("fetchCiJobs", () => {
+  const branches = [{ name: "feat/x", suites: false }];
+
+  it("fails the batch on an unexpected error on a branch", async () => {
+    const gh = respond({ type: "INTERNAL", path: ["repository", "b0"], message: "timeout" });
+    await expect(fetchCiJobs(gh, "acme/app", branches)).rejects.toThrow("timeout");
+  });
+
+  it("skips a branch gone since it was listed", async () => {
+    const gh = respond({ type: "NOT_FOUND", path: ["repository", "b0"], message: "gone" });
+    await expect(fetchCiJobs(gh, "acme/app", branches)).resolves.toEqual({
+      jobs: [],
+      rateRemaining: 4000,
+    });
+  });
+
+  it("keeps the jobs when the default branch comparison fails", async () => {
+    const gh = respond({ type: "INTERNAL", path: ["repository", "c0", "compare"], message: "x" });
+    const page = await fetchCiJobs(gh, "acme/app", branches);
+    expect(page.jobs.map((job) => job.name)).toEqual(["lint"]);
   });
 });

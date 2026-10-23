@@ -227,14 +227,20 @@ describe("createGithubClient", () => {
     timeout.mockRestore();
   });
 
-  it("keeps the data next to errors only when asked to", async () => {
-    const body = { data: { ok: true }, errors: [{ message: "Could not resolve head ref" }] };
+  it("keeps the data next to errors only when it accepts all of them", async () => {
+    const errors = [
+      { message: "Could not resolve head ref", type: "NOT_FOUND" },
+      { message: "Something went wrong", type: "INTERNAL" },
+    ];
     const gh = createGithubClient(
       async () => "tok",
-      async () => jsonResponse(body),
+      async () => jsonResponse({ data: { ok: true }, errors }),
     );
     await expect(gh.gql("q", {})).rejects.toThrow("Could not resolve head ref");
-    await expect(gh.gql("q", {}, { partial: true })).resolves.toEqual({ ok: true });
+    await expect(gh.gql("q", {}, { partial: () => true })).resolves.toEqual({ ok: true });
+    await expect(
+      gh.gql("q", {}, { partial: (error) => error.type === "NOT_FOUND" }),
+    ).rejects.toThrow("Something went wrong");
   });
 
   it("resolves the token once", async () => {

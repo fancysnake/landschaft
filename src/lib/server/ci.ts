@@ -4,6 +4,7 @@ import { ciJobKey } from "../types";
 import {
   type GithubClient,
   GithubError,
+  type GqlError,
   isRed,
   type Login,
   type PageInfo,
@@ -253,8 +254,16 @@ export interface CiJobsPage {
 }
 
 /**
+ * A comparison with the default branch fails without a merge base or once the branch is
+ * deleted; a branch field fails only when the ref is gone. Anything else may be transient.
+ */
+const expectedCiError = ({ path, type }: GqlError): boolean =>
+  /^c\d+$/.test(String(path?.[1])) || (/^b\d+$/.test(String(path?.[1])) && type === "NOT_FOUND");
+
+/**
  * The failed jobs on up to `CI_BATCH` branches, in one query. A branch deleted since it was
- * listed is skipped; one without a merge base gets no comparison, both as errors next to data.
+ * listed is skipped; one without a merge base gets no comparison. Any other error fails the
+ * batch, so the sync keeps the cached jobs.
  * shortcut: the first 100 commits ahead and checks per branch.
  */
 export async function fetchCiJobs(
@@ -280,7 +289,7 @@ export async function fetchCiJobs(
       repository(owner: $owner, name: $name) { ${branches.map((branch, i) => ciBranchFields(i, branch.suites)).join("\n")} }
     }`,
     { ...splitRepo(repo), ...variables },
-    { partial: true },
+    { partial: expectedCiError },
   );
   if (!data.repository) throw new GithubError(`repository ${repo} not found or not accessible`);
   const fields = data.repository;
