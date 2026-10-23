@@ -278,6 +278,23 @@ describe("createGithubClient", () => {
     });
   });
 
+  it("asks for GitHub's maximum of 50 blockers so the list is never truncated", async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        data: {
+          rateLimit: { remaining: 4900 },
+          repository: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } },
+        },
+      }),
+    );
+    const gh = createGithubClient(async () => "tok", fetchImpl);
+    await fetchIssuesPage(gh, "acme/app", { since: null, states: "all", after: null });
+    const body = JSON.parse(
+      (fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as string,
+    ) as { query: string };
+    expect(body.query).toContain("blockedBy(first: 50)");
+  });
+
   it("fails clearly when the repository is not accessible", async () => {
     const gh = createGithubClient(
       async () => "tok",

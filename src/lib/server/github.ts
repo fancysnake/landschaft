@@ -81,6 +81,7 @@ export function createGithubClient(
   };
 }
 
+// blockedBy asks for 50, GitHub's cap per relationship type, so the list is complete.
 const ISSUE_FIELDS = `
 fragment IssueFields on Issue {
   id number title state url createdAt updatedAt closedAt
@@ -91,7 +92,7 @@ fragment IssueFields on Issue {
   parent { number repository { nameWithOwner } }
   subIssuesSummary { total completed percentCompleted }
   issueDependenciesSummary { totalBlockedBy }
-  blockedBy(first: 20) { nodes { number state repository { nameWithOwner } } }
+  blockedBy(first: 50) { nodes { number state repository { nameWithOwner } } }
 }`;
 
 const ISSUES_PAGE_QUERY = `
