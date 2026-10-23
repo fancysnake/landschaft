@@ -27,13 +27,22 @@ export async function getToken(): Promise<string> {
   throw new GithubError("No GitHub token: set GITHUB_TOKEN or run `gh auth login`");
 }
 
+export interface GqlError {
+  message: string;
+  type?: string;
+  path?: (string | number)[];
+}
+
+export interface GqlOptions {
+  /**
+   * Errors next to data that it accepts are dropped and the fields they hit come back null; any
+   * other error throws.
+   */
+  acceptError?: (error: GqlError) => boolean;
+}
+
 export interface GithubClient {
-  /** With `partial`, errors next to data are dropped; the fields they hit come back null. */
-  gql<T>(
-    query: string,
-    variables: Record<string, unknown>,
-    options?: { partial?: boolean },
-  ): Promise<T>;
+  gql<T>(query: string, variables: Record<string, unknown>, options?: GqlOptions): Promise<T>;
 }
 
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
@@ -57,7 +66,7 @@ export function createGithubClient(
     async gql<T>(
       query: string,
       variables: Record<string, unknown>,
-      options: { partial?: boolean } = {},
+      options: GqlOptions = {},
     ): Promise<T> {
       const response = await fetchImpl("https://api.github.com/graphql", {
         method: "POST",
@@ -71,8 +80,12 @@ export function createGithubClient(
       if (!response.ok) {
         throw new GithubError(`GraphQL HTTP ${response.status}: ${await response.text()}`);
       }
-      const payload = (await response.json()) as { data?: T; errors?: { message: string }[] };
-      if (payload.errors?.length && !(options.partial && payload.data)) {
+      const payload = (await response.json()) as { data?: T; errors?: GqlError[] };
+      const { acceptError } = options;
+      if (
+        payload.errors?.length &&
+        !(acceptError && payload.data && payload.errors.every(acceptError))
+      ) {
         throw new GithubError(payload.errors.map((e) => e.message).join("; "));
       }
       if (!payload.data) throw new GithubError("GraphQL response without data");

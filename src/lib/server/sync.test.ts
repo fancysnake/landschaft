@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CiBranchNode } from "./ci";
-import type { GithubClient, IssueNode, PullNode } from "./github";
+import type { GithubClient, GqlOptions, IssueNode, PullNode } from "./github";
 
 import { CONFIG_VERSION, type Config } from "../schema";
 import { cachedIssue, makeIssue, REPO } from "./__fixtures__/issues";
@@ -357,6 +357,33 @@ describe("Syncer", () => {
         pr: null,
       },
     ]);
+  });
+
+  it("keeps the cached jobs of a branch the job query failed on and finishes", async () => {
+    const cached = {
+      repo: REPO,
+      branch: "feat/x",
+      workflow: null,
+      name: "lint",
+      url: "",
+      failedAt: "",
+      authors: [],
+      pr: null,
+    };
+    db.setCiJobs(REPO, [cached, { ...cached, branch: "old" }]);
+    const { gh: fake } = fakeGithub([[]], 5000, [], [], { "feat/x": redBranch("lint") });
+    const error = { message: "Something went wrong", type: "INTERNAL", path: ["repository", "b1"] };
+    const gh: GithubClient = {
+      async gql<T>(query: string, variables: Record<string, unknown>, options?: GqlOptions) {
+        if (query.includes("query CiJobs") && !options?.acceptError?.(error)) {
+          throw new Error(error.message);
+        }
+        return fake.gql<T>(query, variables);
+      },
+    };
+    await new Syncer({ db, gh, now: () => now }).syncRepo(REPO);
+    expect(db.listCiJobs([REPO])).toEqual([cached]);
+    expect(db.getSyncState(REPO)?.lastSyncAt).toBe(now.toISOString());
   });
 
   it("keeps a PR's status when a page upserts it again", async () => {

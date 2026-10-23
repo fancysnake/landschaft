@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { type CiBranchNode, type CiContext, type DefaultBranchNode, toCiJobs } from "./ci";
+import {
+  type CiBranchNode,
+  type CiContext,
+  type DefaultBranchNode,
+  fetchCiJobs,
+  toCiJobs,
+} from "./ci";
+import { createGithubClient, type GqlError } from "./github";
 
 const commits = (...logins: (string | null)[]) => ({
   nodes: logins.map((login) => ({ author: { user: login === null ? null : { login } } })),
@@ -153,5 +160,76 @@ describe("toCiJobs", () => {
     const pushedSince = { ...head, mergedPullRequests: { nodes: [{ headRefOid: "old" }] } };
     expect(toCiJobs("acme/app", "x", pushedSince, base(2))).toHaveLength(1);
     expect(toCiJobs("acme/app", "x", head, { name: "main", compare: null })).toHaveLength(1);
+  });
+});
+
+/** A client whose one response carries `repository` and `errors`. */
+const respond = (repository: Record<string, unknown>, ...errors: GqlError[]) =>
+  createGithubClient(
+    async () => "tok",
+    async () => Response.json({ data: { rateLimit: { remaining: 4000 }, repository }, errors }),
+  );
+
+const red = branch([checkRun("lint", "FAILURE")]);
+const gone = (path: string[], type = "NOT_FOUND"): GqlError => ({
+  message: "x",
+  type,
+  path: ["repository", ...path],
+});
+
+describe("fetchCiJobs", () => {
+  const branches = [
+    { name: "feat/x", suites: false },
+    { name: "feat/y", suites: false },
+  ];
+
+  it("skips a branch gone since it was listed", async () => {
+    const gh = respond({ b0: null, c0: base(1), b1: red, c1: base(1) }, gone(["b0"]));
+    await expect(fetchCiJobs(gh, "acme/app", branches)).resolves.toEqual({
+      jobs: [expect.objectContaining({ branch: "feat/y" })],
+      failed: [],
+      rateRemaining: 4000,
+    });
+  });
+
+  it("reads a branch without a comparison once its ref is gone", async () => {
+    const comparison = { name: "main", compare: null };
+    const gh = respond({ b0: red, c0: comparison, b1: red, c1: base(1) }, gone(["c0", "compare"]));
+    const page = await fetchCiJobs(gh, "acme/app", branches);
+    expect(page.jobs.map((job) => job.branch)).toEqual(["feat/x", "feat/y"]);
+    expect(page.failed).toEqual([]);
+  });
+
+  it("fails the branch any other error hits", async () => {
+    const data = { b0: red, c0: base(1), b1: null, c1: { name: "main", compare: null } };
+    for (const field of ["b1", "c1"]) {
+      const page = await fetchCiJobs(
+        respond(data, gone([field], "INTERNAL")),
+        "acme/app",
+        branches,
+      );
+      expect(page.jobs.map((job) => job.branch)).toEqual(["feat/x"]);
+      expect(page.failed).toEqual(["feat/y"]);
+    }
+  });
+
+  it("fails the branch a NOT_FOUND hits below its refs", async () => {
+    const data = { b0: red, c0: base(1), b1: red, c1: base(1) };
+    for (const path of [
+      ["b1", "target", "statusCheckRollup"],
+      ["c1", "compare", "commits"],
+    ]) {
+      const page = await fetchCiJobs(respond(data, gone(path)), "acme/app", branches);
+      expect(page.jobs.map((job) => job.branch)).toEqual(["feat/x"]);
+      expect(page.failed).toEqual(["feat/y"]);
+    }
+  });
+
+  it("fails every branch on an error that hits none", async () => {
+    const gh = respond({ b0: red, c0: base(1), b1: red, c1: base(1) }, { message: "x" });
+    await expect(fetchCiJobs(gh, "acme/app", branches)).resolves.toMatchObject({
+      jobs: [],
+      failed: ["feat/x", "feat/y"],
+    });
   });
 });
