@@ -4,6 +4,7 @@ import { ciJobKey } from "../types";
 import {
   type GithubClient,
   GithubError,
+  type GqlError,
   isRed,
   type Login,
   type PageInfo,
@@ -142,16 +143,23 @@ const loginsOf = (commits: CommitAuthors): string[] => [
 interface Run {
   failed: boolean;
   at: string;
-  job: Pick<CiJob, "workflow" | "name" | "url" | "failedAt">;
+  job: CiJob;
 }
 
-/** `check` as a run on the commit at `commitUrl`; null for a check run that has not finished. */
-function runOf(check: CiContext, commitUrl: string): Run | null {
+/** What every job on a branch's head commit shares. */
+type HeadOf = Pick<CiJob, "repo" | "branch" | "authors" | "pr">;
+
+/**
+ * `check` as a run on the head commit at `commitUrl`; null for a check run that has not
+ * finished.
+ */
+function runOf(check: CiContext, commitUrl: string, head: HeadOf): Run | null {
   if (check.type === "StatusContext") {
     return {
       failed: isRed(check.state),
       at: check.createdAt,
       job: {
+        ...head,
         workflow: null,
         name: check.context,
         url: webUrl(check.targetUrl) ?? commitUrl,
@@ -165,6 +173,7 @@ function runOf(check: CiContext, commitUrl: string): Run | null {
     failed: FAILED_CONCLUSIONS.has(check.conclusion ?? ""),
     at: startedAt,
     job: {
+      ...head,
       workflow: check.checkSuite.workflowRun?.workflow.name ?? null,
       name: check.name,
       url: webUrl(check.detailsUrl) ?? check.url,
@@ -191,27 +200,32 @@ export function toCiJobs(
   // Merged: its head is the newest merged PR's, or the default branch holds all of it.
   if (node.mergedPullRequests.nodes[0]?.headRefOid === target.oid || compare?.aheadBy === 0)
     return [];
-  const authors = loginsOf(compare ? compare.commits : target.history);
-  const pr = node.associatedPullRequests.nodes[0] ?? null;
+  const head: HeadOf = {
+    repo,
+    branch,
+    authors: loginsOf(compare ? compare.commits : target.history),
+    pr: node.associatedPullRequests.nodes[0] ?? null,
+  };
   // Also merges a job an app reports as a check run and as a commit status alike.
   const newest = new Map<string, Run>();
   const suiteRuns = target.checkSuites?.nodes.flatMap((suite) => suite.checkRuns.nodes) ?? [];
   for (const check of [...(target.statusCheckRollup?.contexts.nodes ?? []), ...suiteRuns]) {
-    const run = runOf(check, target.url);
+    const run = runOf(check, target.url, head);
     if (!run) continue;
-    const key = ciJobKey({ repo, branch, ...run.job });
+    const key = ciJobKey(run.job);
     const seen = newest.get(key);
     if (!seen || run.at > seen.at) newest.set(key, run);
   }
-  return [...newest.values()]
-    .filter((run) => run.failed)
-    .map(({ job }) => ({ repo, branch, authors, pr, ...job }));
+  return [...newest.values()].filter((run) => run.failed).map((run) => run.job);
 }
 
 /** Branches per CI job query. */
 export const CI_BATCH = 20;
 
 const AUTHORS = "nodes { author { user { login } } }";
+
+/** The aliases of branch `index`'s head commit and comparison fields in the CI job query. */
+const aliasesOf = (index: number) => ({ branch: `b${index}`, compare: `c${index}` }) as const;
 
 const CHECK_RUN = `... on CheckRun { name conclusion detailsUrl url startedAt completedAt
   checkSuite { workflowRun { workflow { name } } } }`;
@@ -222,10 +236,11 @@ const CHECK_RUN = `... on CheckRun { name conclusion detailsUrl url startedAt co
  * shortcut: the newest 50 suites, 50 runs each; raise if a busy commit pushes a scheduled run out.
  */
 function ciBranchFields(index: number, suites: boolean): string {
+  const aliases = aliasesOf(index);
   const checkSuites = suites
     ? `checkSuites(last: 50) { nodes { checkRuns(first: 50) { nodes { type: __typename ${CHECK_RUN} } } } }`
     : "";
-  return `b${index}: ref(qualifiedName: $ref${index}) {
+  return `${aliases.branch}: ref(qualifiedName: $ref${index}) {
     associatedPullRequests(states: OPEN, first: 1) { nodes { number url } }
     mergedPullRequests: associatedPullRequests(
       states: MERGED, first: 1, orderBy: { field: CREATED_AT, direction: DESC }
@@ -242,19 +257,39 @@ function ciBranchFields(index: number, suites: boolean): string {
       ${checkSuites}
     } }
   }
-  c${index}: defaultBranchRef { name compare(headRef: $branch${index}) {
+  ${aliases.compare}: defaultBranchRef { name compare(headRef: $branch${index}) {
     aheadBy commits(first: 100) { ${AUTHORS} }
   } }`;
 }
 
 export interface CiJobsPage {
   jobs: CiJob[];
+  /** Branches an unexpected error hit, whose cached jobs still hold. */
+  failed: string[];
   rateRemaining: number;
 }
 
 /**
+ * The branches `error` leaves without jobs to trust. `NOT_FOUND` on a branch's ref, or on the
+ * ref it is compared with, means that ref is gone since it was listed, which nulls the field and
+ * leaves the rest sound; any other error, or one deeper in the field, may leave it partial, so it
+ * fails the branch whose field it hit, or all of them.
+ */
+function failedBy(error: GqlError, branches: CiBranch[]): CiBranch[] {
+  const [, field, ...nested] = error.path ?? [];
+  const hit = branches.filter((_, i) => {
+    const aliases = aliasesOf(i);
+    return field === aliases.branch || field === aliases.compare;
+  });
+  if (hit.length === 0) return branches;
+  const refAt = String(field).startsWith("b") ? "" : "compare";
+  return error.type === "NOT_FOUND" && nested.join(".") === refAt ? [] : hit;
+}
+
+/**
  * The failed jobs on up to `CI_BATCH` branches, in one query. A branch deleted since it was
- * listed is skipped; one without a merge base gets no comparison, both as errors next to data.
+ * listed is skipped, and one whose comparison ref is gone gets none; a branch any other error hit
+ * is `failed`, so the sync keeps its cached jobs.
  * shortcut: the first 100 commits ahead and checks per branch.
  */
 export async function fetchCiJobs(
@@ -269,6 +304,7 @@ export async function fetchCiJobs(
       [`branch${i}`, name],
     ]),
   );
+  const failed = new Set<string>();
   const data = await gh.gql<{
     rateLimit: { remaining: number };
     repository:
@@ -280,13 +316,21 @@ export async function fetchCiJobs(
       repository(owner: $owner, name: $name) { ${branches.map((branch, i) => ciBranchFields(i, branch.suites)).join("\n")} }
     }`,
     { ...splitRepo(repo), ...variables },
-    { partial: true },
+    {
+      acceptError: (error) => {
+        for (const { name } of failedBy(error, branches)) failed.add(name);
+        return true;
+      },
+    },
   );
   if (!data.repository) throw new GithubError(`repository ${repo} not found or not accessible`);
   const fields = data.repository;
   const jobs = branches.flatMap(({ name }, i) => {
-    const node = fields[`b${i}`];
-    return node ? toCiJobs(repo, name, node, fields[`c${i}`] ?? null) : [];
+    const aliases = aliasesOf(i);
+    const node = fields[aliases.branch];
+    return node && !failed.has(name)
+      ? toCiJobs(repo, name, node, fields[aliases.compare] ?? null)
+      : [];
   });
-  return { jobs, rateRemaining: data.rateLimit.remaining };
+  return { jobs, failed: [...failed], rateRemaining: data.rateLimit.remaining };
 }
