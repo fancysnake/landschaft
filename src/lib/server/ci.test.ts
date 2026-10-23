@@ -171,10 +171,10 @@ const respond = (repository: Record<string, unknown>, ...errors: GqlError[]) =>
   );
 
 const red = branch([checkRun("lint", "FAILURE")]);
-const gone = (field: string, type = "NOT_FOUND"): GqlError => ({
+const gone = (path: string[], type = "NOT_FOUND"): GqlError => ({
   message: "x",
   type,
-  path: ["repository", field],
+  path: ["repository", ...path],
 });
 
 describe("fetchCiJobs", () => {
@@ -184,7 +184,7 @@ describe("fetchCiJobs", () => {
   ];
 
   it("skips a branch gone since it was listed", async () => {
-    const gh = respond({ b0: null, c0: base(1), b1: red, c1: base(1) }, gone("b0"));
+    const gh = respond({ b0: null, c0: base(1), b1: red, c1: base(1) }, gone(["b0"]));
     await expect(fetchCiJobs(gh, "acme/app", branches)).resolves.toEqual({
       jobs: [expect.objectContaining({ branch: "feat/y" })],
       failed: [],
@@ -194,7 +194,7 @@ describe("fetchCiJobs", () => {
 
   it("reads a branch without a comparison once its ref is gone", async () => {
     const comparison = { name: "main", compare: null };
-    const gh = respond({ b0: red, c0: comparison, b1: red, c1: base(1) }, gone("c0"));
+    const gh = respond({ b0: red, c0: comparison, b1: red, c1: base(1) }, gone(["c0", "compare"]));
     const page = await fetchCiJobs(gh, "acme/app", branches);
     expect(page.jobs.map((job) => job.branch)).toEqual(["feat/x", "feat/y"]);
     expect(page.failed).toEqual([]);
@@ -203,7 +203,23 @@ describe("fetchCiJobs", () => {
   it("fails the branch any other error hits", async () => {
     const data = { b0: red, c0: base(1), b1: null, c1: { name: "main", compare: null } };
     for (const field of ["b1", "c1"]) {
-      const page = await fetchCiJobs(respond(data, gone(field, "INTERNAL")), "acme/app", branches);
+      const page = await fetchCiJobs(
+        respond(data, gone([field], "INTERNAL")),
+        "acme/app",
+        branches,
+      );
+      expect(page.jobs.map((job) => job.branch)).toEqual(["feat/x"]);
+      expect(page.failed).toEqual(["feat/y"]);
+    }
+  });
+
+  it("fails the branch a NOT_FOUND hits below its refs", async () => {
+    const data = { b0: red, c0: base(1), b1: red, c1: base(1) };
+    for (const path of [
+      ["b1", "target", "statusCheckRollup"],
+      ["c1", "compare", "commits"],
+    ]) {
+      const page = await fetchCiJobs(respond(data, gone(path)), "acme/app", branches);
       expect(page.jobs.map((job) => job.branch)).toEqual(["feat/x"]);
       expect(page.failed).toEqual(["feat/y"]);
     }

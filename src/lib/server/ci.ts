@@ -270,18 +270,20 @@ export interface CiJobsPage {
 }
 
 /**
- * The branches `error` leaves without jobs to trust. `NOT_FOUND` on a field of a branch means
- * its ref is gone since it was listed, which nulls the field and leaves the rest sound; any other
- * error may be transient, so it fails the branch whose field it hit, or all of them.
+ * The branches `error` leaves without jobs to trust. `NOT_FOUND` on a branch's ref, or on the
+ * ref it is compared with, means that ref is gone since it was listed, which nulls the field and
+ * leaves the rest sound; any other error, or one deeper in the field, may leave it partial, so it
+ * fails the branch whose field it hit, or all of them.
  */
 function failedBy(error: GqlError, branches: CiBranch[]): CiBranch[] {
-  const field = error.path?.[1];
+  const [, field, ...nested] = error.path ?? [];
   const hit = branches.filter((_, i) => {
     const aliases = aliasesOf(i);
     return field === aliases.branch || field === aliases.compare;
   });
   if (hit.length === 0) return branches;
-  return error.type === "NOT_FOUND" ? [] : hit;
+  const refAt = String(field).startsWith("b") ? "" : "compare";
+  return error.type === "NOT_FOUND" && nested.join(".") === refAt ? [] : hit;
 }
 
 /**
