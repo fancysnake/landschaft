@@ -1,4 +1,4 @@
-import type { Offer } from "../filter";
+import type { Offer } from "../pacts/filter";
 import type {
   BoardDashboard,
   ViewQuery,
@@ -7,8 +7,8 @@ import type {
   InboxDashboard,
   StarEpicRequest,
   SyncRequest,
-} from "../schema";
-import type { Board, Card, Inbox, LabelDef, NavData, SyncStatus } from "../types";
+} from "../pacts/schema";
+import type { Board, Card, Inbox, LabelDef, NavData, SyncStatus } from "../pacts/types";
 
 /** Tells the islands on this page that the config was saved. */
 export const CONFIG_SAVED = "landschaft:config-saved";

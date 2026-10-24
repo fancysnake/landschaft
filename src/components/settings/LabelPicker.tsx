@@ -1,6 +1,6 @@
 import { type KeyboardEvent, useId, useState } from "react";
 
-import type { LabelDef } from "../../lib/types";
+import type { LabelDef } from "../../lib/pacts/types";
 
 import { labelStyle } from "../../lib/client/labels";
 

@@ -1,6 +1,6 @@
-import { json, route, viewRequest } from "../../../../lib/server/api";
-import { getApp } from "../../../../lib/server/app";
-import { buildBoard } from "../../../../lib/server/board";
+import { getApp } from "../../../../lib/inits";
+import { buildBoard } from "../../../../lib/mills/board";
+import { json, route, viewRequest } from "../../_route";
 
 export const GET = route(async (context) => {
   const { dashboard, query, snapshot, ...audience } = await viewRequest(context, "board");

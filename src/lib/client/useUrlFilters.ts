@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 
-import { type Filters, TEXT_FILTER_KEYS } from "../schema";
+import { type Filters, TEXT_FILTER_KEYS } from "../pacts/schema";
 import { filtersToQuery } from "./api";
 
 export function readFilters(search: string): Filters {

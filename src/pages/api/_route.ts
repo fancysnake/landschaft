@@ -2,12 +2,9 @@ import type { APIContext, APIRoute } from "astro";
 
 import { ZodError, type ZodType } from "zod";
 
-import type { Snapshot } from "../types";
-import type { Audience } from "./board";
-
-import { type Config, type Dashboard, type DashboardType, ViewQuerySchema } from "../schema";
-import { getApp } from "./app";
-import { findDashboard, loadConfig } from "./config";
+import { viewData } from "../../lib/inits";
+import { findDashboard, loadConfig } from "../../lib/links/config/file";
+import { type Dashboard, type DashboardType, ViewQuerySchema } from "../../lib/pacts/schema";
 
 export class ApiError extends Error {
   constructor(
@@ -41,18 +38,6 @@ export async function parseBody<T>(schema: ZodType<T>, request: Request): Promis
 
 export function parseQuery<T>(schema: ZodType<T>, url: URL): T {
   return schema.parse(Object.fromEntries(url.searchParams));
-}
-
-/**
- * The cached issues and jobs of the configured repos and who views them; `viewer` is null when it
- * cannot be fetched.
- */
-export async function viewData({
-  repos,
-  users,
-}: Pick<Config, "repos" | "users">): Promise<Audience & { snapshot: Snapshot }> {
-  const { db, syncer } = getApp();
-  return { snapshot: db.snapshot(repos), users, viewer: await syncer.viewer().catch(() => null) };
 }
 
 /**

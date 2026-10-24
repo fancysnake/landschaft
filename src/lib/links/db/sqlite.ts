@@ -14,9 +14,9 @@ import type {
   PullStatus,
   Snapshot,
   SyncState,
-} from "../types";
+} from "../../pacts/types";
 
-import { isPullStatusLabel } from "../status";
+import { isPullStatusLabel } from "../../pacts/status";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS issues (

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-import { type Config, ConfigSchema, type Dashboard } from "../schema";
+import { type Config, ConfigSchema, type Dashboard } from "../../pacts/schema";
 
 export function configPath(): string {
   return resolve(process.env.LANDSCHAFT_CONFIG ?? "landschaft.config.json");

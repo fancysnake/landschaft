@@ -6,7 +6,7 @@ import {
   matchesFilter,
   type Offer,
   parseFilter,
-} from "../filter";
+} from "../pacts/filter";
 import {
   type BoardDashboard,
   type ViewQuery,
@@ -18,8 +18,9 @@ import {
   type SortBy,
   type SortDir,
   type UnmatchedQuery,
-} from "../schema";
+} from "../pacts/schema";
 import {
+  type Audience,
   type Board,
   type Card,
   cellKey,
@@ -33,7 +34,7 @@ import {
   type IssueRef,
   type LabelRef,
   type Snapshot,
-} from "../types";
+} from "../pacts/types";
 
 /** A swimlane or column with its filter parsed; a null `node` matches everything. */
 export interface Group {
@@ -356,12 +357,6 @@ const toCard = (item: Item, labels: LabelRef[], isEpic: boolean): Card => ({
   createdAt: item.createdAt,
   updatedAt: item.updatedAt,
 });
-
-/** Who a view is for: the global `users` (empty for everyone) and the login `@me` stands for. */
-export interface Audience {
-  users: string[];
-  viewer: string | null;
-}
 
 /**
  * The repos of the open `issues` and failed CI `jobs` that one of the global `users` is in and

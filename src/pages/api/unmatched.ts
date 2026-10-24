@@ -1,8 +1,8 @@
-import { UnmatchedQuerySchema } from "../../lib/schema";
-import { json, parseQuery, route, viewData } from "../../lib/server/api";
-import { getApp } from "../../lib/server/app";
-import { unmatchedItems } from "../../lib/server/board";
-import { loadConfig } from "../../lib/server/config";
+import { getApp, viewData } from "../../lib/inits";
+import { loadConfig } from "../../lib/links/config/file";
+import { unmatchedItems } from "../../lib/mills/board";
+import { UnmatchedQuerySchema } from "../../lib/pacts/schema";
+import { json, parseQuery, route } from "./_route";
 
 export const GET = route(async (context) => {
   const config = loadConfig();

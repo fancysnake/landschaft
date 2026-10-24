@@ -1,12 +1,12 @@
 import { useCallback, useState } from "react";
 
-import type { ItemKind } from "../lib/types";
+import type { ItemKind } from "../lib/pacts/types";
 
 import { api } from "../lib/client/api";
 import { useDebouncedText } from "../lib/client/useDebouncedText";
 import { useHiddenRepos } from "../lib/client/useHiddenRepos";
 import { useSynced } from "../lib/client/useSynced";
-import { filterError } from "../lib/filter";
+import { filterError } from "../lib/pacts/filter";
 import { CardView } from "./board/IssueCard";
 import { ErrorBanner } from "./ErrorBanner";
 import { FilterInput } from "./settings/FilterInput";

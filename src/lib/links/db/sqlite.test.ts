@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { cachedIssue, label, makeIssue, REPO } from "./__fixtures__/issues";
-import { Db } from "./db";
+import { cachedIssue, label, makeIssue, REPO } from "../../__fixtures__/issues";
+import { Db } from "./sqlite";
 
 describe("Db migration", () => {
   it("adds the author column to a pre-existing database and forces a full resync", () => {

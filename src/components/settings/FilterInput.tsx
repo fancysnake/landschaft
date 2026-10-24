@@ -1,6 +1,6 @@
 import { useId } from "react";
 
-import { type Offer, suggestFilter } from "../../lib/filter";
+import { type Offer, suggestFilter } from "../../lib/pacts/filter";
 
 /** A filter expression with completions for its last term and the parse error below it. */
 export function FilterInput({

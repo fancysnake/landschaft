@@ -1,8 +1,8 @@
-import { SyncRequestSchema } from "../../lib/schema";
-import { ApiError, json, route } from "../../lib/server/api";
-import { getApp } from "../../lib/server/app";
-import { loadConfig } from "../../lib/server/config";
-import { SyncBusyError } from "../../lib/server/sync";
+import { getApp } from "../../lib/inits";
+import { loadConfig } from "../../lib/links/config/file";
+import { SyncBusyError } from "../../lib/mills/sync";
+import { SyncRequestSchema } from "../../lib/pacts/schema";
+import { ApiError, json, route } from "./_route";
 
 export const POST = route(async ({ request }) => {
   const text = await request.text();

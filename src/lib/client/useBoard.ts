@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 
-import type { ViewQuery } from "../schema";
+import type { ViewQuery } from "../pacts/schema";
 
 import { api, type BoardResponse, errorMessage } from "./api";
 import { useSynced } from "./useSynced";

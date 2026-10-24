@@ -23,7 +23,7 @@ mise run site:dev   # MkDocs (Material) docs at http://localhost:8000
 mise run site:build # docs build into site/; strict, so a broken link or anchor fails it
 ```
 
-Narrow first: `mise exec -- vitest run src/lib/server/board.test.ts`, `mise exec -- oxlint <file>`.
+Narrow first: `mise exec -- vitest run src/lib/mills/board.test.ts`, `mise exec -- oxlint <file>`.
 `hk` installs the pre-commit hook (fix mode) on `mise install`.
 
 Lint rules are configured in `.oxlintrc.json`; never add inline ignores. `.astro` files are only
@@ -34,14 +34,19 @@ type-checked (`astro check`), not formatted.
 - `bin/landschaft.js` — CLI for consumers (`dev|build|start`): runs Astro with `root` = this
   package; config, DB and the production build (`dist/`, fully bundled via `ssr.noExternal` in the CLI's build call)
   live in the consumer's cwd. Plain JS, `@ts-check`.
-- `src/lib/schema.ts` — zod schemas + types shared by server and client (config, filters).
-- `src/lib/types.ts` — runtime data shapes (Issue, Card, Board, SyncStatus).
-- `src/lib/server/` — Node only: `config.ts` (JSON file, atomic save), `db.ts` (SQLite),
-  `github.ts` (GraphQL sync queries), `ci.ts` (failed CI job queries), `sync.ts` (Syncer +
-  scheduler), `board.ts` (**pure** board builder), `app.ts` (process singleton booted by
-  `src/middleware.ts`), `api.ts` (endpoint helpers).
-- `src/pages/api/**` — JSON endpoints, all wrapped in `route()` from `api.ts`.
-- `src/lib/client/` — fetch wrappers, `useBoard` (polling), URL filters.
+- `src/lib/pacts/` — contracts shared by server and client: `schema.ts` (zod schemas + types:
+  config, filters), `types.ts` (runtime data shapes: Issue, Card, Board, SyncStatus),
+  `filter.ts` (filter language), `status.ts` (pull status labels).
+- `src/lib/mills/` — Node-only logic: `board.ts` (**pure** board builder), `sync.ts` (Syncer +
+  scheduler).
+- `src/lib/links/` — Node-only adapters: `config/file.ts` (JSON file, atomic save),
+  `db/sqlite.ts` (SQLite), `forge/github/client.ts` (GraphQL transport, token),
+  `forge/github/issues.ts` (issue and PR sync queries), `forge/github/ci.ts` (failed CI job queries).
+- `src/lib/inits.ts` — process singleton booted by `src/middleware.ts`, and the read models
+  over it (`viewData`, `navData`) that endpoints and the layout share.
+- `src/pages/api/**` — JSON endpoints, all wrapped in `route()` from `_route.ts` (endpoint
+  helpers; Astro skips `_`-prefixed files when routing).
+- `src/lib/client/` — fetch wrappers, `useBoard` (polling), URL filters, `move` (list reorder).
 - `src/components/board/` and `src/components/settings/` — React islands mounted with
   `client:only="react"` from `src/pages/d/[id].astro` and `src/pages/settings.astro`.
 
@@ -50,9 +55,13 @@ type-checked (`astro check`), not formatted.
 
 ## Conventions
 
+- Imports run inward: `pacts` import no other layer; `links` import `pacts` only; `mills` import
+  `pacts` only; `inits` wires all three. `.oxlintrc.json` enforces this for `pacts` and `links`.
+  Known exemptions: `mills/sync.ts` imports the github and sqlite links directly (#93),
+  and `src/pages/**` imports `inits`, `links` and `mills` (#94).
 - Board logic stays pure and unit-tested in `board.ts`; endpoints only glue.
 - Sync is sequential on purpose (rate limits); `no-await-in-loop` is off for that reason.
 - Config edits go through `saveConfig()` (validation + tmp-file rename). Ids are immutable
   once saved because they are in URLs.
-- Tests live next to the code as `*.test.ts`; fixtures in `src/lib/server/__fixtures__/`.
+- Tests live next to the code as `*.test.ts`; fixtures in `src/lib/__fixtures__/`.
 - No tests for React forms/components; verify UI in a browser.

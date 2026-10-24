@@ -1,18 +1,23 @@
-import type { CiJob, SyncStatus } from "../types";
-import type { Db } from "./db";
+import type { Db } from "../links/db/sqlite";
+import type { GithubClient } from "../links/forge/github/client";
+import type { CiJob, SyncStatus } from "../pacts/types";
 
-import { closedSince, type Config } from "../schema";
-import { type CiBranch, CI_BATCH, fetchCiBranchesPage, fetchCiJobs } from "./ci";
+import {
+  type CiBranch,
+  CI_BATCH,
+  fetchCiBranchesPage,
+  fetchCiJobs,
+} from "../links/forge/github/ci";
 import {
   fetchIssuesPage,
   fetchPullStatuses,
   fetchPullsPage,
   fetchRepoLabels,
   fetchViewer,
-  type GithubClient,
   type PageOptions,
   STATUS_BATCH,
-} from "./github";
+} from "../links/forge/github/issues";
+import { closedSince, type Config } from "../pacts/schema";
 
 const FULL_SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const SINCE_OVERLAP_MS = 2 * 60 * 1000;
