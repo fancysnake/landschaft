@@ -65,7 +65,7 @@ export function useSyncStatus(): SyncController {
       setError(null);
       try {
         const response = await api.sync({ full });
-        awaitedRun.current = response.run ?? null;
+        awaitedRun.current = response.run;
         apply(response.status);
       } catch (cause) {
         setError(`Sync failed: ${errorMessage(cause)}`);

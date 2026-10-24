@@ -50,9 +50,10 @@ function errorMessage(error: unknown): string {
 
 export class Syncer {
   version = 0;
-  /** Sync-all runs finished; the run started or joined now is number `runs + 1`. */
+  /** Sync-all runs finished. */
   runs = 0;
   lastSyncAt: string | null = null;
+  /** Written by sync-all runs alone; a repo's own error stays in its sync state. */
   lastError: string | null = null;
   rateRemaining: number | null = null;
   viewerLogin: string | null = null;
@@ -103,7 +104,7 @@ export class Syncer {
   /**
    * Adds `repos` to the running sync-all, or starts one; resolves when that run ends. A run
    * syncs one repo at a time, skips those already in flight, and ends with every failure it met
-   * in `lastError`.
+   * in `lastError`. Never rejects.
    */
   syncAll(repos: string[], options: SyncOptions = {}): Promise<void> {
     for (const repo of repos) {
@@ -112,6 +113,11 @@ export class Syncer {
     // Deferred a tick, so a run that finds the queue empty ends after `running` is set.
     this.running ??= Promise.resolve().then(() => this.drainQueue());
     return this.running;
+  }
+
+  /** The sync-all run a `syncAll` call starts or joins now; it ends once `runs` reaches it. */
+  get currentRun(): number {
+    return this.runs + 1;
   }
 
   private async drainQueue(): Promise<void> {
@@ -130,7 +136,6 @@ export class Syncer {
     } finally {
       this.lastError = errors.length > 0 ? errors.join("; ") : null;
       this.runs += 1;
-      this.version += 1;
       this.running = null;
     }
   }
@@ -181,12 +186,12 @@ export class Syncer {
         updatedAt: this.now().toISOString(),
       });
       this.lastSyncAt = stamp;
-      this.lastError = null;
       return { repo, full, upserted, closed };
     } catch (error) {
-      const message = errorMessage(error);
-      this.db.setSyncState(repo, { lastError: message, updatedAt: this.now().toISOString() });
-      this.lastError = `${repo}: ${message}`;
+      this.db.setSyncState(repo, {
+        lastError: errorMessage(error),
+        updatedAt: this.now().toISOString(),
+      });
       throw error;
     } finally {
       this.inFlight.delete(repo);
@@ -293,7 +298,7 @@ export function startScheduler(
         Date.now() - Date.parse(state.lastSyncAt) >= config.refreshMinutes * 60_000
       );
     });
-    if (due.length > 0) await syncer.syncAll(due).catch(() => undefined);
+    if (due.length > 0) await syncer.syncAll(due);
   };
   const first = setTimeout(() => void tick(), options.firstDelayMs ?? 1000);
   const interval = setInterval(() => void tick(), tickMs);

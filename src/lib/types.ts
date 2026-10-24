@@ -199,7 +199,7 @@ export interface SyncStatus {
   /** Sync-all runs finished since the server started. */
   runs: number;
   lastSyncAt: string | null;
-  /** Every failure of the last sync-all run, or of a single-repo sync since. */
+  /** Every failure of the last finished sync-all run. */
   lastError: string | null;
   rateRemaining: number | null;
   inFlight: string[];

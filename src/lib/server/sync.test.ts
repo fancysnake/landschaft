@@ -407,7 +407,7 @@ describe("Syncer", () => {
     expect(pageCalls(calls)[0]?.variables).toMatchObject({ since: null, states: ["OPEN"] });
   });
 
-  it("records errors, clears the in-flight flag and still bumps the version", async () => {
+  it("keeps a repo's error in its sync state alone, clears the in-flight flag and bumps the version", async () => {
     const gh: GithubClient = {
       async gql() {
         throw new Error("boom");
@@ -418,7 +418,7 @@ describe("Syncer", () => {
     expect(db.getSyncState(REPO)?.lastError).toBe("boom");
     expect(syncer.status()).toMatchObject({
       version: 1,
-      lastError: "acme/app: boom",
+      lastError: null,
       inFlight: [],
     });
   });
@@ -436,6 +436,7 @@ describe("Syncer", () => {
     const running = syncer.syncRepo(REPO);
     await expect(syncer.syncRepo(REPO)).rejects.toBeInstanceOf(SyncBusyError);
     await expect(syncer.syncAll([REPO])).resolves.toBeUndefined();
+    expect(syncer.status()).toMatchObject({ runs: 1, version: 0 });
     const empty = { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] };
     gate.resolve({
       rateLimit: { remaining: 5000 },
@@ -474,11 +475,14 @@ describe("Syncer", () => {
     });
     const syncer = new Syncer({ db, gh, now: () => now });
     const first = syncer.syncAll([REPO]);
+    await vi.waitFor(() => expect(syncer.inFlight.has(REPO)).toBe(true));
     const second = syncer.syncAll(["acme/other"], { full: true });
     expect(second).toBe(first);
+    expect(syncer.currentRun).toBe(1);
     gate.resolve(undefined);
     await second;
     expect(syncer.status().runs).toBe(1);
+    expect(syncer.currentRun).toBe(2);
     expect(
       pageCalls(calls)
         .filter((c) => c.variables.name === "other")

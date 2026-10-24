@@ -27,5 +27,5 @@ export const POST = route(async ({ request }) => {
   }
   // The run ends once /api/version reports `runs >= run`, its failures in `lastError`.
   void syncer.syncAll(loadConfig().repos, { full: body.full });
-  return json({ status: syncer.status(), run: syncer.runs + 1 }, 202);
+  return json({ status: syncer.status(), run: syncer.currentRun }, 202);
 });

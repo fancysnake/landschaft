@@ -32,11 +32,10 @@ export interface UnmatchedResponse {
   status: SyncStatus;
 }
 
+/** A sync-all's answer, sent with `202` before any repo finishes. */
 export interface SyncResponse {
-  /** Absent on a sync-all, which answers `202` before any repo finishes. */
-  results?: { repo: string; full: boolean; upserted: number; closed: number }[];
-  /** On a sync-all: the run it joined, done once `status.runs` reaches it. */
-  run?: number;
+  /** The run it joined, done once `status.runs` reaches it. */
+  run: number;
   status: SyncStatus;
 }
 
@@ -100,7 +99,7 @@ export const api = {
       `/api/unmatched?${new URLSearchParams({ hide: hide.join(","), filter })}`,
     ),
   version: () => request<SyncStatus>("/api/version"),
-  sync: (body: Partial<SyncRequest>) =>
+  sync: (body: Pick<SyncRequest, "full">) =>
     request<SyncResponse>("/api/sync", { method: "POST", body: JSON.stringify(body) }),
   setEpicStarred: (dashboardId: string, body: StarEpicRequest) =>
     request<{ starredEpics: string[] }>(
