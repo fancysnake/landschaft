@@ -196,7 +196,10 @@ export interface SyncState {
 
 export interface SyncStatus {
   version: number;
+  /** Sync-all runs finished since the server started. */
+  runs: number;
   lastSyncAt: string | null;
+  /** Every failure of the last sync-all run, or of a single-repo sync since. */
   lastError: string | null;
   rateRemaining: number | null;
   inFlight: string[];

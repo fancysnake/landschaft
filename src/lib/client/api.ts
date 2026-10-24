@@ -35,6 +35,8 @@ export interface UnmatchedResponse {
 export interface SyncResponse {
   /** Absent on a sync-all, which answers `202` before any repo finishes. */
   results?: { repo: string; full: boolean; upserted: number; closed: number }[];
+  /** On a sync-all: the run it joined, done once `status.runs` reaches it. */
+  run?: number;
   status: SyncStatus;
 }
 

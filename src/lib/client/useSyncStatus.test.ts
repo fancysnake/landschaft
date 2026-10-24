@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 
 import type { SyncStatus } from "../types";
 
-import { api, type SyncResponse } from "./api";
+import { api } from "./api";
 import { SYNCED, type SyncController, useSyncStatus } from "./useSyncStatus";
 
 vi.mock("./api", async (importOriginal) => {
@@ -15,7 +15,7 @@ vi.mock("./api", async (importOriginal) => {
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const status = (version: number, extra: Partial<SyncStatus> = {}) =>
-  ({ version, inFlight: [], lastError: null, ...extra }) as SyncStatus;
+  ({ version, runs: 0, inFlight: [], lastError: null, ...extra }) as SyncStatus;
 
 let root: Root;
 
@@ -42,8 +42,8 @@ test("a changed version is announced, the first one is not", async () => {
   const announced: unknown[] = [];
   const listen = (event: Event) => announced.push((event as CustomEvent).detail);
   window.addEventListener(SYNCED, listen);
-  vi.mocked(api.version).mockResolvedValueOnce(status(1)).mockResolvedValue(status(2));
-  vi.mocked(api.sync).mockResolvedValue({} as SyncResponse);
+  vi.mocked(api.version).mockResolvedValue(status(1));
+  vi.mocked(api.sync).mockResolvedValue({ status: status(2), run: 1 });
 
   const result = await renderStatus();
   await act(() => result.current!.sync());
@@ -52,19 +52,26 @@ test("a changed version is announced, the first one is not", async () => {
   expect(announced).toEqual([2]);
 });
 
-test("a sync reports the error it finished with", async () => {
+const poll = () => act(async () => void document.dispatchEvent(new Event("visibilitychange")));
+
+test("a sync waits for its run and reports the errors it ended with", async () => {
   vi.mocked(api.version)
     .mockResolvedValueOnce(status(1))
-    .mockResolvedValueOnce(status(1, { inFlight: ["o/r"] }))
-    .mockResolvedValue(status(2, { lastError: "rate limited" }));
-  vi.mocked(api.sync).mockResolvedValue({} as SyncResponse);
+    .mockResolvedValueOnce(status(2, { runs: 1, lastError: "other run" }))
+    .mockResolvedValue(status(3, { runs: 2, lastError: "rate limited" }));
+  vi.mocked(api.sync).mockResolvedValue({ status: status(1, { runs: 1 }), run: 2 });
 
   const result = await renderStatus();
   await act(() => result.current!.sync());
-  expect(result.current!.error).toBeNull();
+  expect(result.current!.syncing).toBe(true);
 
-  await act(async () => void document.dispatchEvent(new Event("visibilitychange")));
+  await poll();
+  expect(result.current!.error).toBeNull();
+  expect(result.current!.syncing).toBe(true);
+
+  await poll();
   expect(result.current!.error).toBe("rate limited");
+  expect(result.current!.syncing).toBe(false);
 });
 
 test("a refused sync is reported", async () => {

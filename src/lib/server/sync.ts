@@ -50,6 +50,8 @@ function errorMessage(error: unknown): string {
 
 export class Syncer {
   version = 0;
+  /** Sync-all runs finished; the run started or joined now is number `runs + 1`. */
+  runs = 0;
   lastSyncAt: string | null = null;
   lastError: string | null = null;
   rateRemaining: number | null = null;
@@ -60,6 +62,9 @@ export class Syncer {
   private readonly now: () => Date;
   private readonly closedDays: () => number;
   private viewerPromise: Promise<string> | null = null;
+  /** Repos the running sync-all has yet to reach, each with its `full` flag. */
+  private readonly queue = new Map<string, boolean>();
+  private running: Promise<void> | null = null;
 
   constructor(deps: SyncDeps) {
     this.db = deps.db;
@@ -71,6 +76,7 @@ export class Syncer {
   status(): SyncStatus {
     return {
       version: this.version,
+      runs: this.runs,
       lastSyncAt: this.lastSyncAt,
       lastError: this.lastError,
       rateRemaining: this.rateRemaining,
@@ -94,15 +100,38 @@ export class Syncer {
     return this.viewerPromise;
   }
 
-  /** Sequential; a failing repo is recorded and skipped, the rest still sync. */
-  async syncAll(repos: string[], options: SyncOptions = {}): Promise<void> {
+  /**
+   * Adds `repos` to the running sync-all, or starts one; resolves when that run ends. A run
+   * syncs one repo at a time, skips those already in flight, and ends with every failure it met
+   * in `lastError`.
+   */
+  syncAll(repos: string[], options: SyncOptions = {}): Promise<void> {
     for (const repo of repos) {
-      if (this.inFlight.has(repo)) continue;
-      try {
-        await this.syncRepo(repo, options);
-      } catch {
-        // recorded in sync_state and lastError by syncRepo
+      this.queue.set(repo, Boolean(options.full) || Boolean(this.queue.get(repo)));
+    }
+    // Deferred a tick, so a run that finds the queue empty ends after `running` is set.
+    this.running ??= Promise.resolve().then(() => this.drainQueue());
+    return this.running;
+  }
+
+  private async drainQueue(): Promise<void> {
+    const errors: string[] = [];
+    try {
+      // A Map iterator also visits the repos added while the run goes.
+      for (const [repo, full] of this.queue) {
+        this.queue.delete(repo);
+        if (this.inFlight.has(repo)) continue;
+        try {
+          await this.syncRepo(repo, { full });
+        } catch (error) {
+          errors.push(`${repo}: ${errorMessage(error)}`);
+        }
       }
+    } finally {
+      this.lastError = errors.length > 0 ? errors.join("; ") : null;
+      this.runs += 1;
+      this.version += 1;
+      this.running = null;
     }
   }
 
@@ -256,15 +285,15 @@ export function startScheduler(
       syncer.lastError = `config: ${errorMessage(error)}`;
       return;
     }
-    for (const repo of config.repos) {
-      if (stopped || syncer.inFlight.has(repo)) continue;
+    const due = config.repos.filter((repo) => {
+      if (syncer.inFlight.has(repo)) return false;
       const state = syncer.db.getSyncState(repo);
-      const due =
+      return (
         !state?.lastSyncAt ||
-        Date.now() - Date.parse(state.lastSyncAt) >= config.refreshMinutes * 60_000;
-      if (!due) continue;
-      await syncer.syncRepo(repo).catch(() => undefined);
-    }
+        Date.now() - Date.parse(state.lastSyncAt) >= config.refreshMinutes * 60_000
+      );
+    });
+    if (due.length > 0) await syncer.syncAll(due).catch(() => undefined);
   };
   const first = setTimeout(() => void tick(), options.firstDelayMs ?? 1000);
   const interval = setInterval(() => void tick(), tickMs);
