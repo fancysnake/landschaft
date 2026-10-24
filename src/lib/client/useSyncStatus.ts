@@ -22,25 +22,29 @@ export function useSyncStatus(): SyncController {
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const versionRef = useRef<number | null>(null);
-  // Set by sync(); the first poll with nothing in flight reports that sync's error, if any.
-  const awaitingSync = useRef(false);
+  // The run sync() joined; the first status that counts it reports that run's errors.
+  const awaitedRun = useRef<number | null>(null);
+
+  const apply = useCallback((next: SyncStatus) => {
+    setStatus(next);
+    if (versionRef.current !== null && next.version !== versionRef.current) {
+      window.dispatchEvent(new CustomEvent(SYNCED, { detail: next.version }));
+    }
+    versionRef.current = next.version;
+    if (awaitedRun.current !== null && next.runs >= awaitedRun.current) {
+      awaitedRun.current = null;
+      setSyncing(false);
+      setError(next.lastError);
+    }
+  }, []);
 
   const poll = useCallback(async () => {
     try {
-      const next = await api.version();
-      setStatus(next);
-      if (versionRef.current !== null && next.version !== versionRef.current) {
-        window.dispatchEvent(new CustomEvent(SYNCED, { detail: next.version }));
-      }
-      versionRef.current = next.version;
-      if (awaitingSync.current && next.inFlight.length === 0) {
-        awaitingSync.current = false;
-        setError(next.lastError);
-      }
+      apply(await api.version());
     } catch {
       // transient; the next tick retries
     }
-  }, []);
+  }, [apply]);
 
   useEffect(() => {
     const tick = () => {
@@ -60,16 +64,15 @@ export function useSyncStatus(): SyncController {
       setSyncing(true);
       setError(null);
       try {
-        await api.sync({ full });
-        awaitingSync.current = true;
+        const response = await api.sync({ full });
+        awaitedRun.current = response.run;
+        apply(response.status);
       } catch (cause) {
         setError(`Sync failed: ${errorMessage(cause)}`);
-      } finally {
-        setSyncing(false);
       }
-      await poll();
+      if (awaitedRun.current === null) setSyncing(false);
     },
-    [poll],
+    [apply],
   );
 
   const dismissError = useCallback(() => setError(null), []);

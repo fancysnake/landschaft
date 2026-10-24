@@ -407,7 +407,7 @@ describe("Syncer", () => {
     expect(pageCalls(calls)[0]?.variables).toMatchObject({ since: null, states: ["OPEN"] });
   });
 
-  it("records errors, clears the in-flight flag and still bumps the version", async () => {
+  it("keeps a repo's error in its sync state alone, clears the in-flight flag and bumps the version", async () => {
     const gh: GithubClient = {
       async gql() {
         throw new Error("boom");
@@ -418,7 +418,7 @@ describe("Syncer", () => {
     expect(db.getSyncState(REPO)?.lastError).toBe("boom");
     expect(syncer.status()).toMatchObject({
       version: 1,
-      lastError: "acme/app: boom",
+      lastError: null,
       inFlight: [],
     });
   });
@@ -436,6 +436,7 @@ describe("Syncer", () => {
     const running = syncer.syncRepo(REPO);
     await expect(syncer.syncRepo(REPO)).rejects.toBeInstanceOf(SyncBusyError);
     await expect(syncer.syncAll([REPO])).resolves.toBeUndefined();
+    expect(syncer.status()).toMatchObject({ runs: 1, version: 0 });
     const empty = { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] };
     gate.resolve({
       rateLimit: { remaining: 5000 },
@@ -443,6 +444,50 @@ describe("Syncer", () => {
     });
     await expect(running).resolves.toMatchObject({ upserted: 0 });
     expect(syncer.inFlight.size).toBe(0);
+  });
+
+  it("keeps a sync-all's early failure past a later success and counts the run", async () => {
+    const { gh: good } = fakeGithub([[]]);
+    const gh: GithubClient = {
+      gql: <T>(query: string, variables: Record<string, unknown>): Promise<T> =>
+        variables.name === "bad"
+          ? Promise.reject(new Error("boom"))
+          : good.gql<T>(query, variables),
+    };
+    const syncer = new Syncer({ db, gh, now: () => now });
+    await syncer.syncAll(["acme/bad", REPO]);
+    expect(db.getSyncState(REPO)?.lastSyncAt).not.toBeNull();
+    expect(syncer.status()).toMatchObject({ runs: 1, lastError: "acme/bad: boom" });
+  });
+
+  it("adds a sync-all's repos to the running one, keeping their full flag", async () => {
+    const gate = deferred();
+    const { gh: real, calls } = fakeGithub([[]]);
+    const gh: GithubClient = {
+      gql: async <T>(query: string, variables: Record<string, unknown>): Promise<T> => {
+        await gate.promise;
+        return real.gql<T>(query, variables);
+      },
+    };
+    db.setSyncState("acme/other", {
+      lastSyncAt: "2026-05-01T11:00:00.000Z",
+      lastFullSyncAt: "2026-05-01T11:00:00.000Z",
+    });
+    const syncer = new Syncer({ db, gh, now: () => now });
+    const first = syncer.syncAll([REPO]);
+    await vi.waitFor(() => expect(syncer.inFlight.has(REPO)).toBe(true));
+    const second = syncer.syncAll(["acme/other"], { full: true });
+    expect(second).toBe(first);
+    expect(syncer.currentRun).toBe(1);
+    gate.resolve(undefined);
+    await second;
+    expect(syncer.status().runs).toBe(1);
+    expect(syncer.currentRun).toBe(2);
+    expect(
+      pageCalls(calls)
+        .filter((c) => c.variables.name === "other")
+        .map((c) => c.variables.since),
+    ).toContain(null);
   });
 
   it("aborts when the rate limit is nearly gone and more pages remain", async () => {

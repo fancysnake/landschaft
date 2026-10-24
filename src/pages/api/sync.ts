@@ -25,7 +25,7 @@ export const POST = route(async ({ request }) => {
       throw new ApiError(502, error instanceof Error ? error.message : String(error));
     }
   }
-  // Failures land in status.lastError; clients follow progress through /api/version.
+  // The run ends once /api/version reports `runs >= run`, its failures in `lastError`.
   void syncer.syncAll(loadConfig().repos, { full: body.full });
-  return json({ status: syncer.status() }, 202);
+  return json({ status: syncer.status(), run: syncer.currentRun }, 202);
 });
