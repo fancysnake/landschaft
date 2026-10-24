@@ -104,7 +104,8 @@ fragment IssueFields on Issue {
   parent { number repository { nameWithOwner } }
   subIssuesSummary { total completed percentCompleted }
   issueDependenciesSummary { totalBlockedBy }
-  blockedBy(first: 20) { nodes { number state repository { nameWithOwner } } }
+  # 50 is GitHub's cap per relationship type; isBlocked's blockedByTotal guard covers any it omits
+  blockedBy(first: 50) { nodes { number state repository { nameWithOwner } } }
 }`;
 
 const ISSUES_PAGE_QUERY = `
