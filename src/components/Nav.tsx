@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import type { NavData } from "../lib/types";
+import type { NavData } from "../lib/pacts/types";
 
 import { api, CONFIG_SAVED } from "../lib/client/api";
 import { repoShortName } from "../lib/client/labels";

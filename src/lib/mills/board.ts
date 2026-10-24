@@ -6,7 +6,7 @@ import {
   matchesFilter,
   type Offer,
   parseFilter,
-} from "../filter";
+} from "../pacts/filter";
 import {
   type BoardDashboard,
   type ViewQuery,
@@ -18,7 +18,7 @@ import {
   type SortBy,
   type SortDir,
   type UnmatchedQuery,
-} from "../schema";
+} from "../pacts/schema";
 import {
   type Board,
   type Card,
@@ -33,7 +33,7 @@ import {
   type IssueRef,
   type LabelRef,
   type Snapshot,
-} from "../types";
+} from "../pacts/types";
 
 /** A swimlane or column with its filter parsed; a null `node` matches everything. */
 export interface Group {

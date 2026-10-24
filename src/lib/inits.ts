@@ -1,8 +1,8 @@
-import { closedDays } from "../schema";
-import { loadConfig } from "./config";
-import { Db } from "./db";
-import { createGithubClient, getToken, type GithubClient } from "./github";
-import { startScheduler, Syncer } from "./sync";
+import { loadConfig } from "./links/config/file";
+import { Db } from "./links/db/sqlite";
+import { createGithubClient, getToken, type GithubClient } from "./links/github/api";
+import { startScheduler, Syncer } from "./mills/sync";
+import { closedDays } from "./pacts/schema";
 
 export interface App {
   db: Db;

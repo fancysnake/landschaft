@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { createGithubClient, type GqlError } from "./api";
 import {
   type CiBranchNode,
   type CiContext,
@@ -7,7 +8,6 @@ import {
   fetchCiJobs,
   toCiJobs,
 } from "./ci";
-import { createGithubClient, type GqlError } from "./github";
 
 const commits = (...logins: (string | null)[]) => ({
   nodes: logins.map((login) => ({ author: { user: login === null ? null : { login } } })),

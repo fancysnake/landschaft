@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { PullStatusLabel } from "../status";
+import type { PullStatusLabel } from "../../pacts/status";
 
 import {
   type CheckContext,
@@ -13,7 +13,7 @@ import {
   toIssue,
   toPull,
   toPullStatus,
-} from "./github";
+} from "./api";
 
 const node: IssueNode = {
   id: "I_1",

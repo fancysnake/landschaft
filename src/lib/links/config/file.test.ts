@@ -3,8 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { type BoardDashboard, CONFIG_VERSION, ConfigSchema, type Dashboard } from "../schema";
-import { findDashboard, loadConfig, saveConfig } from "./config";
+import {
+  type BoardDashboard,
+  CONFIG_VERSION,
+  ConfigSchema,
+  type Dashboard,
+} from "../../pacts/schema";
+import { findDashboard, loadConfig, saveConfig } from "./file";
 
 const minimal = {
   version: CONFIG_VERSION,

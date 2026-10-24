@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { CiBranchNode } from "./ci";
-import type { GithubClient, GqlOptions, IssueNode, PullNode } from "./github";
+import type { GithubClient, GqlOptions, IssueNode, PullNode } from "../links/github/api";
+import type { CiBranchNode } from "../links/github/ci";
 
-import { CONFIG_VERSION, type Config } from "../schema";
-import { cachedIssue, makeIssue, REPO } from "./__fixtures__/issues";
-import { Db } from "./db";
+import { cachedIssue, makeIssue, REPO } from "../__fixtures__/issues";
+import { Db } from "../links/db/sqlite";
+import { CONFIG_VERSION, type Config } from "../pacts/schema";
 import { startScheduler, SyncBusyError, Syncer } from "./sync";
 
 function toNode(number: number, state: "OPEN" | "CLOSED" = "OPEN"): IssueNode {

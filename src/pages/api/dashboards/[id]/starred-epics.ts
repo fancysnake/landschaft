@@ -1,8 +1,8 @@
-import { StarEpicRequestSchema } from "../../../../lib/schema";
-import { ApiError, json, parseBody, route } from "../../../../lib/server/api";
-import { getApp } from "../../../../lib/server/app";
-import { findDashboard, loadConfig } from "../../../../lib/server/config";
-import { parseIssueKey } from "../../../../lib/types";
+import { getApp } from "../../../../lib/inits";
+import { findDashboard, loadConfig } from "../../../../lib/links/config/file";
+import { StarEpicRequestSchema } from "../../../../lib/pacts/schema";
+import { parseIssueKey } from "../../../../lib/pacts/types";
+import { ApiError, json, parseBody, route } from "../../_route";
 
 export const POST = route(async ({ params, request }) => {
   const { epic, starred } = await parseBody(StarEpicRequestSchema, request);

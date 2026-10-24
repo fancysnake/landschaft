@@ -1,9 +1,9 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-import type { FetchedIssue, IssueState, LabelDef, PullStatus } from "../types";
+import type { FetchedIssue, IssueState, LabelDef, PullStatus } from "../../pacts/types";
 
-import { PULL_STATUS_NAMES, type PullStatusLabel } from "../status";
+import { PULL_STATUS_NAMES, type PullStatusLabel } from "../../pacts/status";
 
 const execFileAsync = promisify(execFile);
 

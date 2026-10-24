@@ -2,7 +2,7 @@ import { Fragment } from "react";
 
 import { useBoard } from "../../lib/client/useBoard";
 import { useViewRequest } from "../../lib/client/useViewRequest";
-import { cellKey } from "../../lib/types";
+import { cellKey } from "../../lib/pacts/types";
 import { EpicStrip } from "./EpicStrip";
 import { CardView } from "./IssueCard";
 import { TONE } from "./tone";

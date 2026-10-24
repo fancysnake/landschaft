@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import type { SyncStatus as Status } from "../../lib/types";
+import type { SyncStatus as Status } from "../../lib/pacts/types";
 
 import { relativeTime } from "../../lib/client/labels";
 

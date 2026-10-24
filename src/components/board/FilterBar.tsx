@@ -1,7 +1,7 @@
-import type { Epic, Facets } from "../../lib/types";
+import type { Epic, Facets } from "../../lib/pacts/types";
 
 import { useDebouncedText } from "../../lib/client/useDebouncedText";
-import { type Filters, TEXT_FILTER_KEYS } from "../../lib/schema";
+import { type Filters, TEXT_FILTER_KEYS } from "../../lib/pacts/schema";
 
 interface Props {
   filters: Filters;

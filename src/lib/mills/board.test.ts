@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { InboxDashboard, ViewQuery } from "../schema";
+import type { InboxDashboard, ViewQuery } from "../pacts/schema";
 
-import { askedLabels, type FilterNode } from "../filter";
-import { type Card, cellKey, type Issue } from "../types";
 import {
   DASHBOARD,
   EVERYONE,
@@ -12,7 +10,9 @@ import {
   makeJob,
   REPO,
   snapshot,
-} from "./__fixtures__/issues";
+} from "../__fixtures__/issues";
+import { askedLabels, type FilterNode } from "../pacts/filter";
+import { type Card, cellKey, type Issue } from "../pacts/types";
 import {
   buildBoard,
   buildInbox,

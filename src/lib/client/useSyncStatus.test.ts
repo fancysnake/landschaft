@@ -2,7 +2,7 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
-import type { SyncStatus } from "../types";
+import type { SyncStatus } from "../pacts/types";
 
 import { api } from "./api";
 import { SYNCED, type SyncController, useSyncStatus } from "./useSyncStatus";

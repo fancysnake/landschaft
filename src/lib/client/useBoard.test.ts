@@ -2,7 +2,7 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
-import type { ViewQuery } from "../schema";
+import type { ViewQuery } from "../pacts/schema";
 
 import { api, type BoardResponse } from "./api";
 import { type BoardController, useBoard } from "./useBoard";

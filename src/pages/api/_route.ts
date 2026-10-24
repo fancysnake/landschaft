@@ -2,12 +2,18 @@ import type { APIContext, APIRoute } from "astro";
 
 import { ZodError, type ZodType } from "zod";
 
-import type { Snapshot } from "../types";
-import type { Audience } from "./board";
+import type { Audience } from "../../lib/mills/board";
+import type { NavData, Snapshot } from "../../lib/pacts/types";
 
-import { type Config, type Dashboard, type DashboardType, ViewQuerySchema } from "../schema";
-import { getApp } from "./app";
-import { findDashboard, loadConfig } from "./config";
+import { getApp } from "../../lib/inits";
+import { findDashboard, loadConfig } from "../../lib/links/config/file";
+import { scopedRepos } from "../../lib/mills/board";
+import {
+  type Config,
+  type Dashboard,
+  type DashboardType,
+  ViewQuerySchema,
+} from "../../lib/pacts/schema";
 
 export class ApiError extends Error {
   constructor(
@@ -67,6 +73,19 @@ export async function viewRequest<T extends DashboardType>({ params, url }: APIC
   if (!isType(dashboard)) throw new ApiError(404, `${type} not found`);
   const query = parseQuery(ViewQuerySchema, url);
   return { dashboard, query, ...(await viewData(config)) };
+}
+
+export async function navData(): Promise<NavData> {
+  const config = loadConfig();
+  const { snapshot, ...audience } = await viewData(config);
+  return {
+    dashboards: config.dashboards.map(({ id, name, filter }) => ({
+      id,
+      name,
+      repos: [...scopedRepos(snapshot, { filter }, audience)],
+    })),
+    repos: config.repos,
+  };
 }
 
 /** Wraps a handler so thrown errors become JSON responses with a fitting status. */

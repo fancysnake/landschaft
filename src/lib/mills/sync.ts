@@ -1,8 +1,6 @@
-import type { CiJob, SyncStatus } from "../types";
-import type { Db } from "./db";
+import type { Db } from "../links/db/sqlite";
+import type { CiJob, SyncStatus } from "../pacts/types";
 
-import { closedSince, type Config } from "../schema";
-import { type CiBranch, CI_BATCH, fetchCiBranchesPage, fetchCiJobs } from "./ci";
 import {
   fetchIssuesPage,
   fetchPullStatuses,
@@ -12,7 +10,9 @@ import {
   type GithubClient,
   type PageOptions,
   STATUS_BATCH,
-} from "./github";
+} from "../links/github/api";
+import { type CiBranch, CI_BATCH, fetchCiBranchesPage, fetchCiJobs } from "../links/github/ci";
+import { closedSince, type Config } from "../pacts/schema";
 
 const FULL_SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const SINCE_OVERLAP_MS = 2 * 60 * 1000;

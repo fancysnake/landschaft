@@ -1,7 +1,7 @@
-import { ConfigSchema, reposToResync } from "../../lib/schema";
-import { json, parseBody, route } from "../../lib/server/api";
-import { getApp } from "../../lib/server/app";
-import { loadConfig, saveConfig } from "../../lib/server/config";
+import { getApp } from "../../lib/inits";
+import { loadConfig, saveConfig } from "../../lib/links/config/file";
+import { ConfigSchema, reposToResync } from "../../lib/pacts/schema";
+import { json, parseBody, route } from "./_route";
 
 export const GET = route(() => json(loadConfig()));
 

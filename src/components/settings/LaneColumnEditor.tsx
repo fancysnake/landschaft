@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
-import { filterError, type Offer } from "../../lib/filter";
-import { move } from "../../lib/move";
+import { move } from "../../lib/client/move";
+import { filterError, type Offer } from "../../lib/pacts/filter";
 import { FilterInput } from "./FilterInput";
 import { MoveButtons } from "./MoveButtons";
 
