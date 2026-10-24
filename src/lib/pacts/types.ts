@@ -108,6 +108,12 @@ export interface Snapshot {
   jobs: CiJob[];
 }
 
+/** Who a view is for: the global `users` (empty for everyone) and the login `@me` stands for. */
+export interface Audience {
+  users: string[];
+  viewer: string | null;
+}
+
 export function ciJobKey(job: Pick<CiJob, "repo" | "branch" | "workflow" | "name">): string {
   // Fields apart, since a workflow or job name may hold any separator.
   return JSON.stringify([job.repo, job.branch, job.workflow, job.name]);

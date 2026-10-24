@@ -20,6 +20,7 @@ import {
   type UnmatchedQuery,
 } from "../pacts/schema";
 import {
+  type Audience,
   type Board,
   type Card,
   cellKey,
@@ -356,12 +357,6 @@ const toCard = (item: Item, labels: LabelRef[], isEpic: boolean): Card => ({
   createdAt: item.createdAt,
   updatedAt: item.updatedAt,
 });
-
-/** Who a view is for: the global `users` (empty for everyone) and the login `@me` stands for. */
-export interface Audience {
-  users: string[];
-  viewer: string | null;
-}
 
 /**
  * The repos of the open `issues` and failed CI `jobs` that one of the global `users` is in and

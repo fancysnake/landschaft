@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { GithubClient, GqlOptions, IssueNode, PullNode } from "../links/github/api";
-import type { CiBranchNode } from "../links/github/ci";
+import type { CiBranchNode } from "../links/forge/github/ci";
+import type { GithubClient, GqlOptions } from "../links/forge/github/client";
+import type { IssueNode, PullNode } from "../links/forge/github/issues";
 
 import { cachedIssue, makeIssue, REPO } from "../__fixtures__/issues";
 import { Db } from "../links/db/sqlite";

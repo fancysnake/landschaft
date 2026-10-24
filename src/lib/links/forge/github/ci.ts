@@ -1,6 +1,6 @@
-import type { CiJob } from "../../pacts/types";
+import type { CiJob } from "../../../pacts/types";
 
-import { ciJobKey } from "../../pacts/types";
+import { ciJobKey } from "../../../pacts/types";
 import {
   type GithubClient,
   GithubError,
@@ -10,7 +10,7 @@ import {
   type PageInfo,
   splitRepo,
   type StatusState,
-} from "./api";
+} from "./client";
 
 const CI_BRANCHES_QUERY = `
 query CiBranches($owner: String!, $name: String!, $after: String) {

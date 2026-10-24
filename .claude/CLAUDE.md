@@ -40,9 +40,10 @@ type-checked (`astro check`), not formatted.
 - `src/lib/mills/` — Node-only logic: `board.ts` (**pure** board builder), `sync.ts` (Syncer +
   scheduler).
 - `src/lib/links/` — Node-only adapters: `config/file.ts` (JSON file, atomic save),
-  `db/sqlite.ts` (SQLite), `github/api.ts` (GraphQL sync queries), `github/ci.ts` (failed CI
-  job queries).
-- `src/lib/inits.ts` — process singleton booted by `src/middleware.ts`.
+  `db/sqlite.ts` (SQLite), `forge/github/client.ts` (GraphQL transport, token),
+  `forge/github/issues.ts` (issue and PR sync queries), `forge/github/ci.ts` (failed CI job queries).
+- `src/lib/inits.ts` — process singleton booted by `src/middleware.ts`, and the read models
+  over it (`viewData`, `navData`) that endpoints and the layout share.
 - `src/pages/api/**` — JSON endpoints, all wrapped in `route()` from `_route.ts` (endpoint
   helpers; Astro skips `_`-prefixed files when routing).
 - `src/lib/client/` — fetch wrappers, `useBoard` (polling), URL filters, `move` (list reorder).
@@ -54,6 +55,10 @@ type-checked (`astro check`), not formatted.
 
 ## Conventions
 
+- Imports run inward: `pacts` import no other layer; `links` import `pacts` only; `mills` import
+  `pacts` only; `inits` wires all three. `.oxlintrc.json` enforces this for `pacts` and `links`.
+  Known exemptions: `mills/sync.ts` imports the github and sqlite links directly (#93),
+  and `src/pages/**` imports `inits`, `links` and `mills` (#94).
 - Board logic stays pure and unit-tested in `board.ts`; endpoints only glue.
 - Sync is sequential on purpose (rate limits); `no-await-in-loop` is off for that reason.
 - Config edits go through `saveConfig()` (validation + tmp-file rename). Ids are immutable

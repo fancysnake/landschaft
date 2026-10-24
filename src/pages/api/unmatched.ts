@@ -1,8 +1,8 @@
-import { getApp } from "../../lib/inits";
+import { getApp, viewData } from "../../lib/inits";
 import { loadConfig } from "../../lib/links/config/file";
 import { unmatchedItems } from "../../lib/mills/board";
 import { UnmatchedQuerySchema } from "../../lib/pacts/schema";
-import { json, parseQuery, route, viewData } from "./_route";
+import { json, parseQuery, route } from "./_route";
 
 export const GET = route(async (context) => {
   const config = loadConfig();

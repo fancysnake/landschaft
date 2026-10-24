@@ -12,14 +12,15 @@ Astro 7 in SSR mode (`@astrojs/node`, standalone) with React 19 islands, Tailwin
   requests. The types are inferred from them.
 - `src/lib/links/config/file.ts` — load and atomic save of `landschaft.config.json`.
 - `src/lib/links/db/sqlite.ts` — SQLite schema and queries (issues, blockers, labels, failed CI jobs, sync state).
-- `src/lib/links/github/api.ts` — GraphQL sync queries; token from
-  `GITHUB_TOKEN` or `gh auth token`.
+- `src/lib/links/forge/github/` — GraphQL transport (`client.ts`, token from `GITHUB_TOKEN` or
+  `gh auth token`), issue and PR sync queries (`issues.ts`) and failed CI jobs (`ci.ts`).
 - `src/lib/mills/sync.ts` — the `Syncer` (sequential, incremental and full passes) and the
   scheduler that syncs every global repository each `refreshMinutes`.
 - `src/lib/mills/board.ts` — the **pure** board builder. Everything
   about placement lives here and is unit-tested against fixtures.
 - `src/lib/inits.ts` — one DB handle, GitHub client and scheduler per process, booted by
-  `src/middleware.ts` on the first request and surviving Vite HMR.
+  `src/middleware.ts` on the first request and surviving Vite HMR; also the view and nav data
+  read over them.
 - `src/pages/api/**` — thin JSON endpoints wrapped in `route()` from `_route.ts`.
 - `src/lib/client/` — fetch wrappers, `useBoard` (polling), URL filters.
 - `src/components/board/`, `src/components/settings/` — React islands mounted with

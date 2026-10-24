@@ -1,7 +1,6 @@
 import type { Db } from "../links/db/sqlite";
-import type { Audience } from "../mills/board";
 import type { BoardDashboard } from "../pacts/schema";
-import type { CiJob, Issue, Snapshot } from "../pacts/types";
+import type { Audience, CiJob, Issue, Snapshot } from "../pacts/types";
 
 export const REPO = "acme/app";
 

@@ -1,17 +1,22 @@
 import type { Db } from "../links/db/sqlite";
+import type { GithubClient } from "../links/forge/github/client";
 import type { CiJob, SyncStatus } from "../pacts/types";
 
+import {
+  type CiBranch,
+  CI_BATCH,
+  fetchCiBranchesPage,
+  fetchCiJobs,
+} from "../links/forge/github/ci";
 import {
   fetchIssuesPage,
   fetchPullStatuses,
   fetchPullsPage,
   fetchRepoLabels,
   fetchViewer,
-  type GithubClient,
   type PageOptions,
   STATUS_BATCH,
-} from "../links/github/api";
-import { type CiBranch, CI_BATCH, fetchCiBranchesPage, fetchCiJobs } from "../links/github/ci";
+} from "../links/forge/github/issues";
 import { closedSince, type Config } from "../pacts/schema";
 
 const FULL_SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000;

@@ -2,18 +2,9 @@ import type { APIContext, APIRoute } from "astro";
 
 import { ZodError, type ZodType } from "zod";
 
-import type { Audience } from "../../lib/mills/board";
-import type { NavData, Snapshot } from "../../lib/pacts/types";
-
-import { getApp } from "../../lib/inits";
+import { viewData } from "../../lib/inits";
 import { findDashboard, loadConfig } from "../../lib/links/config/file";
-import { scopedRepos } from "../../lib/mills/board";
-import {
-  type Config,
-  type Dashboard,
-  type DashboardType,
-  ViewQuerySchema,
-} from "../../lib/pacts/schema";
+import { type Dashboard, type DashboardType, ViewQuerySchema } from "../../lib/pacts/schema";
 
 export class ApiError extends Error {
   constructor(
@@ -50,18 +41,6 @@ export function parseQuery<T>(schema: ZodType<T>, url: URL): T {
 }
 
 /**
- * The cached issues and jobs of the configured repos and who views them; `viewer` is null when it
- * cannot be fetched.
- */
-export async function viewData({
-  repos,
-  users,
-}: Pick<Config, "repos" | "users">): Promise<Audience & { snapshot: Snapshot }> {
-  const { db, syncer } = getApp();
-  return { snapshot: db.snapshot(repos), users, viewer: await syncer.viewer().catch(() => null) };
-}
-
-/**
  * What a view endpoint works from: the dashboard of `type` the URL names (404 otherwise), the
  * query, and `viewData`.
  */
@@ -73,19 +52,6 @@ export async function viewRequest<T extends DashboardType>({ params, url }: APIC
   if (!isType(dashboard)) throw new ApiError(404, `${type} not found`);
   const query = parseQuery(ViewQuerySchema, url);
   return { dashboard, query, ...(await viewData(config)) };
-}
-
-export async function navData(): Promise<NavData> {
-  const config = loadConfig();
-  const { snapshot, ...audience } = await viewData(config);
-  return {
-    dashboards: config.dashboards.map(({ id, name, filter }) => ({
-      id,
-      name,
-      repos: [...scopedRepos(snapshot, { filter }, audience)],
-    })),
-    repos: config.repos,
-  };
 }
 
 /** Wraps a handler so thrown errors become JSON responses with a fitting status. */
