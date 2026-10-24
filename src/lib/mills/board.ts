@@ -124,6 +124,7 @@ const jobItem = (job: CiJob, byKey: Map<string, Issue>): JobItem => ({
   blocking: false,
   name: job.name,
   branch: job.branch,
+  issueType: null,
 });
 
 /** `job` as a card showing `labels`. */
@@ -157,8 +158,8 @@ function relatedTo(epicKey: string, byKey: Map<string, Issue>): Set<string> {
 }
 
 /**
- * Text, assignee, label, job and epic filters as one predicate over an item, its card `key` and
- * the `text` the search box matches; an unset filter passes everything.
+ * Text, assignee, label, type, job and epic filters as one predicate over an item, its card `key`
+ * and the `text` the search box matches; an unset filter passes everything.
  */
 function barFilter(
   filters: Filters,
@@ -167,11 +168,13 @@ function barFilter(
   const query = filters.q?.trim().toLowerCase();
   const related = filters.epic ? relatedTo(filters.epic, byKey) : null;
   const wantedLabel = filters.label && labelKey(filters.label);
+  const wantedType = filters.type?.toLowerCase();
   const wantedJob = filters.job?.toLowerCase();
   return (item, key, text) =>
     (!query || text.toLowerCase().includes(query)) &&
     (!filters.assignee || item.assignees.some((a) => a.login === filters.assignee)) &&
     (!wantedLabel || item.labels.some((l) => labelKey(l.name) === wantedLabel)) &&
+    (!wantedType || (item.issueType !== null && item.issueType.toLowerCase() === wantedType)) &&
     (!wantedJob || item.name?.toLowerCase() === wantedJob) &&
     (!related || related.has(key));
 }
@@ -296,6 +299,8 @@ function facetsOf(
   const assignees = new Set<string>();
   /** First spelling seen of each label, by its `labelKey`. */
   const labels = new Map<string, string>();
+  /** First spelling seen of each issue type, by its lower case. */
+  const types = new Map<string, string>();
   const jobs = new Set<string>();
   for (const item of items) {
     repos.add(item.repo);
@@ -304,12 +309,16 @@ function facetsOf(
       const key = labelKey(label.name);
       if (!labels.has(key)) labels.set(key, label.name);
     }
+    if (item.issueType && !types.has(item.issueType.toLowerCase())) {
+      types.set(item.issueType.toLowerCase(), item.issueType);
+    }
     if (item.kind === "ci-job" && item.name !== null) jobs.add(item.name);
   }
   return {
     repos: [...repos].toSorted(),
     assignees: [...assignees].toSorted(),
     labels: [...labels.values()].toSorted(),
+    types: [...types.values()].toSorted(),
     jobs: [...jobs].toSorted(),
     sort: { by: filters.sort ?? sort.by, dir: filters.dir ?? sort.dir },
   };
@@ -336,6 +345,7 @@ const toCard = (item: Item, labels: LabelRef[], isEpic: boolean): Card => ({
   title: item.title,
   url: item.url,
   state: item.state,
+  issueType: item.issueType,
   assignees: item.assignees,
   labels,
   progress: item.subIssues.total > 0 ? item.subIssues : null,

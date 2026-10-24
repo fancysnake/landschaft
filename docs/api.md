@@ -17,7 +17,7 @@ localhost only. Errors are `{ "error": "message" }` with a matching status.
 
 ## Board
 
-`GET /api/dashboards/:id/board?q=&hide=&assignee=&label=&epic=&sort=updated&dir=desc`
+`GET /api/dashboards/:id/board?q=&hide=&assignee=&label=&type=&epic=&sort=updated&dir=desc`
 returns the grid as cells keyed by swimlane and column id, the epic strip, the repositories
 among the dashboard's items and the label catalogue used for colouring. `hide` lists
 repositories to leave out. The React island renders it as-is; all placement logic is server-side

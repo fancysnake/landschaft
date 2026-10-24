@@ -130,6 +130,8 @@ export interface IssueItemCard {
   title: string;
   url: string;
   state: IssueState;
+  /** GitHub's issue type; null for PRs and untyped issues. */
+  issueType: string | null;
   assignees: Assignee[];
   labels: LabelRef[];
   progress: Progress | null;
@@ -159,6 +161,8 @@ export interface Facets {
   repos: string[];
   assignees: string[];
   labels: string[];
+  /** GitHub issue types among the dashboard's items. */
+  types: string[];
   /** Names of the failed CI jobs among the dashboard's items. */
   jobs: string[];
   sort: { by: SortBy; dir: SortDir };

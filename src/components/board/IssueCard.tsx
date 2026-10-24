@@ -97,6 +97,7 @@ function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean 
           {card.number}
         </span>
         {card.kind === "pr" && <span className={`pill ${TONE.sky}`}>PR</span>}
+        {card.issueType && <span className={`pill ${TONE.neutral}`}>{card.issueType}</span>}
         {card.isEpic && <span className={`pill ${TONE.violet}`}>epic</span>}
         {card.state === "CLOSED" && <span className={`pill ${TONE.neutral}`}>closed</span>}
         {card.blocked && <span className={`pill ${TONE.red}`}>blocked</span>}
