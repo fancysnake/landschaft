@@ -206,6 +206,8 @@ export interface FilterItem {
   /** A CI job's name and branch; null otherwise. */
   name: string | null;
   branch: string | null;
+  /** An issue's type; null for an untyped issue, a PR or a CI job. */
+  issueType: string | null;
 }
 
 /** What a filter tests besides the item. */

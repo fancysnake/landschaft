@@ -100,9 +100,6 @@ export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Iss
   });
 }
 
-/** An item as the filter bar and its options see it; a CI job has no issue type. */
-type BarItem = FilterItem & { issueType?: string | null };
-
 /** A failed CI job as filters see it, its labels carrying the colours its card shows. */
 type JobItem = Omit<FilterItem, "labels"> & { labels: LabelRef[] };
 
@@ -127,6 +124,7 @@ const jobItem = (job: CiJob, byKey: Map<string, Issue>): JobItem => ({
   blocking: false,
   name: job.name,
   branch: job.branch,
+  issueType: null,
 });
 
 /** `job` as a card showing `labels`. */
@@ -166,7 +164,7 @@ function relatedTo(epicKey: string, byKey: Map<string, Issue>): Set<string> {
 function barFilter(
   filters: Filters,
   byKey: Map<string, Issue>,
-): (item: BarItem, key: string, text: string) => boolean {
+): (item: FilterItem, key: string, text: string) => boolean {
   const query = filters.q?.trim().toLowerCase();
   const related = filters.epic ? relatedTo(filters.epic, byKey) : null;
   const wantedLabel = filters.label && labelKey(filters.label);
@@ -176,7 +174,7 @@ function barFilter(
     (!query || text.toLowerCase().includes(query)) &&
     (!filters.assignee || item.assignees.some((a) => a.login === filters.assignee)) &&
     (!wantedLabel || item.labels.some((l) => labelKey(l.name) === wantedLabel)) &&
-    (!wantedType || item.issueType?.toLowerCase() === wantedType) &&
+    (!wantedType || (item.issueType !== null && item.issueType.toLowerCase() === wantedType)) &&
     (!wantedJob || item.name?.toLowerCase() === wantedJob) &&
     (!related || related.has(key));
 }
@@ -292,7 +290,7 @@ function placer(dashboard: Dashboard, viewer: string | null): (item: FilterItem)
 
 /** The repo chips, filter options and sort of a view over `items`, offering the `shown` labels. */
 function facetsOf(
-  items: BarItem[],
+  items: FilterItem[],
   shown: (label: { name: string }) => boolean,
   filters: ViewQuery,
   sort: Dashboard["sort"],
@@ -301,7 +299,8 @@ function facetsOf(
   const assignees = new Set<string>();
   /** First spelling seen of each label, by its `labelKey`. */
   const labels = new Map<string, string>();
-  const types = new Set<string>();
+  /** First spelling seen of each issue type, by its lower case. */
+  const types = new Map<string, string>();
   const jobs = new Set<string>();
   for (const item of items) {
     repos.add(item.repo);
@@ -310,14 +309,16 @@ function facetsOf(
       const key = labelKey(label.name);
       if (!labels.has(key)) labels.set(key, label.name);
     }
-    if (item.issueType) types.add(item.issueType);
+    if (item.issueType && !types.has(item.issueType.toLowerCase())) {
+      types.set(item.issueType.toLowerCase(), item.issueType);
+    }
     if (item.kind === "ci-job" && item.name !== null) jobs.add(item.name);
   }
   return {
     repos: [...repos].toSorted(),
     assignees: [...assignees].toSorted(),
     labels: [...labels.values()].toSorted(),
-    types: [...types].toSorted(),
+    types: [...types.values()].toSorted(),
     jobs: [...jobs].toSorted(),
     sort: { by: filters.sort ?? sort.by, dir: filters.dir ?? sort.dir },
   };
