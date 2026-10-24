@@ -138,7 +138,7 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
 - Open **pull requests** are cards like issues.
 - Repo chips in the top bar switch each global repository on or off for every board, in this
   browser; a dashboard with no items in the repos switched on is dimmed.
-- Filters (text, assignee, label, epic, sort) live in the URL, so a view is a link.
+- Filters (text, assignee, label, issue type, epic, sort) live in the URL, so a view is a link.
 
 <!-- --8<-- [end:placement] -->
 

@@ -100,6 +100,9 @@ export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Iss
   });
 }
 
+/** An item as the filter bar and its options see it; a CI job has no issue type. */
+type BarItem = FilterItem & { issueType?: string | null };
+
 /** A failed CI job as filters see it, its labels carrying the colours its card shows. */
 type JobItem = Omit<FilterItem, "labels"> & { labels: LabelRef[] };
 
@@ -157,21 +160,23 @@ function relatedTo(epicKey: string, byKey: Map<string, Issue>): Set<string> {
 }
 
 /**
- * Text, assignee, label, job and epic filters as one predicate over an item, its card `key` and
- * the `text` the search box matches; an unset filter passes everything.
+ * Text, assignee, label, type, job and epic filters as one predicate over an item, its card `key`
+ * and the `text` the search box matches; an unset filter passes everything.
  */
 function barFilter(
   filters: Filters,
   byKey: Map<string, Issue>,
-): (item: FilterItem, key: string, text: string) => boolean {
+): (item: BarItem, key: string, text: string) => boolean {
   const query = filters.q?.trim().toLowerCase();
   const related = filters.epic ? relatedTo(filters.epic, byKey) : null;
   const wantedLabel = filters.label && labelKey(filters.label);
+  const wantedType = filters.type?.toLowerCase();
   const wantedJob = filters.job?.toLowerCase();
   return (item, key, text) =>
     (!query || text.toLowerCase().includes(query)) &&
     (!filters.assignee || item.assignees.some((a) => a.login === filters.assignee)) &&
     (!wantedLabel || item.labels.some((l) => labelKey(l.name) === wantedLabel)) &&
+    (!wantedType || item.issueType?.toLowerCase() === wantedType) &&
     (!wantedJob || item.name?.toLowerCase() === wantedJob) &&
     (!related || related.has(key));
 }
@@ -287,7 +292,7 @@ function placer(dashboard: Dashboard, viewer: string | null): (item: FilterItem)
 
 /** The repo chips, filter options and sort of a view over `items`, offering the `shown` labels. */
 function facetsOf(
-  items: FilterItem[],
+  items: BarItem[],
   shown: (label: { name: string }) => boolean,
   filters: ViewQuery,
   sort: Dashboard["sort"],
@@ -296,6 +301,7 @@ function facetsOf(
   const assignees = new Set<string>();
   /** First spelling seen of each label, by its `labelKey`. */
   const labels = new Map<string, string>();
+  const types = new Set<string>();
   const jobs = new Set<string>();
   for (const item of items) {
     repos.add(item.repo);
@@ -304,12 +310,14 @@ function facetsOf(
       const key = labelKey(label.name);
       if (!labels.has(key)) labels.set(key, label.name);
     }
+    if (item.issueType) types.add(item.issueType);
     if (item.kind === "ci-job" && item.name !== null) jobs.add(item.name);
   }
   return {
     repos: [...repos].toSorted(),
     assignees: [...assignees].toSorted(),
     labels: [...labels.values()].toSorted(),
+    types: [...types].toSorted(),
     jobs: [...jobs].toSorted(),
     sort: { by: filters.sort ?? sort.by, dir: filters.dir ?? sort.dir },
   };
@@ -336,6 +344,7 @@ const toCard = (item: Item, labels: LabelRef[], isEpic: boolean): Card => ({
   title: item.title,
   url: item.url,
   state: item.state,
+  issueType: item.issueType,
   assignees: item.assignees,
   labels,
   progress: item.subIssues.total > 0 ? item.subIssues : null,
