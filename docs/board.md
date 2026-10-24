@@ -74,7 +74,7 @@ top of main stays off. `author:` and `user:` match those commit authors.
 that PR's labels: the card shows them, and `label:` and the label filter match them. A catch-all
 swimlane, column or inbox group takes jobs like any other item; `-is:ci-job` in a dashboard's
 filter keeps them off it. The search box matches job and branch names, and the CI job filter
-picks jobs by name and hides issues; the assignee and epic filters hide jobs.
+picks jobs by name and hides issues; the assignee, type and epic filters hide jobs.
 
 Each sync first reads the head commit status of every branch, then fetches jobs and commit
 authors for the failing ones and the default branch alone. That status leaves out scheduled
@@ -100,5 +100,6 @@ every chip on and, once all are on, `none` turns them off. The choice holds on e
 this browser, and after a reload. A dashboard with no items in the repositories switched on is
 dimmed in the top bar.
 
-Text, assignee, label, epic and sort live in the query string, so a filtered view is a link you
-can bookmark or send. Empty values count as unset.
+Text, assignee, label, type, epic and sort live in the query string, so a filtered view is a
+link you can bookmark or send. Empty values count as unset. Type is GitHub's issue type, shown
+on each typed card; the type filter hides PRs and jobs.

@@ -28,6 +28,7 @@ const item = (extra: Partial<FilterItem> = {}): FilterItem => ({
   blocking: false,
   name: null,
   branch: null,
+  issueType: null,
   ...extra,
 });
 const labels = (...names: string[]) => item({ labels: names.map((name) => ({ name })) });

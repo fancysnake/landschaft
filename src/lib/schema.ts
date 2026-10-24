@@ -396,7 +396,7 @@ export const SyncRequestSchema = z.object({
 export type SyncRequest = z.infer<typeof SyncRequestSchema>;
 
 /** Free-text filters: set from the filter bar, cleared together by "Clear filters". */
-export const TEXT_FILTER_KEYS = ["q", "assignee", "label", "epic", "job"] as const;
+export const TEXT_FILTER_KEYS = ["q", "assignee", "label", "type", "epic", "job"] as const;
 export type TextFilterKey = (typeof TEXT_FILTER_KEYS)[number];
 
 export type Filters = { [K in TextFilterKey]?: string } & {

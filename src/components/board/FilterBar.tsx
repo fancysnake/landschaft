@@ -53,6 +53,21 @@ export function FilterBar({ filters, facets, epics, onChange }: Props) {
           </option>
         ))}
       </select>
+      {facets.types.length > 0 && (
+        <select
+          aria-label="Type"
+          value={filters.type ?? ""}
+          onChange={(event) => onChange({ type: event.target.value || undefined })}
+          className="field"
+        >
+          <option value="">Any type</option>
+          {facets.types.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+      )}
       {epics && epics.length > 0 && (
         <select
           aria-label="Epic"

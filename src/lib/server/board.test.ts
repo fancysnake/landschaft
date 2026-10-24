@@ -775,6 +775,48 @@ describe("buildBoard", () => {
     expect(shown(issues, { q: "login", assignee: "ann" })).toEqual([1]);
   });
 
+  it("filters by issue type in any case, which hides every PR and CI job", () => {
+    const issues = [
+      makeIssue({ number: 1, issueType: "Bug" }),
+      makeIssue({ number: 2, issueType: "Task" }),
+      makeIssue({ number: 3 }),
+      makeIssue({ number: 4, issueType: "Bug" }),
+      makeIssue({ number: 5, kind: "pr" }),
+    ];
+    const board = buildBoard(snapshot(issues, [makeJob({ name: "lint" })]), DASHBOARD, {
+      ...EVERYONE,
+      query: { type: "BUG" },
+    });
+    expect(numbers(board)).toEqual([4, 1]);
+  });
+
+  it("offers each issue type once, in the first spelling seen", () => {
+    const issues = [
+      makeIssue({ number: 1, issueType: "Bug" }),
+      makeIssue({ number: 2, issueType: "Task" }),
+      makeIssue({ number: 3, issueType: "bug" }),
+    ];
+    const board = buildBoard(snapshot(issues, [makeJob({ name: "lint" })]), DASHBOARD, EVERYONE);
+    expect(board.types).toEqual(["Bug", "Task"]);
+  });
+
+  it("shows each issue's type on its card", () => {
+    const issues = [
+      makeIssue({ number: 1, issueType: "Bug" }),
+      makeIssue({ number: 2, issueType: "Task" }),
+      makeIssue({ number: 3 }),
+      makeIssue({ number: 4, issueType: "Bug" }),
+    ];
+    const board = buildBoard(snapshot(issues), DASHBOARD, EVERYONE);
+    const cards = board.cells[cell("rest", "todo")]!;
+    expect(cards.map((c) => c.kind !== "ci-job" && c.issueType)).toEqual([
+      "Bug",
+      null,
+      "Task",
+      "Bug",
+    ]);
+  });
+
   it("places pull requests next to issues and never lists them as epics", () => {
     const issues = [makeIssue({ number: 1 }), makeIssue({ number: 2, kind: "pr" })];
     const board = buildBoard(snapshot(issues), DASHBOARD, EVERYONE);
