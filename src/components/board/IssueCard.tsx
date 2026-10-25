@@ -10,6 +10,7 @@ const STATUS_PILLS: Record<PullStatusLabel, { text: string; title: string; tone:
   "is:ci:failed": { text: "CI ✗", title: "CI failed", tone: "red" },
   "is:ci:running": { text: "CI …", title: "CI running", tone: "amber" },
   "is:unanswered": { text: "comments", title: "Unanswered review comments", tone: "orange" },
+  "is:draft": { text: "draft", title: "Draft pull request", tone: "neutral" },
 };
 
 /** Card with a coloured bar on the left for its kind; white unless `surface` tints it. */

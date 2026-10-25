@@ -104,6 +104,7 @@ describe("toPull", () => {
 function statusNode(overrides: Partial<PullStatusNode> = {}): PullStatusNode {
   return {
     number: 30,
+    isDraft: false,
     mergeable: "MERGEABLE",
     author: { login: "bob" },
     commits: { nodes: [] },
@@ -142,6 +143,10 @@ describe("toPullStatus", () => {
       reviewThreads: { nodes: [thread(false, "carol")] },
     });
     expect(toPullStatus(pull).statuses).toEqual(["is:conflicting", "is:unanswered"]);
+  });
+
+  it("flags drafts", () => {
+    expect(holds("is:draft", { isDraft: true })).toBe(true);
   });
 
   it("flags merge conflicts only when GitHub says CONFLICTING", () => {

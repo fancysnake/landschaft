@@ -114,6 +114,7 @@ function fakeGithub(
             `pr${number}`,
             {
               number,
+              isDraft: false,
               mergeable: conflicting.includes(number) ? "CONFLICTING" : "MERGEABLE",
               author: null,
               commits: { nodes: [] },

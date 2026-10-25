@@ -123,6 +123,8 @@ describe("matchesFilter", () => {
     expect(fits("is:issue", pr)).toBe(false);
     expect(fits("is:CI:failed", pr)).toBe(true);
     expect(fits("is:conflicting", pr)).toBe(false);
+    expect(fits("is:draft", pr)).toBe(false);
+    expect(fits("is:draft", item({ kind: "pr", statuses: ["is:draft"] }))).toBe(true);
     expect(fits("has:pr", item({ hasPr: true }))).toBe(true);
     expect(filterError("is:has-pr")).toMatch(/is:has-pr is not valid/);
     expect(fits("is:blocked", item({ blocked: true }))).toBe(true);

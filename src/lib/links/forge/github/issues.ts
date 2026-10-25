@@ -251,6 +251,7 @@ function isRunning(check: CheckContext): boolean {
 
 export interface PullStatusNode {
   number: number;
+  isDraft: boolean;
   mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN";
   author: Login | null;
   commits: {
@@ -277,6 +278,7 @@ export function toPullStatus(node: PullStatusNode): PullStatus {
     "is:unanswered": node.reviewThreads.nodes.some(
       (thread) => !thread.isResolved && thread.comments.nodes[0]?.author?.login !== author,
     ),
+    "is:draft": node.isDraft,
   };
   return { number: node.number, statuses: PULL_STATUS_NAMES.filter((name) => holds[name]) };
 }
@@ -284,7 +286,7 @@ export function toPullStatus(node: PullStatusNode): PullStatus {
 /** Each PR is its own aliased field. ponytail: first 100 checks and review threads. */
 function pullStatusField(number: number): string {
   return `pr${number}: pullRequest(number: ${number}) {
-    number mergeable author { login }
+    number isDraft mergeable author { login }
     commits(last: 1) { nodes { commit { statusCheckRollup { state contexts(first: 100) { nodes {
       type: __typename
       ... on CheckRun { status }
