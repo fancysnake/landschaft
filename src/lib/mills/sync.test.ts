@@ -6,8 +6,10 @@ import type { IssueNode, PullNode } from "../links/forge/github/issues";
 
 import { cachedIssue, makeIssue, REPO } from "../__fixtures__/issues";
 import { Db } from "../links/db/sqlite";
+import { GithubForge } from "../links/forge/github/forge";
 import { CONFIG_VERSION, type Config } from "../pacts/schema";
-import { startScheduler, SyncBusyError, Syncer } from "./sync";
+import { SyncBusyError } from "../pacts/services";
+import { startScheduler, Syncer } from "./sync";
 
 function toNode(number: number, state: "OPEN" | "CLOSED" = "OPEN"): IssueNode {
   const issue = makeIssue({ number, state });
@@ -183,7 +185,7 @@ describe("Syncer", () => {
   it("does a full open-only sync the first time, paging and closing stale rows", async () => {
     db.upsertIssues([makeIssue({ number: 99 })]);
     const { gh, calls } = fakeGithub([[toNode(1), toNode(2)], [toNode(3)]]);
-    const syncer = new Syncer({ db, gh, now: () => now });
+    const syncer = new Syncer({ db, forge: new GithubForge(gh), now: () => now });
 
     const result = await syncer.syncRepo(REPO);
 
@@ -208,7 +210,12 @@ describe("Syncer", () => {
 
   it("also fetches the items closed within the window on a full sync", async () => {
     const { gh, calls } = fakeGithub([[toNode(1)]]);
-    const syncer = new Syncer({ db, gh, now: () => now, closedDays: () => 7 });
+    const syncer = new Syncer({
+      db,
+      forge: new GithubForge(gh),
+      now: () => now,
+      closedDays: () => 7,
+    });
 
     await syncer.syncRepo(REPO);
 
@@ -234,7 +241,7 @@ describe("Syncer", () => {
     });
     db.upsertIssues([makeIssue({ number: 5 })]);
     const { gh, calls } = fakeGithub([[toNode(5, "CLOSED")]]);
-    const syncer = new Syncer({ db, gh, now: () => now });
+    const syncer = new Syncer({ db, forge: new GithubForge(gh), now: () => now });
 
     const result = await syncer.syncRepo(REPO);
 
@@ -256,7 +263,7 @@ describe("Syncer", () => {
       [toPullNode(20, "2026-05-01T11:30:00Z"), toPullNode(21, "2026-04-01T00:00:00Z")],
       [toPullNode(22, "2026-03-01T00:00:00Z")],
     ]);
-    const syncer = new Syncer({ db, gh, now: () => now });
+    const syncer = new Syncer({ db, forge: new GithubForge(gh), now: () => now });
 
     expect(await syncer.syncRepo(REPO)).toMatchObject({ upserted: 1 });
     expect(calls.filter((c) => c.query.includes("query PullsPage"))).toHaveLength(1);
@@ -269,7 +276,7 @@ describe("Syncer", () => {
 
   it("keeps open pull requests open on a full sync", async () => {
     const { gh } = fakeGithub([[toNode(1)]], 5000, [[toPullNode(2, "2026-05-01T00:00:00Z")]]);
-    const syncer = new Syncer({ db, gh, now: () => now });
+    const syncer = new Syncer({ db, forge: new GithubForge(gh), now: () => now });
     expect(await syncer.syncRepo(REPO)).toMatchObject({ full: true, upserted: 2, closed: 0 });
     expect(cachedIssue(db, REPO, 2)?.state).toBe("OPEN");
   });
@@ -281,7 +288,7 @@ describe("Syncer", () => {
     });
     db.upsertIssues([makeIssue({ number: 7, kind: "pr" }), makeIssue({ number: 8 })]);
     const { gh, calls } = fakeGithub([[]], 5000, [], [7]);
-    const syncer = new Syncer({ db, gh, now: () => now });
+    const syncer = new Syncer({ db, forge: new GithubForge(gh), now: () => now });
 
     await syncer.syncRepo(REPO);
 
@@ -305,7 +312,7 @@ describe("Syncer", () => {
   it("asks for PR statuses 50 at a time", async () => {
     openPulls(51);
     const { gh, calls } = fakeGithub([[]], 5000, [], [51]);
-    await new Syncer({ db, gh, now: () => now }).syncRepo(REPO);
+    await new Syncer({ db, forge: new GithubForge(gh), now: () => now }).syncRepo(REPO);
     expect(statusCalls(calls)).toHaveLength(2);
     expect(cachedIssue(db, REPO, 51)?.statuses).toEqual(["is:conflicting"]);
   });
@@ -314,7 +321,7 @@ describe("Syncer", () => {
     openPulls(51);
     const everyPull = Array.from({ length: 51 }, (_, i) => i + 1);
     const { gh, calls } = fakeGithub([[]], 50, [], everyPull);
-    const syncer = new Syncer({ db, gh, now: () => now });
+    const syncer = new Syncer({ db, forge: new GithubForge(gh), now: () => now });
     await expect(syncer.syncRepo(REPO)).rejects.toThrow(/rate limit/);
     expect(statusCalls(calls)).toHaveLength(1);
     const flagged = db.listIssues([REPO]).filter((issue) => issue.statuses.length > 0);
@@ -339,7 +346,7 @@ describe("Syncer", () => {
       "feat/x": redBranch("lint"),
       gone: null,
     });
-    await new Syncer({ db, gh, now: () => now }).syncRepo(REPO);
+    await new Syncer({ db, forge: new GithubForge(gh), now: () => now }).syncRepo(REPO);
     const jobQueries = calls.filter((c) => c.query.includes("query CiJobs"));
     expect(jobQueries.map((c) => c.variables)).toEqual([
       expect.objectContaining({ branch0: "main", branch1: "feat/x", branch2: "gone" }),
@@ -382,7 +389,7 @@ describe("Syncer", () => {
         return fake.gql<T>(query, variables);
       },
     };
-    await new Syncer({ db, gh, now: () => now }).syncRepo(REPO);
+    await new Syncer({ db, forge: new GithubForge(gh), now: () => now }).syncRepo(REPO);
     expect(db.listCiJobs([REPO])).toEqual([cached]);
     expect(db.getSyncState(REPO)?.lastSyncAt).toBe(now.toISOString());
   });
@@ -403,7 +410,7 @@ describe("Syncer", () => {
       lastFullSyncAt: "2026-04-29T11:00:00.000Z",
     });
     const { gh, calls } = fakeGithub([[]]);
-    const syncer = new Syncer({ db, gh, now: () => now });
+    const syncer = new Syncer({ db, forge: new GithubForge(gh), now: () => now });
     await syncer.syncRepo(REPO);
     expect(pageCalls(calls)[0]?.variables).toMatchObject({ since: null, states: ["OPEN"] });
   });
@@ -414,7 +421,7 @@ describe("Syncer", () => {
         throw new Error("boom");
       },
     };
-    const syncer = new Syncer({ db, gh, now: () => now });
+    const syncer = new Syncer({ db, forge: new GithubForge(gh), now: () => now });
     await expect(syncer.syncRepo(REPO)).rejects.toThrow("boom");
     expect(db.getSyncState(REPO)?.lastError).toBe("boom");
     expect(syncer.status()).toMatchObject({
@@ -433,7 +440,7 @@ describe("Syncer", () => {
           ? labelsOnly.gql<T>(query, variables)
           : (gate.promise as Promise<T>),
     };
-    const syncer = new Syncer({ db, gh, now: () => now });
+    const syncer = new Syncer({ db, forge: new GithubForge(gh), now: () => now });
     const running = syncer.syncRepo(REPO);
     await expect(syncer.syncRepo(REPO)).rejects.toBeInstanceOf(SyncBusyError);
     await expect(syncer.syncAll([REPO])).resolves.toBeUndefined();
@@ -455,7 +462,7 @@ describe("Syncer", () => {
           ? Promise.reject(new Error("boom"))
           : good.gql<T>(query, variables),
     };
-    const syncer = new Syncer({ db, gh, now: () => now });
+    const syncer = new Syncer({ db, forge: new GithubForge(gh), now: () => now });
     await syncer.syncAll(["acme/bad", REPO]);
     expect(db.getSyncState(REPO)?.lastSyncAt).not.toBeNull();
     expect(syncer.status()).toMatchObject({ runs: 1, lastError: "acme/bad: boom" });
@@ -474,7 +481,7 @@ describe("Syncer", () => {
       lastSyncAt: "2026-05-01T11:00:00.000Z",
       lastFullSyncAt: "2026-05-01T11:00:00.000Z",
     });
-    const syncer = new Syncer({ db, gh, now: () => now });
+    const syncer = new Syncer({ db, forge: new GithubForge(gh), now: () => now });
     const first = syncer.syncAll([REPO]);
     await vi.waitFor(() => expect(syncer.inFlight.has(REPO)).toBe(true));
     const second = syncer.syncAll(["acme/other"], { full: true });
@@ -493,7 +500,7 @@ describe("Syncer", () => {
 
   it("aborts when the rate limit is nearly gone and more pages remain", async () => {
     const { gh } = fakeGithub([[toNode(1)], [toNode(2)]], 50);
-    const syncer = new Syncer({ db, gh, now: () => now });
+    const syncer = new Syncer({ db, forge: new GithubForge(gh), now: () => now });
     await expect(syncer.syncRepo(REPO)).rejects.toThrow(/rate limit/);
     expect(cachedIssue(db, REPO, 1)).not.toBeNull();
     expect(cachedIssue(db, REPO, 2)).toBeNull();
@@ -501,7 +508,7 @@ describe("Syncer", () => {
 
   it("fetches the viewer once and exposes it in the status", async () => {
     const { gh, calls } = fakeGithub([]);
-    const syncer = new Syncer({ db, gh, now: () => now });
+    const syncer = new Syncer({ db, forge: new GithubForge(gh), now: () => now });
     expect(syncer.status().viewer).toBeNull();
     expect(await syncer.viewer()).toBe("me");
     expect(await syncer.viewer()).toBe("me");
@@ -527,7 +534,7 @@ describe("startScheduler", () => {
       lastFullSyncAt: "2026-05-01T11:59:30.000Z",
     });
     const { gh, calls } = fakeGithub([[]]);
-    const syncer = new Syncer({ db, gh });
+    const syncer = new Syncer({ db, forge: new GithubForge(gh) });
     const config: Config = {
       version: CONFIG_VERSION,
       repos: ["acme/due", "acme/fresh"],

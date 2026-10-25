@@ -1,59 +1,39 @@
-import type { Db } from "../links/db/sqlite";
-import type { GithubClient } from "../links/forge/github/client";
+import type { SyncStore } from "../pacts/db";
 import type { CiJob, SyncStatus } from "../pacts/types";
 
 import {
   type CiBranch,
   CI_BATCH,
-  fetchCiBranchesPage,
-  fetchCiJobs,
-} from "../links/forge/github/ci";
-import {
-  fetchIssuesPage,
-  fetchPullStatuses,
-  fetchPullsPage,
-  fetchRepoLabels,
-  fetchViewer,
+  type Forge,
+  type IssuesPage,
   type PageOptions,
   STATUS_BATCH,
-} from "../links/forge/github/issues";
+} from "../pacts/forge";
 import { closedSince, type Config } from "../pacts/schema";
+import {
+  SyncBusyError,
+  type SyncOptions,
+  type SyncResult,
+  type SyncService,
+} from "../pacts/services";
 
 const FULL_SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const SINCE_OVERLAP_MS = 2 * 60 * 1000;
 const RATE_FLOOR = 200;
 
 export interface SyncDeps {
-  db: Db;
-  gh: GithubClient;
+  db: SyncStore;
+  forge: Forge;
   now?: () => Date;
   /** How many days of closed items a full sync fetches besides the open ones. */
   closedDays?: () => number;
-}
-
-export interface SyncResult {
-  repo: string;
-  full: boolean;
-  upserted: number;
-  closed: number;
-}
-
-export interface SyncOptions {
-  full?: boolean;
-}
-
-export class SyncBusyError extends Error {
-  constructor(repo: string) {
-    super(`${repo}: sync already running`);
-    this.name = "SyncBusyError";
-  }
 }
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export class Syncer {
+export class Syncer implements SyncService {
   version = 0;
   /** Sync-all runs finished. */
   runs = 0;
@@ -63,8 +43,8 @@ export class Syncer {
   rateRemaining: number | null = null;
   viewerLogin: string | null = null;
   readonly inFlight = new Set<string>();
-  readonly db: Db;
-  private readonly gh: GithubClient;
+  readonly db: SyncStore;
+  private readonly forge: Forge;
   private readonly now: () => Date;
   private readonly closedDays: () => number;
   private viewerPromise: Promise<string> | null = null;
@@ -74,7 +54,7 @@ export class Syncer {
 
   constructor(deps: SyncDeps) {
     this.db = deps.db;
-    this.gh = deps.gh;
+    this.forge = deps.forge;
     this.now = deps.now ?? (() => new Date());
     this.closedDays = deps.closedDays ?? (() => 0);
   }
@@ -93,7 +73,7 @@ export class Syncer {
 
   /** Login behind the token, fetched once; a failure is retried on the next call. */
   viewer(): Promise<string> {
-    this.viewerPromise ??= fetchViewer(this.gh).then(
+    this.viewerPromise ??= this.forge.viewer().then(
       (login) => {
         this.viewerLogin = login;
         return login;
@@ -165,23 +145,18 @@ export class Syncer {
       let upserted = 0;
       const cutoff = closedSince(full ? this.closedDays() : 0, startedAt);
       const closedFrom = Number.isFinite(cutoff) ? new Date(cutoff).toISOString() : null;
-      for (const fetchPage of [fetchIssuesPage, fetchPullsPage]) {
-        upserted += await this.drain(fetchPage, repo, query, seen);
+      for (const kind of ["issuesPage", "pullsPage"] as const) {
+        upserted += await this.drain(kind, repo, query, seen);
         // An open-only full sync misses what closed lately, which boards still show.
         if (closedFrom) {
-          upserted += await this.drain(
-            fetchPage,
-            repo,
-            { since: closedFrom, states: "closed" },
-            seen,
-          );
+          upserted += await this.drain(kind, repo, { since: closedFrom, states: "closed" }, seen);
         }
       }
 
       const closed = full ? this.db.closeMissing(repo, seen) : 0;
       await this.refreshPullStatuses(repo);
       await this.refreshCiJobs(repo);
-      this.db.upsertLabels(repo, await fetchRepoLabels(this.gh, repo));
+      this.db.upsertLabels(repo, await this.forge.repoLabels(repo));
 
       const stamp = startedAt.toISOString();
       this.db.setSyncState(repo, {
@@ -205,11 +180,11 @@ export class Syncer {
   }
 
   /**
-   * Upserts every page `fetchPage` returns, adding the numbers to `seen`; stops short when
+   * Upserts every page of `kind` the forge returns, adding the numbers to `seen`; stops short when
    * the rate limit runs low. Returns how many issues it upserted.
    */
   private async drain(
-    fetchPage: typeof fetchIssuesPage,
+    kind: "issuesPage" | "pullsPage",
     repo: string,
     query: Omit<PageOptions, "after">,
     seen: Set<number>,
@@ -217,7 +192,7 @@ export class Syncer {
     let upserted = 0;
     let after: string | null = null;
     do {
-      const page = await fetchPage(this.gh, repo, { ...query, after });
+      const page: IssuesPage = await this.forge[kind](repo, { ...query, after });
       this.db.upsertIssues(page.issues);
       upserted += page.issues.length;
       for (const issue of page.issues) seen.add(issue.number);
@@ -232,7 +207,7 @@ export class Syncer {
     const numbers = this.db.openPullNumbers(repo);
     for (let start = 0; start < numbers.length; start += STATUS_BATCH) {
       const batch = numbers.slice(start, start + STATUS_BATCH);
-      const page = await fetchPullStatuses(this.gh, repo, batch);
+      const page = await this.forge.pullStatuses(repo, batch);
       this.db.setPullStatuses(repo, page.statuses);
       this.spend(page.rateRemaining, start + STATUS_BATCH < numbers.length);
     }
@@ -247,7 +222,7 @@ export class Syncer {
     const watched: CiBranch[] = [];
     let after: string | null = null;
     do {
-      const page = await fetchCiBranchesPage(this.gh, repo, after);
+      const page = await this.forge.ciBranchesPage(repo, after);
       watched.push(...page.branches);
       after = page.hasNextPage ? page.endCursor : null;
       this.spend(page.rateRemaining, Boolean(after) || watched.length > 0);
@@ -256,7 +231,7 @@ export class Syncer {
     const failed = new Set<string>();
     for (let start = 0; start < watched.length; start += CI_BATCH) {
       const batch = watched.slice(start, start + CI_BATCH);
-      const page = await fetchCiJobs(this.gh, repo, batch);
+      const page = await this.forge.ciJobs(repo, batch);
       jobs.push(...page.jobs);
       for (const name of page.failed) failed.add(name);
       this.spend(page.rateRemaining, start + CI_BATCH < watched.length);

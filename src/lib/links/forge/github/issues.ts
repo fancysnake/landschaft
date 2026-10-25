@@ -1,3 +1,4 @@
+import type { IssuesPage, PageOptions, PullStatusPage } from "../../../pacts/forge";
 import type { FetchedIssue, IssueState, LabelDef, PullStatus } from "../../../pacts/types";
 
 import { PULL_STATUS_NAMES, type PullStatusLabel } from "../../../pacts/status";
@@ -189,22 +190,6 @@ export function toPull(repo: string, node: PullNode): FetchedIssue {
   };
 }
 
-export interface IssuesPage {
-  issues: FetchedIssue[];
-  hasNextPage: boolean;
-  endCursor: string | null;
-  rateRemaining: number;
-}
-
-/** Which states a page fetches; a closed PR is closed or merged. */
-export type PageStates = "open" | "closed" | "all";
-
-export interface PageOptions {
-  since: string | null;
-  states: PageStates;
-  after: string | null;
-}
-
 const ISSUE_STATES = { open: ["OPEN"], closed: ["CLOSED"], all: null } as const;
 const PULL_STATES = { open: ["OPEN"], closed: ["CLOSED", "MERGED"], all: null } as const;
 
@@ -296,9 +281,6 @@ export function toPullStatus(node: PullStatusNode): PullStatus {
   return { number: node.number, statuses: PULL_STATUS_NAMES.filter((name) => holds[name]) };
 }
 
-/** PRs per status query; the caller splits the open PRs into batches this size. */
-export const STATUS_BATCH = 50;
-
 /** Each PR is its own aliased field. ponytail: first 100 checks and review threads. */
 function pullStatusField(number: number): string {
   return `pr${number}: pullRequest(number: ${number}) {
@@ -310,11 +292,6 @@ function pullStatusField(number: number): string {
     } } } } } }
     reviewThreads(first: 100) { nodes { isResolved comments(last: 1) { nodes { author { login } } } } }
   }`;
-}
-
-export interface PullStatusPage {
-  statuses: PullStatus[];
-  rateRemaining: number;
 }
 
 /**

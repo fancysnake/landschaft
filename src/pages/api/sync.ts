@@ -1,10 +1,8 @@
-import { getApp } from "../../lib/inits";
-import { loadConfig } from "../../lib/links/config/file";
-import { SyncBusyError } from "../../lib/mills/sync";
 import { SyncRequestSchema } from "../../lib/pacts/schema";
+import { SyncBusyError } from "../../lib/pacts/services";
 import { ApiError, json, route } from "./_route";
 
-export const POST = route(async ({ request }) => {
+export const POST = route(async ({ locals, request }) => {
   const text = await request.text();
   let raw: unknown = {};
   if (text.trim()) {
@@ -15,7 +13,7 @@ export const POST = route(async ({ request }) => {
     }
   }
   const body = SyncRequestSchema.parse(raw);
-  const { syncer } = getApp();
+  const { config, sync: syncer } = locals.services;
   if (body.repo) {
     try {
       const result = await syncer.syncRepo(body.repo, { full: body.full });
@@ -26,6 +24,6 @@ export const POST = route(async ({ request }) => {
     }
   }
   // The run ends once /api/version reports `runs >= run`, its failures in `lastError`.
-  void syncer.syncAll(loadConfig().repos, { full: body.full });
+  void syncer.syncAll(config.load().repos, { full: body.full });
   return json({ status: syncer.status(), run: syncer.currentRun }, 202);
 });

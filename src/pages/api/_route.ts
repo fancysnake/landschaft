@@ -2,9 +2,7 @@ import type { APIContext, APIRoute } from "astro";
 
 import { ZodError, type ZodType } from "zod";
 
-import { viewData } from "../../lib/inits";
-import { findDashboard, loadConfig } from "../../lib/links/config/file";
-import { type Dashboard, type DashboardType, ViewQuerySchema } from "../../lib/pacts/schema";
+import { InvalidError, NotFoundError } from "../../lib/pacts/services";
 
 export class ApiError extends Error {
   constructor(
@@ -40,20 +38,6 @@ export function parseQuery<T>(schema: ZodType<T>, url: URL): T {
   return schema.parse(Object.fromEntries(url.searchParams));
 }
 
-/**
- * What a view endpoint works from: the dashboard of `type` the URL names (404 otherwise), the
- * query, and `viewData`.
- */
-export async function viewRequest<T extends DashboardType>({ params, url }: APIContext, type: T) {
-  const config = loadConfig();
-  const dashboard = findDashboard(config, params.id ?? "");
-  const isType = (d: Dashboard | undefined): d is Extract<Dashboard, { type: T }> =>
-    d?.type === type;
-  if (!isType(dashboard)) throw new ApiError(404, `${type} not found`);
-  const query = parseQuery(ViewQuerySchema, url);
-  return { dashboard, query, ...(await viewData(config)) };
-}
-
 /** Wraps a handler so thrown errors become JSON responses with a fitting status. */
 export function route(handler: (context: APIContext) => Promise<Response> | Response): APIRoute {
   return async (context) => {
@@ -61,6 +45,8 @@ export function route(handler: (context: APIContext) => Promise<Response> | Resp
       return await handler(context);
     } catch (error) {
       if (error instanceof ApiError) return json({ error: error.message }, error.status);
+      if (error instanceof NotFoundError) return json({ error: error.message }, 404);
+      if (error instanceof InvalidError) return json({ error: error.message }, 400);
       if (error instanceof ZodError) {
         return json({ error: "validation failed", issues: error.issues }, 400);
       }

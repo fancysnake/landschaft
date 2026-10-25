@@ -1,4 +1,3 @@
-import type { Db } from "../links/db/sqlite";
 import type { BoardDashboard } from "../pacts/schema";
 import type { Audience, CiJob, Issue, Snapshot } from "../pacts/types";
 
@@ -55,7 +54,11 @@ export const DASHBOARD: BoardDashboard = {
 };
 
 /** The cached item `repo#number`, or null. */
-export function cachedIssue(db: Db, repo: string, number: number): Issue | null {
+export function cachedIssue(
+  db: { listIssues(repos: string[]): Issue[] },
+  repo: string,
+  number: number,
+): Issue | null {
   return db.listIssues([repo]).find((issue) => issue.number === number) ?? null;
 }
 
