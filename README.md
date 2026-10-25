@@ -112,8 +112,9 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
     issue), `is:closed` (closed or merged; see the dashboard's `closedDays`).
   - `has:parent-issue`, `has:sub-issues`, `parent-issue:owner/repo#12`.
   - PR statuses from GitHub: `is:conflicting` (merge conflicts), `is:ci:failed` (the last
-    commit shows GitHub's red ✗), `is:ci:running` (a check has not finished) and
-    `is:unanswered` (an unresolved review thread whose last comment is not the PR author's).
+    commit shows GitHub's red ✗), `is:ci:running` (a check has not finished),
+    `is:unanswered` (an unresolved review thread whose last comment is not the PR author's)
+    and `is:draft` (a draft PR).
     `is:pr is:conflicting|ci:failed|unanswered` gathers the PRs waiting on their author.
   - `has:pr` picks issues an open PR closes (GitHub's "linked pull requests"), whoever
     opened the PR, as long as the PR is in one of the global repos, and CI jobs whose branch

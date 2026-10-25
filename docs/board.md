@@ -36,9 +36,9 @@ the local database, never on GitHub, so a closed epic that is reopened keeps its
 
 Open pull requests are synced alongside issues and placed by the same filters. They carry a `PR` badge and a sky-blue tint (issues green, epics violet, blocked red). Put `is:pr` (or `is:issue`) in a swimlane's or column's filter to split them.
 
-`is:conflicting`, `is:ci:failed`, `is:ci:running` and `is:unanswered` pick PRs by merge
-conflicts, a failed check (GitHub's red ✗ on the last commit), any check still running, or review
-threads awaiting the author; each sync refreshes them for every open PR.
+`is:conflicting`, `is:ci:failed`, `is:ci:running`, `is:unanswered` and `is:draft` pick PRs by
+merge conflicts, a failed check (GitHub's red ✗ on the last commit), any check still running,
+review threads awaiting the author, or draft state; each sync refreshes them for every open PR.
 
 A PR card shows a pill for each status that holds, whatever lane it is in: `conflict`, `CI ✗`,
 `CI …` or `comments`.

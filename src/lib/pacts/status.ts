@@ -4,6 +4,7 @@ export const PULL_STATUS_NAMES = [
   "is:ci:failed",
   "is:ci:running",
   "is:unanswered",
+  "is:draft",
 ] as const;
 export type PullStatusLabel = (typeof PULL_STATUS_NAMES)[number];
 
