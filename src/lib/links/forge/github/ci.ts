@@ -1,3 +1,4 @@
+import type { CiBranch, CiBranchesPage, CiJobsPage } from "../../../pacts/forge";
 import type { CiJob } from "../../../pacts/types";
 
 import { ciJobKey } from "../../../pacts/types";
@@ -33,19 +34,6 @@ interface CiBranchesData {
       nodes: { name: string; target: { statusCheckRollup?: { state: StatusState } | null } }[];
     };
   } | null;
-}
-
-/** A branch to read failed jobs of; `suites` also reads its head commit's check suites. */
-export interface CiBranch {
-  name: string;
-  suites: boolean;
-}
-
-export interface CiBranchesPage {
-  branches: CiBranch[];
-  hasNextPage: boolean;
-  endCursor: string | null;
-  rateRemaining: number;
 }
 
 /**
@@ -219,9 +207,6 @@ export function toCiJobs(
   return [...newest.values()].filter((run) => run.failed).map((run) => run.job);
 }
 
-/** Branches per CI job query. */
-export const CI_BATCH = 20;
-
 const AUTHORS = "nodes { author { user { login } } }";
 
 /** The aliases of branch `index`'s head commit and comparison fields in the CI job query. */
@@ -260,13 +245,6 @@ function ciBranchFields(index: number, suites: boolean): string {
   ${aliases.compare}: defaultBranchRef { name compare(headRef: $branch${index}) {
     aheadBy commits(first: 100) { ${AUTHORS} }
   } }`;
-}
-
-export interface CiJobsPage {
-  jobs: CiJob[];
-  /** Branches an unexpected error hit, whose cached jobs still hold. */
-  failed: string[];
-  rateRemaining: number;
 }
 
 /**

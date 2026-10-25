@@ -1,9 +1,6 @@
-import { getApp } from "../../../../lib/inits";
-import { buildInbox } from "../../../../lib/mills/board";
-import { json, route, viewRequest } from "../../_route";
+import { ViewQuerySchema } from "../../../../lib/pacts/schema";
+import { json, parseQuery, route } from "../../_route";
 
-export const GET = route(async (context) => {
-  const { dashboard, query, snapshot, ...audience } = await viewRequest(context, "inbox");
-  const inbox = buildInbox(snapshot, dashboard, { ...audience, query });
-  return json({ dashboard, inbox, status: getApp().syncer.status() });
-});
+export const GET = route(async ({ locals, params, url }) =>
+  json(await locals.services.views.inbox(params.id ?? "", parseQuery(ViewQuerySchema, url))),
+);

@@ -8,8 +8,9 @@ import {
   CONFIG_VERSION,
   ConfigSchema,
   type Dashboard,
+  findDashboard,
 } from "../../pacts/schema";
-import { findDashboard, loadConfig, saveConfig } from "./file";
+import { loadConfig, saveConfig } from "./file";
 
 const minimal = {
   version: CONFIG_VERSION,

@@ -1,16 +1,17 @@
-import type { Audience, NavData, Snapshot } from "./pacts/types";
+import type { ConfigStore } from "./pacts/config";
+import type { Services } from "./pacts/services";
 
-import { loadConfig } from "./links/config/file";
+import { loadConfig, saveConfig } from "./links/config/file";
 import { Db } from "./links/db/sqlite";
-import { createGithubClient, getToken, type GithubClient } from "./links/forge/github/client";
-import { scopedRepos } from "./mills/board";
+import { createGithubClient, getToken } from "./links/forge/github/client";
+import { GithubForge } from "./links/forge/github/forge";
+import { ConfigKeeper } from "./mills/config";
 import { startScheduler, Syncer } from "./mills/sync";
-import { closedDays, type Config } from "./pacts/schema";
+import { Views } from "./mills/views";
+import { closedDays } from "./pacts/schema";
 
 export interface App {
-  db: Db;
-  gh: GithubClient;
-  syncer: Syncer;
+  services: Services;
   stop(): void;
 }
 
@@ -20,13 +21,21 @@ const registry = globalThis as { landschaftApp?: App };
 export function getApp(): App {
   if (!registry.landschaftApp) {
     const db = new Db();
-    const gh = createGithubClient(getToken);
-    const syncer = new Syncer({ db, gh, closedDays: () => closedDays(loadConfig()) });
-    const stopScheduler = startScheduler(syncer, loadConfig);
+    const forge = new GithubForge(createGithubClient(getToken));
+    const config: ConfigStore = { load: () => loadConfig(), save: (raw) => saveConfig(raw) };
+    const syncer = new Syncer({ db, forge, closedDays: () => closedDays(config.load()) });
+    const stopScheduler = startScheduler(syncer, config.load);
     registry.landschaftApp = {
-      db,
-      gh,
-      syncer,
+      services: {
+        config: new ConfigKeeper(config, syncer),
+        sync: syncer,
+        views: new Views({
+          config: config.load,
+          store: db,
+          syncer,
+          viewer: () => syncer.viewer().catch(() => null),
+        }),
+      },
       stop() {
         stopScheduler();
         db.close();
@@ -35,29 +44,4 @@ export function getApp(): App {
     };
   }
   return registry.landschaftApp;
-}
-
-/**
- * The cached issues and jobs of the configured repos and who views them; `viewer` is null when it
- * cannot be fetched.
- */
-export async function viewData({
-  repos,
-  users,
-}: Pick<Config, "repos" | "users">): Promise<Audience & { snapshot: Snapshot }> {
-  const { db, syncer } = getApp();
-  return { snapshot: db.snapshot(repos), users, viewer: await syncer.viewer().catch(() => null) };
-}
-
-export async function navData(): Promise<NavData> {
-  const config = loadConfig();
-  const { snapshot, ...audience } = await viewData(config);
-  return {
-    dashboards: config.dashboards.map(({ id, name, filter }) => ({
-      id,
-      name,
-      repos: [...scopedRepos(snapshot, { filter }, audience)],
-    })),
-    repos: config.repos,
-  };
 }

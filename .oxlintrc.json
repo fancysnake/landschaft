@@ -20,7 +20,8 @@
     ],
     "import/no-unassigned-import": "off",
     "no-await-in-loop": "off",
-    "react/react-in-jsx-scope": "off"
+    "react/react-in-jsx-scope": "off",
+    "import/no-cycle": "error"
   },
   "ignorePatterns": ["dist", ".astro", "node_modules", "site"],
   "overrides": [
@@ -32,8 +33,24 @@
           {
             "patterns": [
               {
-                "regex": "^(\\.\\./)+(mills|links|inits|client|components|layouts|pages)(/|$)",
+                "regex": "^\\.\\./",
                 "message": "pacts import nothing first-party outside pacts."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/lib/mills/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^(\\.\\./)+(.*/)?(links|inits|client|components|layouts|pages)(/|$)",
+                "message": "mills import pacts only."
               }
             ]
           }
@@ -48,12 +65,34 @@
           {
             "patterns": [
               {
-                "regex": "^(\\.\\./)+(mills|inits|client|components|layouts|pages)(/|$)",
-                "message": "links import pacts, never mills, inits or gates."
+                "regex": "^(\\.\\./)+(.*/)?(mills|inits|client|components|layouts|pages)(/|$)",
+                "message": "links import pacts only."
               }
             ]
           }
         ]
+      }
+    },
+    {
+      "files": ["src/pages/**", "src/layouts/**", "src/components/**", "src/lib/client/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^\\.{1,2}/(.*/)?(mills|links|inits)(/|$)",
+                "message": "gates import pacts only; services come from locals."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/*.test.ts", "src/lib/__fixtures__/**"],
+      "rules": {
+        "no-restricted-imports": "off"
       }
     }
   ]

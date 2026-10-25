@@ -2,10 +2,10 @@
 import Board from "../../components/board/Board";
 import Inbox from "../../components/board/Inbox";
 import Base from "../../layouts/Base.astro";
-import { findDashboard, loadConfig } from "../../lib/links/config/file";
+import { findDashboard } from "../../lib/pacts/schema";
 
 const id = Astro.params.id ?? "";
-const dashboard = findDashboard(loadConfig(), id);
+const dashboard = findDashboard(Astro.locals.services.config.load(), id);
 if (!dashboard) return Astro.redirect("/", 302);
 ---
 
