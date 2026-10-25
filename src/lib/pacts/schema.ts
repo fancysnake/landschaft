@@ -363,6 +363,10 @@ export function withType(type: DashboardType, from: DashboardBase): Dashboard {
     : { type, ...base, groups: [] };
 }
 
+export function findDashboard(config: Config, dashboardId: string): Dashboard | undefined {
+  return config.dashboards.find((dashboard) => dashboard.id === dashboardId);
+}
+
 /** The longest window any dashboard shows closed items for, in days; what a full sync fetches. */
 export const closedDays = (config: { dashboards: Pick<Dashboard, "closedDays">[] }): number =>
   Math.max(0, ...config.dashboards.map((dashboard) => dashboard.closedDays));

@@ -1,5 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 
+import type { SyncStore, ViewStore } from "../../pacts/db";
 import type {
   Assignee,
   Blocker,
@@ -187,7 +188,7 @@ export function dbPath(): string {
   return process.env.LANDSCHAFT_DB ?? "landschaft.db";
 }
 
-export class Db {
+export class Db implements SyncStore, ViewStore {
   private readonly db: DatabaseSync;
 
   constructor(file = dbPath()) {

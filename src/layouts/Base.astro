@@ -3,14 +3,12 @@ import "../styles/global.css";
 
 import Nav from "../components/Nav";
 
-import { navData } from "../lib/inits";
-
 interface Props {
   title: string;
 }
 
 const { title } = Astro.props;
-const nav = await navData();
+const nav = await Astro.locals.services.views.nav();
 ---
 
 <!doctype html>

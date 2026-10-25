@@ -1,8 +1,7 @@
 ---
 import Base from "../layouts/Base.astro";
-import { loadConfig } from "../lib/links/config/file";
 
-const { dashboards } = loadConfig();
+const { dashboards } = Astro.locals.services.config.load();
 ---
 
 <Base title="Dashboards">

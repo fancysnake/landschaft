@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-import { type Config, ConfigSchema, type Dashboard } from "../../pacts/schema";
+import { type Config, ConfigSchema } from "../../pacts/schema";
 
 export function configPath(): string {
   return resolve(process.env.LANDSCHAFT_CONFIG ?? "landschaft.config.json");
@@ -20,8 +20,4 @@ export function saveConfig(config: unknown, file = configPath()): Config {
   writeFileSync(tmp, `${JSON.stringify(parsed, null, 2)}\n`);
   renameSync(tmp, file);
   return parsed;
-}
-
-export function findDashboard(config: Config, id: string): Dashboard | undefined {
-  return config.dashboards.find((dashboard) => dashboard.id === id);
 }
