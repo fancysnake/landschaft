@@ -49,7 +49,7 @@
           {
             "patterns": [
               {
-                "regex": "^(\\.\\./)+(links|inits|client|components|layouts|pages)(/|$)",
+                "regex": "^(\\.\\./)+(.*/)?(links|inits|client|components|layouts|pages)(/|$)",
                 "message": "mills import pacts only."
               }
             ]
@@ -65,7 +65,7 @@
           {
             "patterns": [
               {
-                "regex": "^(\\.\\./)+(mills|inits|client|components|layouts|pages)(/|$)",
+                "regex": "^(\\.\\./)+(.*/)?(mills|inits|client|components|layouts|pages)(/|$)",
                 "message": "links import pacts only."
               }
             ]

@@ -19,7 +19,7 @@ export const POST = route(async ({ locals, request }) => {
       const result = await syncer.syncRepo(body.repo, { full: body.full });
       return json({ results: [result], status: syncer.status() });
     } catch (error) {
-      if (error instanceof SyncBusyError) throw new ApiError(409, error.message);
+      if (error instanceof SyncBusyError) throw error;
       throw new ApiError(502, error instanceof Error ? error.message : String(error));
     }
   }

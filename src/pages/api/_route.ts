@@ -2,7 +2,7 @@ import type { APIContext, APIRoute } from "astro";
 
 import { ZodError, type ZodType } from "zod";
 
-import { InvalidError, NotFoundError } from "../../lib/pacts/services";
+import { InvalidError, NotFoundError, SyncBusyError } from "../../lib/pacts/services";
 
 export class ApiError extends Error {
   constructor(
@@ -47,6 +47,7 @@ export function route(handler: (context: APIContext) => Promise<Response> | Resp
       if (error instanceof ApiError) return json({ error: error.message }, error.status);
       if (error instanceof NotFoundError) return json({ error: error.message }, 404);
       if (error instanceof InvalidError) return json({ error: error.message }, 400);
+      if (error instanceof SyncBusyError) return json({ error: error.message }, 409);
       if (error instanceof ZodError) {
         return json({ error: "validation failed", issues: error.issues }, 400);
       }

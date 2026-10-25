@@ -1,6 +1,5 @@
 import type { ViewStore } from "../pacts/db";
-import type { Audience, NavData, Snapshot } from "../pacts/types";
-import type { Syncer } from "./sync";
+import type { Audience, NavData, Snapshot, SyncStatus } from "../pacts/types";
 
 import {
   type Config,
@@ -10,14 +9,23 @@ import {
   type UnmatchedQuery,
   type ViewQuery,
 } from "../pacts/schema";
-import { InvalidError, NotFoundError, type ViewService } from "../pacts/services";
+import { InvalidError, NotFoundError, type SyncService, type ViewService } from "../pacts/services";
 import { parseIssueKey } from "../pacts/types";
 import { buildBoard, buildInbox, scopedRepos, unmatchedItems } from "./board";
 
 export interface ViewDeps {
   config: () => Config;
   store: ViewStore;
-  syncer: Pick<Syncer, "status" | "viewer">;
+  syncer: Pick<SyncService, "status">;
+  /** Login behind the token; null when it cannot be fetched. */
+  viewer: () => Promise<string | null>;
+}
+
+interface Context {
+  config: Config;
+  snapshot: Snapshot;
+  audience: Audience;
+  status: SyncStatus;
 }
 
 function dashboardOf<T extends DashboardType>(config: Config, id: string, type: T) {
@@ -31,25 +39,20 @@ function dashboardOf<T extends DashboardType>(config: Config, id: string, type: 
 export class Views implements ViewService {
   constructor(private readonly deps: ViewDeps) {}
 
-  /**
-   * The cached issues and jobs of the configured repos and who views them; `viewer` is null when
-   * it cannot be fetched.
-   */
-  private async audience({
-    repos,
-    users,
-  }: Pick<Config, "repos" | "users">): Promise<Audience & { snapshot: Snapshot }> {
-    const { store, syncer } = this.deps;
+  /** The config, the cached issues and jobs of its repos, who views them and the sync status. */
+  private async context(): Promise<Context> {
+    const { config: load, store, syncer, viewer } = this.deps;
+    const config = load();
     return {
-      snapshot: store.snapshot(repos),
-      users,
-      viewer: await syncer.viewer().catch(() => null),
+      config,
+      snapshot: store.snapshot(config.repos),
+      audience: { users: config.users, viewer: await viewer() },
+      status: syncer.status(),
     };
   }
 
   async nav(): Promise<NavData> {
-    const config = this.deps.config();
-    const { snapshot, ...audience } = await this.audience(config);
+    const { config, snapshot, audience } = await this.context();
     return {
       dashboards: config.dashboards.map(({ id, name, filter }) => ({
         id,
@@ -61,27 +64,24 @@ export class Views implements ViewService {
   }
 
   async board(id: string, query: ViewQuery) {
-    const config = this.deps.config();
+    const { config, snapshot, audience, status } = await this.context();
     const dashboard = dashboardOf(config, id, "board");
-    const { snapshot, ...audience } = await this.audience(config);
     const starred = this.deps.store.starredEpics(dashboard.id);
     const board = buildBoard(snapshot, dashboard, { ...audience, query, starred });
-    return { dashboard, board, status: this.deps.syncer.status() };
+    return { dashboard, board, status };
   }
 
   async inbox(id: string, query: ViewQuery) {
-    const config = this.deps.config();
+    const { config, snapshot, audience, status } = await this.context();
     const dashboard = dashboardOf(config, id, "inbox");
-    const { snapshot, ...audience } = await this.audience(config);
     const inbox = buildInbox(snapshot, dashboard, { ...audience, query });
-    return { dashboard, inbox, status: this.deps.syncer.status() };
+    return { dashboard, inbox, status };
   }
 
   async unmatched(query: UnmatchedQuery) {
-    const config = this.deps.config();
-    const { snapshot, ...audience } = await this.audience(config);
+    const { config, snapshot, audience, status } = await this.context();
     const { items, offer } = unmatchedItems(snapshot, config.dashboards, { ...audience, query });
-    return { items, offer, status: this.deps.syncer.status() };
+    return { items, offer, status };
   }
 
   labels(repos: string[]) {

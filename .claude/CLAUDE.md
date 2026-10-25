@@ -37,7 +37,8 @@ type-checked (`astro check`), not formatted.
 - `src/lib/pacts/` — contracts shared by server and client: `schema.ts` (zod schemas + types:
   config, filters), `types.ts` (runtime data shapes: Issue, Card, Board, SyncStatus),
   `filter.ts` (filter language), `status.ts` (pull status labels), `services.ts` (the services
-  gates call, their shared errors), `forge.ts` and `db.ts` (protocols the links implement).
+  gates call, their shared errors), `forge.ts`, `db.ts` and `config.ts` (protocols the links
+  implement).
 - `src/lib/mills/` — Node-only logic: `board.ts` (**pure** board builder), `sync.ts` (Syncer +
   scheduler), `views.ts` and `config.ts` (the view and config services).
 - `src/lib/links/` — Node-only adapters: `config/file.ts` (JSON file, atomic save),

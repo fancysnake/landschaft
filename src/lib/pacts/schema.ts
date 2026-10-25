@@ -363,12 +363,6 @@ export function withType(type: DashboardType, from: DashboardBase): Dashboard {
     : { type, ...base, groups: [] };
 }
 
-/** Where the config is kept; `save` validates before it writes. */
-export interface ConfigStore {
-  load(): Config;
-  save(config: unknown): Config;
-}
-
 export function findDashboard(config: Config, dashboardId: string): Dashboard | undefined {
   return config.dashboards.find((dashboard) => dashboard.id === dashboardId);
 }

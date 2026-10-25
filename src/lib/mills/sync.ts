@@ -5,7 +5,6 @@ import {
   type CiBranch,
   CI_BATCH,
   type Forge,
-  type IssuesPage,
   type PageOptions,
   STATUS_BATCH,
 } from "../pacts/forge";
@@ -145,11 +144,20 @@ export class Syncer implements SyncService {
       let upserted = 0;
       const cutoff = closedSince(full ? this.closedDays() : 0, startedAt);
       const closedFrom = Number.isFinite(cutoff) ? new Date(cutoff).toISOString() : null;
-      for (const kind of ["issuesPage", "pullsPage"] as const) {
-        upserted += await this.drain(kind, repo, query, seen);
+      const fetchers: Forge["issuesPage"][] = [
+        (r, o) => this.forge.issuesPage(r, o),
+        (r, o) => this.forge.pullsPage(r, o),
+      ];
+      for (const fetchPage of fetchers) {
+        upserted += await this.drain(fetchPage, repo, query, seen);
         // An open-only full sync misses what closed lately, which boards still show.
         if (closedFrom) {
-          upserted += await this.drain(kind, repo, { since: closedFrom, states: "closed" }, seen);
+          upserted += await this.drain(
+            fetchPage,
+            repo,
+            { since: closedFrom, states: "closed" },
+            seen,
+          );
         }
       }
 
@@ -180,11 +188,11 @@ export class Syncer implements SyncService {
   }
 
   /**
-   * Upserts every page of `kind` the forge returns, adding the numbers to `seen`; stops short when
+   * Upserts every page `fetchPage` returns, adding the numbers to `seen`; stops short when
    * the rate limit runs low. Returns how many issues it upserted.
    */
   private async drain(
-    kind: "issuesPage" | "pullsPage",
+    fetchPage: Forge["issuesPage"],
     repo: string,
     query: Omit<PageOptions, "after">,
     seen: Set<number>,
@@ -192,7 +200,7 @@ export class Syncer implements SyncService {
     let upserted = 0;
     let after: string | null = null;
     do {
-      const page: IssuesPage = await this.forge[kind](repo, { ...query, after });
+      const page = await fetchPage(repo, { ...query, after });
       this.db.upsertIssues(page.issues);
       upserted += page.issues.length;
       for (const issue of page.issues) seen.add(issue.number);

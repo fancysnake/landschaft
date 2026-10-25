@@ -1,6 +1,7 @@
+import type { ConfigStore } from "../pacts/config";
 import type { ConfigService, SyncService } from "../pacts/services";
 
-import { type Config, type ConfigStore, reposToResync } from "../pacts/schema";
+import { type Config, reposToResync } from "../pacts/schema";
 
 export class ConfigKeeper implements ConfigService {
   constructor(

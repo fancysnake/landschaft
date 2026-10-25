@@ -1,4 +1,4 @@
-import type { ConfigStore } from "./pacts/schema";
+import type { ConfigStore } from "./pacts/config";
 import type { Services } from "./pacts/services";
 
 import { loadConfig, saveConfig } from "./links/config/file";
@@ -29,7 +29,12 @@ export function getApp(): App {
       services: {
         config: new ConfigKeeper(config, syncer),
         sync: syncer,
-        views: new Views({ config: config.load, store: db, syncer }),
+        views: new Views({
+          config: config.load,
+          store: db,
+          syncer,
+          viewer: () => syncer.viewer().catch(() => null),
+        }),
       },
       stop() {
         stopScheduler();
