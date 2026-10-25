@@ -41,7 +41,7 @@ merge conflicts, a failed check (GitHub's red ✗ on the last commit), any check
 review threads awaiting the author, or draft state; each sync refreshes them for every open PR.
 
 A PR card shows a pill for each status that holds, whatever lane it is in: `conflict`, `CI ✗`,
-`CI …` or `comments`.
+`CI …`, `comments` or `draft`.
 
 `has:pr` picks issues that an open PR closes (GitHub's "linked pull requests"), whoever
 opened the PR, as long as the PR is in one of the global repos; such an issue card shows a
