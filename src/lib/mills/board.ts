@@ -102,7 +102,7 @@ export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Iss
 }
 
 /** A failed CI job as filters see it, its labels carrying the colours its card shows. */
-type JobItem = Omit<FilterItem, "labels"> & { labels: LabelRef[] };
+type JobItem = Omit<FilterItem, "kind" | "labels"> & { kind: "ci-job"; labels: LabelRef[] };
 
 /**
  * A failed CI job as filters see it: the labels of its open PR in `byKey`, no assignees or links,
@@ -158,14 +158,17 @@ function relatedTo(epicKey: string, byKey: Map<string, Issue>): Set<string> {
   return new Set([...base, ...linked]);
 }
 
+/** Whether an item, with its card `key` and the `text` the search box matches, shows. */
+type BarFilter = (item: FilterItem, key: string, text: string) => boolean;
+
+/** Whether a card or the filter bar offers a label. */
+type LabelShown = (label: { name: string }) => boolean;
+
 /**
- * Text, assignee, label, type, job and epic filters as one predicate over an item, its card `key`
- * and the `text` the search box matches; an unset filter passes everything.
+ * Text, assignee, label, type, job and epic filters as one predicate; an unset filter passes
+ * everything.
  */
-function barFilter(
-  filters: Filters,
-  byKey: Map<string, Issue>,
-): (item: FilterItem, key: string, text: string) => boolean {
+function barFilter(filters: Filters, byKey: Map<string, Issue>): BarFilter {
   const query = filters.q?.trim().toLowerCase();
   const related = filters.epic ? relatedTo(filters.epic, byKey) : null;
   const wantedLabel = filters.label && labelKey(filters.label);
@@ -206,10 +209,23 @@ function inScope(
   return (item) => matchesFilter(base, item, { viewer }) && matchesFilter(scope, item, { viewer });
 }
 
+/** An issue or failed CI job: its item, card `key`, the `text` the search box matches, its card. */
+interface Entry {
+  item: Item | JobItem;
+  key: string;
+  text: string;
+  card: (labels: LabelRef[], isEpic: boolean) => Card;
+}
+
+/** `issues` by key, and the entries a view picks its cards from. */
+interface Scoped {
+  byKey: Map<string, Issue>;
+  entries: Entry[];
+}
+
 /**
- * `issues` by key, plus the open ones, those closed at or after `cutoff` (ms), and the failed
- * CI `jobs` that one of the global `users` (empty for everyone) is in and that pass `scope`,
- * each with its item.
+ * The open `issues`, those closed at or after `cutoff` (ms), and the failed CI `jobs` that one
+ * of the global `users` (empty for everyone) is in and that pass `scope`.
  */
 function scopedItems(
   issues: Issue[],
@@ -218,27 +234,29 @@ function scopedItems(
   viewer: string | null,
   scope: FilterNode | null = null,
   cutoff = Number.POSITIVE_INFINITY,
-): {
-  byKey: Map<string, Issue>;
-  listed: { issue: Issue; item: Item }[];
-  jobItems: { job: CiJob; item: JobItem }[];
-} {
+): Scoped {
   const byKey = new Map(issues.map((issue) => [keyOf(issue), issue]));
   // From all of `issues`, not just the open ones.
   const itemOf = itemsOf(issues, byKey);
   const passes = inScope(users, viewer, scope);
   const shows = (issue: Issue) =>
     issue.state === "OPEN" || (issue.closedAt !== null && Date.parse(issue.closedAt) >= cutoff);
-  const listed = issues.flatMap((issue) => {
-    if (!shows(issue)) return [];
+  const issueEntries = issues.filter(shows).map((issue): Entry => {
     const item = itemOf(issue);
-    return passes(item) ? [{ issue, item }] : [];
+    return {
+      item,
+      key: keyOf(item),
+      text: `${item.number} ${item.title}`,
+      card: (labels, isEpic) => toCard(item, labels, isEpic),
+    };
   });
-  const jobItems = jobs.flatMap((job) => {
-    const item = jobItem(job, byKey);
-    return passes(item) ? [{ job, item }] : [];
-  });
-  return { byKey, listed, jobItems };
+  const jobEntries = jobs.map((job): Entry => ({
+    item: jobItem(job, byKey),
+    key: ciJobKey(job),
+    text: `${job.name} ${job.branch}`,
+    card: (labels) => jobCard(job, labels),
+  }));
+  return { byKey, entries: [...issueEntries, ...jobEntries].filter(({ item }) => passes(item)) };
 }
 
 /** The dashboard's filter, swimlanes, columns and `epicLabel` (as a `labelKey`), parsed. */
@@ -292,7 +310,7 @@ function placer(dashboard: Dashboard, viewer: string | null): (item: FilterItem)
 /** The repo chips, filter options and sort of a view over `items`, offering the `shown` labels. */
 function facetsOf(
   items: FilterItem[],
-  shown: (label: { name: string }) => boolean,
+  shown: LabelShown,
   filters: ViewQuery,
   sort: Dashboard["sort"],
 ): Facets {
@@ -329,10 +347,7 @@ function facetsOf(
  * Whether a card keeps a label: all but the ones `nodes` ask for and the `epicLabel`, compared
  * by `labelKey`.
  */
-function labelShown(
-  nodes: (FilterNode | null)[],
-  epicLabel?: string,
-): (label: { name: string }) => boolean {
+function labelShown(nodes: (FilterNode | null)[], epicLabel?: string): LabelShown {
   const structural = new Set([...nodes.flatMap(askedLabels), ...(epicLabel ? [epicLabel] : [])]);
   return (label) => !structural.has(labelKey(label.name));
 }
@@ -368,11 +383,9 @@ export function scopedRepos(
   { users, viewer }: Audience,
 ): Set<string> {
   const scope = parseFilter(dashboard.filter);
-  const { listed, jobItems } = scopedItems(issues, jobs, users, viewer, scope);
-  return new Set([
-    ...listed.map(({ issue }) => issue.repo),
-    ...jobItems.map(({ job }) => job.repo),
-  ]);
+  return new Set(
+    scopedItems(issues, jobs, users, viewer, scope).entries.map(({ item }) => item.repo),
+  );
 }
 
 /** The inputs of the unmatched view. */
@@ -395,49 +408,41 @@ export function unmatchedItems(
   const filter = parseFilter(query.filter ?? "");
   const placers = dashboards.map((dashboard) => placer(dashboard, viewer));
   const placed = (item: FilterItem) => placers.some((places) => places(item));
-  const missed = ({ item }: { item: FilterItem }) => !hide.includes(item.repo) && !placed(item);
+  const missed = ({ item }: Entry) => !hide.includes(item.repo) && !placed(item);
   // Hidden repos are dropped last: their items still count for `has:pr` and blockers.
-  const unmatched = (scope: FilterNode | null) => {
-    const { listed, jobItems } = scopedItems(issues, jobs, users, viewer, scope);
-    return { listed: listed.filter(missed), jobItems: jobItems.filter(missed) };
-  };
+  const unmatched = (scope: FilterNode | null) =>
+    scopedItems(issues, jobs, users, viewer, scope).entries.filter(missed);
   const shown = unmatched(filter);
   const all = filter ? unmatched(null) : shown;
   const sort = { by: "updated", dir: "desc" } as const;
   const { repos, assignees, labels } = facetsOf(
-    [...all.listed, ...all.jobItems].map(({ item }) => item),
+    all.map(({ item }) => item),
     () => true,
     {},
     sort,
   );
   return {
-    items: [
-      ...shown.listed.map(({ item }) => toCard(item, item.labels, false)),
-      ...shown.jobItems.map(({ job, item }) => jobCard(job, item.labels)),
-    ].toSorted(compareBy(sort.by, sort.dir)),
+    items: shown
+      .map(({ item, card }) => card(item.labels, false))
+      .toSorted(compareBy(sort.by, sort.dir)),
     offer: { labels, repos, users: assignees },
   };
 }
 
 /** How a view picks and labels its cards; `isEpic` marks epic cards. */
 interface CardRules {
-  hide?: string[] | undefined;
-  wanted: ReturnType<typeof barFilter>;
-  shown: ReturnType<typeof labelShown>;
-  isEpic?: (item: Item) => boolean;
+  wanted: BarFilter;
+  shown: LabelShown;
+  isEpic: (item: FilterItem) => boolean;
 }
 
-/** Cards of `listed` and `jobItems` outside the `hide` repos that pass `wanted`, with their items. */
+/** Cards of the `entries` that pass `wanted`, with their items. */
 function* visibleCards(
-  { listed, jobItems }: Pick<ReturnType<typeof scopedItems>, "listed" | "jobItems">,
-  { hide = [], wanted, shown, isEpic = () => false }: CardRules,
+  entries: Entry[],
+  { wanted, shown, isEpic }: CardRules,
 ): Generator<[FilterItem, Card]> {
-  for (const { issue, item } of listed)
-    if (!hide.includes(issue.repo) && wanted(item, keyOf(issue), `${issue.number} ${issue.title}`))
-      yield [item, toCard(item, issue.labels.filter(shown), isEpic(item))];
-  for (const { job, item } of jobItems)
-    if (!hide.includes(job.repo) && wanted(item, ciJobKey(job), `${job.name} ${job.branch}`))
-      yield [item, jobCard(job, item.labels.filter(shown))];
+  for (const { item, key, text, card } of entries)
+    if (wanted(item, key, text)) yield [item, card(item.labels.filter(shown), isEpic(item))];
 }
 
 /** The inputs of a board or inbox; `now` dates the window of recently closed items. */
@@ -462,26 +467,21 @@ export function buildBoard(
 ): Board {
   const axes = compileGrid(dashboard);
   const { scope } = axes;
-  const { byKey, listed, jobItems } = scopedItems(
-    issues,
-    jobs,
-    users,
-    viewer,
-    scope,
-    closedSince(dashboard.closedDays, now),
-  );
-  const wanted = barFilter(query, byKey);
+  const cutoff = closedSince(dashboard.closedDays, now);
+  const scoped = scopedItems(issues, jobs, users, viewer, scope, cutoff);
   const shown = labelShown(
     [scope, ...[...axes.swimlanes, ...axes.columns].map((group) => group.node)],
     axes.epicLabel,
   );
   const facets = facetsOf(
-    [...listed, ...jobItems].map(({ item }) => item),
+    scoped.entries.map(({ item }) => item),
     shown,
     query,
     dashboard.sort,
   );
   const { sort } = facets;
+  // After the facets, so a hidden repo keeps its chip.
+  const entries = scoped.entries.filter(({ item }) => !query.hide?.includes(item.repo));
 
   const board: Board = {
     ...facets,
@@ -520,17 +520,16 @@ export function buildBoard(
       board.columnTotals[column.id] = (board.columnTotals[column.id] ?? 0) + 1;
   };
 
-  const rules = { hide: query.hide, wanted, shown, isEpic: axes.isEpic };
-  for (const [item, card] of visibleCards({ listed, jobItems }, rules)) put(item, card);
+  const rules = { wanted: barFilter(query, scoped.byKey), shown, isEpic: axes.isEpic };
+  for (const [item, card] of visibleCards(entries, rules)) put(item, card);
 
   const compare = compareBy(sort.by, sort.dir);
   for (const [key, cards] of Object.entries(board.cells))
     board.cells[key] = cards.toSorted(compare);
   const isStarred = (issue: Issue) => starred.has(keyOf(issue));
   // The epic strip ignores the filter bar, so it doesn't come from the cards.
-  board.epics = listed
-    .filter(({ issue, item }) => !query.hide?.includes(issue.repo) && axes.isEpic(item))
-    .map(({ issue }) => issue)
+  board.epics = entries
+    .flatMap(({ item }) => (item.kind !== "ci-job" && axes.isEpic(item) ? [item] : []))
     .toSorted((a, b) => Number(isStarred(b)) - Number(isStarred(a)) || compare(a, b))
     .map((issue) => ({
       key: keyOf(issue),
@@ -555,22 +554,16 @@ export function buildInbox(
 ): Inbox {
   const scope = parseFilter(dashboard.filter);
   const groups = compile(dashboard.groups);
-  const { byKey, listed, jobItems } = scopedItems(
-    issues,
-    jobs,
-    users,
-    viewer,
-    scope,
-    closedSince(dashboard.closedDays, now),
-  );
-  const wanted = barFilter(query, byKey);
+  const cutoff = closedSince(dashboard.closedDays, now);
+  const scoped = scopedItems(issues, jobs, users, viewer, scope, cutoff);
   const shown = labelShown([scope, ...groups.map((group) => group.node)]);
   const facets = facetsOf(
-    [...listed, ...jobItems].map(({ item }) => item),
+    scoped.entries.map(({ item }) => item),
     shown,
     query,
     dashboard.sort,
   );
+  const entries = scoped.entries.filter(({ item }) => !query.hide?.includes(item.repo));
   const cards = new Map<string, Card[]>(groups.map((group) => [group.id, []]));
   let total = 0;
   const put = (item: FilterItem, card: Card) => {
@@ -579,11 +572,8 @@ export function buildInbox(
     cards.get(group.id)!.push(card);
     total += 1;
   };
-  for (const [item, card] of visibleCards(
-    { listed, jobItems },
-    { hide: query.hide, wanted, shown },
-  ))
-    put(item, card);
+  const rules = { wanted: barFilter(query, scoped.byKey), shown, isEpic: () => false };
+  for (const [item, card] of visibleCards(entries, rules)) put(item, card);
   const compare = compareBy(facets.sort.by, facets.sort.dir);
   return {
     ...facets,
