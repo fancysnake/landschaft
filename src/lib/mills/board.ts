@@ -419,6 +419,27 @@ export function unmatchedItems(
   };
 }
 
+/** How a view picks and labels its cards; `isEpic` marks epic cards. */
+interface CardRules {
+  hide?: string[] | undefined;
+  wanted: ReturnType<typeof barFilter>;
+  shown: ReturnType<typeof labelShown>;
+  isEpic?: (item: Item) => boolean;
+}
+
+/** Cards of `listed` and `jobItems` outside the `hide` repos that pass `wanted`, with their items. */
+function* visibleCards(
+  { listed, jobItems }: Pick<ReturnType<typeof scopedItems>, "listed" | "jobItems">,
+  { hide = [], wanted, shown, isEpic = () => false }: CardRules,
+): Generator<[FilterItem, Card]> {
+  for (const { issue, item } of listed)
+    if (!hide.includes(issue.repo) && wanted(item, keyOf(issue), `${issue.number} ${issue.title}`))
+      yield [item, toCard(item, issue.labels.filter(shown), isEpic(item))];
+  for (const { job, item } of jobItems)
+    if (!hide.includes(job.repo) && wanted(item, ciJobKey(job), `${job.name} ${job.branch}`))
+      yield [item, jobCard(job, item.labels.filter(shown))];
+}
+
 /** The inputs of a board or inbox; `now` dates the window of recently closed items. */
 interface ViewOptions extends Audience {
   query?: ViewQuery;
@@ -478,8 +499,6 @@ export function buildBoard(
   }
   for (const column of dashboard.columns) board.columnTotals[column.id] = 0;
 
-  const epicIssues: Issue[] = [];
-
   /** Puts `card` in every cell `item` lands in, and counts it once if it shows in any. */
   const put = (item: FilterItem, card: Card) => {
     const placed = placeOnGrid(axes, item, viewer);
@@ -501,25 +520,17 @@ export function buildBoard(
       board.columnTotals[column.id] = (board.columnTotals[column.id] ?? 0) + 1;
   };
 
-  for (const { issue, item } of listed) {
-    if (query.hide?.includes(issue.repo)) continue;
-
-    const isEpic = axes.isEpic(item);
-    if (isEpic) epicIssues.push(issue);
-
-    if (wanted(item, keyOf(issue), `${issue.number} ${issue.title}`))
-      put(item, toCard(item, issue.labels.filter(shown), isEpic));
-  }
-  for (const { job, item } of jobItems) {
-    if (!query.hide?.includes(job.repo) && wanted(item, ciJobKey(job), `${job.name} ${job.branch}`))
-      put(item, jobCard(job, item.labels.filter(shown)));
-  }
+  const rules = { hide: query.hide, wanted, shown, isEpic: axes.isEpic };
+  for (const [item, card] of visibleCards({ listed, jobItems }, rules)) put(item, card);
 
   const compare = compareBy(sort.by, sort.dir);
   for (const [key, cards] of Object.entries(board.cells))
     board.cells[key] = cards.toSorted(compare);
   const isStarred = (issue: Issue) => starred.has(keyOf(issue));
-  board.epics = epicIssues
+  // The epic strip ignores the filter bar, so it doesn't come from the cards.
+  board.epics = listed
+    .filter(({ issue, item }) => !query.hide?.includes(issue.repo) && axes.isEpic(item))
+    .map(({ issue }) => issue)
     .toSorted((a, b) => Number(isStarred(b)) - Number(isStarred(a)) || compare(a, b))
     .map((issue) => ({
       key: keyOf(issue),
@@ -568,17 +579,11 @@ export function buildInbox(
     cards.get(group.id)!.push(card);
     total += 1;
   };
-  for (const { issue, item } of listed) {
-    if (
-      !query.hide?.includes(issue.repo) &&
-      wanted(item, keyOf(issue), `${issue.number} ${issue.title}`)
-    )
-      put(item, toCard(item, issue.labels.filter(shown), false));
-  }
-  for (const { job, item } of jobItems) {
-    if (!query.hide?.includes(job.repo) && wanted(item, ciJobKey(job), `${job.name} ${job.branch}`))
-      put(item, jobCard(job, item.labels.filter(shown)));
-  }
+  for (const [item, card] of visibleCards(
+    { listed, jobItems },
+    { hide: query.hide, wanted, shown },
+  ))
+    put(item, card);
   const compare = compareBy(facets.sort.by, facets.sort.dir);
   return {
     ...facets,
