@@ -876,11 +876,27 @@ describe("buildBoard", () => {
       prFor(21, 2),
       prFor(22, 1, "CLOSED"),
       prFor(23, 3),
+      prFor(24, 10),
+      makeIssue({
+        number: 25,
+        kind: "pr",
+        statuses: ["is:draft"],
+        linked: [{ repo: REPO, number: 1 }],
+      }),
+      makeIssue({
+        number: 26,
+        kind: "pr",
+        repo: "acme/other",
+        linked: [{ repo: REPO, number: 1 }],
+      }),
     ];
-    const epics = buildBoard(snapshot(issues), DASHBOARD, EVERYONE).epics;
+    const epics = buildBoard(snapshot(issues), DASHBOARD, {
+      ...EVERYONE,
+      query: { hide: ["acme/other"] },
+    }).epics;
     expect(epics.map((e) => [e.number, e.openPrs])).toEqual([
       [11, 0],
-      [10, 2],
+      [10, 4],
     ]);
   });
 
