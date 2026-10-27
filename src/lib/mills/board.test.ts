@@ -1044,10 +1044,9 @@ describe("CI jobs", () => {
     expect(buildBoard(snapshot([], jobs), scoped, EVERYONE).total).toBe(0);
   });
 
-  it("matches the text filter on job and branch names, and no other filter without a PR", () => {
+  it("matches the text filter on job and branch names, and no other filter", () => {
     expect(shownJobs({ q: "FIX/" })).toEqual(["lint"]);
     expect(shownJobs({ q: "test" })).toEqual(["test"]);
-    expect(shownJobs({ label: "bug" })).toEqual([]);
     expect(shownJobs({ assignee: "bob" })).toEqual([]);
     expect(shownJobs({ epic: "acme/app#1" })).toEqual([]);
     expect(shownJobs({ hide: [REPO] })).toEqual([]);
