@@ -11,6 +11,7 @@ interface Props {
 }
 
 export function EpicTile({ epic, selected, onToggle, onToggleStar }: Props) {
+  const many = epic.openPrs > 1;
   return (
     <div
       className={`flex shrink-0 rounded-lg border text-xs shadow-xs transition-colors ${epic.starred ? "w-60 border-l-[3px]" : "w-52"} ${
@@ -56,6 +57,14 @@ export function EpicTile({ epic, selected, onToggle, onToggleStar }: Props) {
           <span className="tabular-nums text-neutral-500">
             {epic.progress ? `${epic.progress.completed}/${epic.progress.total}` : "–"}
           </span>
+          {epic.openPrs > 0 && (
+            <span
+              title={`${many ? `${epic.openPrs} open PRs close` : "An open PR closes"} this epic or a related issue`}
+              className={`pill shrink-0 ${TONE.sky}`}
+            >
+              {epic.openPrs} PR{many ? "s" : ""}
+            </span>
+          )}
         </div>
       </button>
       <a

@@ -159,6 +159,8 @@ export interface Epic {
   progress: Progress | null;
   /** Marked as in active development on this dashboard. */
   starred: boolean;
+  /** Open PRs that close the epic or an issue related to it. */
+  openPrs: number;
 }
 
 /** What the filter bar and repo chips need from any dashboard view. */

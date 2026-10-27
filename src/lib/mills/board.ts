@@ -531,15 +531,22 @@ export function buildBoard(
   board.epics = entries
     .flatMap(({ item }) => (item.kind !== "ci-job" && axes.isEpic(item) ? [item] : []))
     .toSorted((a, b) => Number(isStarred(b)) - Number(isStarred(a)) || compare(a, b))
-    .map((issue) => ({
-      key: keyOf(issue),
-      repo: issue.repo,
-      number: issue.number,
-      title: issue.title,
-      url: issue.url,
-      progress: issue.subIssues.total > 0 ? issue.subIssues : null,
-      starred: isStarred(issue),
-    }));
+    .map((issue) => {
+      const related = relatedTo(keyOf(issue), scoped.byKey);
+      return {
+        key: keyOf(issue),
+        repo: issue.repo,
+        number: issue.number,
+        title: issue.title,
+        url: issue.url,
+        progress: issue.subIssues.total > 0 ? issue.subIssues : null,
+        starred: isStarred(issue),
+        // From `entries`, as the epic filter is, so the badge counts what a click shows.
+        openPrs: entries.filter(
+          ({ item, key }) => item.kind === "pr" && item.state === "OPEN" && related.has(key),
+        ).length,
+      };
+    });
   return board;
 }
 

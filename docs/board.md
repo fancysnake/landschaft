@@ -26,7 +26,7 @@ Issues carrying the dashboard's `epicLabel` (in any case) are lifted out of the 
 each with its sub-issue progress from GitHub. Clicking an epic filters the board to its
 sub-issues and to issues it blocks or is blocked by; clicking again clears the filter. The ↗ on a tile opens the epic on GitHub.
 Pull requests that close the epic or any of those issues (GitHub's "linked pull requests")
-are kept as well.
+are kept as well. A sky `PR` badge on the tile counts the open ones, drafts included.
 
 The ☆ on a tile marks the epic as in active development: it moves to the front of the strip
 with an amber accent and an `active` badge; ★ clears it. The mark is kept per dashboard in
