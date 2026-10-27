@@ -56,6 +56,14 @@ export function EpicTile({ epic, selected, onToggle, onToggleStar }: Props) {
           <span className="tabular-nums text-neutral-500">
             {epic.progress ? `${epic.progress.completed}/${epic.progress.total}` : "–"}
           </span>
+          {epic.openPrs > 0 && (
+            <span
+              title={`${epic.openPrs > 1 ? `${epic.openPrs} open PRs close` : "An open PR closes"} this epic or a related issue`}
+              className={`pill shrink-0 ${TONE.sky}`}
+            >
+              {epic.openPrs} PR{epic.openPrs > 1 ? "s" : ""}
+            </span>
+          )}
         </div>
       </button>
       <a

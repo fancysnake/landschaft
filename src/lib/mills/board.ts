@@ -539,6 +539,10 @@ export function buildBoard(
       url: issue.url,
       progress: issue.subIssues.total > 0 ? issue.subIssues : null,
       starred: isStarred(issue),
+      openPrs: [...relatedTo(keyOf(issue), scoped.byKey)].filter((key) => {
+        const related = scoped.byKey.get(key);
+        return related?.kind === "pr" && related.state === "OPEN";
+      }).length,
     }));
   return board;
 }
