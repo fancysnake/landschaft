@@ -527,9 +527,12 @@ export function buildBoard(
   for (const [key, cards] of Object.entries(board.cells))
     board.cells[key] = cards.toSorted(compare);
   const isStarred = (issue: Issue) => starred.has(keyOf(issue));
-  // The epic strip ignores the filter bar, so it doesn't come from the cards.
+  // The epic strip ignores the filter bar, so it doesn't come from the cards. Closed epics show
+  // only as cards.
   board.epics = entries
-    .flatMap(({ item }) => (item.kind !== "ci-job" && axes.isEpic(item) ? [item] : []))
+    .flatMap(({ item }) =>
+      item.kind !== "ci-job" && item.state === "OPEN" && axes.isEpic(item) ? [item] : [],
+    )
     .toSorted((a, b) => Number(isStarred(b)) - Number(isStarred(a)) || compare(a, b))
     .map((issue) => {
       const related = relatedTo(keyOf(issue), scoped.byKey);
