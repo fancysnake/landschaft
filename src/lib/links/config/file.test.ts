@@ -166,7 +166,7 @@ describe("config schema rules", () => {
     const swimlanes = [
       { id: "a", name: "A", labels: ["a"] },
       { id: "rest", name: "Rest" },
-      { id: "b", name: "B", labels: ["b"] },
+      { id: "b", name: "B", labels: ["b", "c"], match: "all" },
     ];
     const columns = [
       { id: "a", name: "A", labels: ["a"] },
@@ -180,12 +180,12 @@ describe("config schema rules", () => {
     });
     expect(asBoard(parsed.dashboards[0]).swimlanes.map((group) => group.filter)).toEqual([
       "label:a",
-      "other -(label:b)",
-      "label:b",
+      "other -(label:b label:c)",
+      "label:b label:c",
     ]);
     expect(asBoard(parsed.dashboards[0]).columns.map((column) => column.filter)).toEqual([
       "label:a",
-      "other -(label:a)",
+      "other -label:a",
       "is:pr label:b",
       "",
     ]);
@@ -358,6 +358,8 @@ describe("config upgrades", () => {
             { id: "d", name: "D", filter: "label:is-has-pr has:sub-issues" },
             { id: "e", name: "E", filter: 'is:"has-pr"' },
             { id: "f", name: "F", filter: 'is:pr|"HAS-PR"' },
+            { id: "g", name: "G", filter: 'label:"x is:has-pr" is:has-pr' },
+            { id: "h", name: "H", filter: "(label:x)  AND -(is:pr)" },
           ],
         }),
         {
@@ -372,11 +374,13 @@ describe("config upgrades", () => {
     expect(board?.filter).toBe("-has:pr");
     expect(asBoard(board).swimlanes.map(({ filter }) => filter)).toEqual([
       "is:issue has:pr",
-      "label:x ((is:conflicting OR has:pr))",
+      "label:x (is:conflicting OR has:pr)",
       "has:pr",
       "label:is-has-pr has:sub-issues",
       "has:pr",
-      "(is:pr OR has:pr)",
+      "is:pr OR has:pr",
+      'label:"x is:has-pr" has:pr',
+      "(label:x)  AND -(is:pr)",
     ]);
     expect(inbox?.type === "inbox" && inbox.groups[0]?.filter).toBe("has:pr");
   });

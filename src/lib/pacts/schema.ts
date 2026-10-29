@@ -1,7 +1,18 @@
 import { z } from "zod";
 
-import { filterError, ISSUE_REF, LOGIN, parseFilter, quoteValue, REPO, usesOther } from "./filter";
-import { isPullStatusLabel } from "./status";
+import {
+  FilterError,
+  filterError,
+  type FilterKey,
+  type FilterNode,
+  ISSUE_REF,
+  LOGIN,
+  parseFilter,
+  printFilter,
+  REPO,
+  usesOther,
+} from "./filter";
+import { isPullStatusLabel, statusValue } from "./status";
 
 const id = z
   .string()
@@ -25,25 +36,47 @@ const LegacyGroupSchema = z.object({
 });
 type LegacyGroup = z.infer<typeof LegacyGroupSchema>;
 
+const term = (key: FilterKey, values: string[]): FilterNode => ({ type: "term", key, values });
+const HAS_PR = term("has", ["pr"]);
+
+/** The non-null `nodes` under one `type` node; the node itself when it is alone, null for none. */
+function join(type: "and" | "or", maybe: (FilterNode | null)[]): FilterNode | null {
+  const nodes = maybe.filter((node) => node !== null);
+  return nodes.length > 1 ? { type, nodes } : (nodes[0] ?? null);
+}
+
+/**
+ * `text` parsed with any value of a known key, as migrations read filters written for an older
+ * version; undefined when it does not parse, which validation then reports.
+ */
+function parseOld(text: string): FilterNode | null | undefined {
+  try {
+    return parseFilter(text, { check: false });
+  } catch (error) {
+    if (error instanceof FilterError) return undefined;
+    throw error;
+  }
+}
+
 /** The filter term for a legacy label naming a state, not a GitHub label; null otherwise. */
 const stateTerm = (name: string) =>
-  name === "is:has-pr" ? "has:pr" : isPullStatusLabel(name) ? name : null;
+  name === "is:has-pr" ? HAS_PR : isPullStatusLabel(name) ? term("is", [statusValue(name)]) : null;
 
 /**
  * The filter a legacy group stands for: any → `label:a|b`, all → `label:a label:b`; null for
  * the catch-all, which `migrateAxis` rewrites.
  */
-function legacyFilter({ labels = [], match = "any", kind = "any" }: LegacyGroup): string | null {
-  const plain = labels.filter((name) => stateTerm(name) === null).map(quoteValue);
-  const statuses = labels.flatMap((name) => stateTerm(name) ?? []);
-  const parts =
-    match === "all"
-      ? [...plain.map((name) => `label:${name}`), ...statuses]
-      : [...(plain.length > 0 ? [`label:${plain.join("|")}`] : []), ...statuses];
-  const body = parts.join(match === "all" ? " " : " OR ");
-  if (kind === "any") return body || null;
-  const ored = match === "any" && parts.length > 1;
-  return [`is:${kind}`, ored ? `(${body})` : body].filter(Boolean).join(" ");
+function legacyFilter({
+  labels = [],
+  match = "any",
+  kind = "any",
+}: LegacyGroup): FilterNode | null {
+  const plain = labels.filter((name) => stateTerm(name) === null);
+  const statuses = labels.map(stateTerm);
+  const anyLabel = plain.length > 0 ? term("label", plain) : null;
+  const labelTerms = match === "all" ? plain.map((name) => term("label", [name])) : [anyLabel];
+  const body = join(match === "all" ? "and" : "or", [...labelTerms, ...statuses]);
+  return join("and", [kind === "any" ? null : term("is", [kind]), body]);
 }
 
 export type Axis = "swimlanes" | "columns";
@@ -59,21 +92,23 @@ export const OTHER_LOOKS_AT: Record<Axis, "earlier" | "later"> = {
 
 /**
  * Old configs carry `labels`/`match`/`kind`; they turn into `filter` unless one is set. A legacy
- * catch-all took what no other entry took: `other` excludes the entries it looks at, a `-(…)`
+ * catch-all took what no other entry took: `other` excludes the entries it looks at, a `-`
  * each of the rest.
  */
 const migrateAxis =
   (axis: Axis) =>
   <T extends LegacyGroup & { filter?: string }>(groups: T[]) => {
-    const filterOf = ({ labels, match, kind, filter }: T) =>
-      filter ?? legacyFilter({ labels, match, kind });
+    // A transform runs after validation, so an explicit filter parses.
+    const nodeOf = ({ labels, match, kind, filter }: T) =>
+      filter === undefined ? legacyFilter({ labels, match, kind }) : parseFilter(filter);
     return groups.map(({ labels, match, kind, filter, ...group }, index) => {
-      const own = filter ?? legacyFilter({ labels, match, kind });
-      if (own !== null) return { ...group, filter: own };
+      if (filter !== undefined) return { ...group, filter };
+      const own = legacyFilter({ labels, match, kind });
+      if (own !== null) return { ...group, filter: printFilter(own) };
       const unseen =
         OTHER_LOOKS_AT[axis] === "earlier" ? groups.slice(index + 1) : groups.slice(0, index);
-      const excluded = unseen.map(filterOf).flatMap((other) => (other ? [`-(${other})`] : []));
-      return { ...group, filter: ["other", ...excluded].join(" ") };
+      const excluded = unseen.map(nodeOf).map((node) => node && { type: "not" as const, node });
+      return { ...group, filter: printFilter(join("and", [{ type: "other" }, ...excluded])) };
     });
   };
 
@@ -227,11 +262,15 @@ function migrateScope(config: unknown): unknown {
       ["user", legacyUsers(dashboard), list(global.users)],
     ] as const;
     const parts = scopes.flatMap(([key, own, all]) =>
-      own.length === 0 || sameSet(own, all) ? [] : [`${key}:${own.join("|")}`],
+      own.length === 0 || sameSet(own, all) ? [] : [term(key, own.map(String))],
     );
-    if (parts.length === 0) return dashboard;
-    const filter = dashboard.filter ? [`(${String(dashboard.filter)})`] : [];
-    return { ...dashboard, filter: [...filter, ...parts].join(" ") };
+    const filter = parseOld(String(dashboard.filter ?? ""));
+    // A filter that does not parse fails validation, so the narrowing would never be saved.
+    if (parts.length === 0 || filter === undefined) return dashboard;
+    return {
+      ...dashboard,
+      filter: printFilter(join("and", [filter, ...parts])),
+    };
   };
   return {
     ...config,
@@ -278,16 +317,31 @@ function withCiLane(dashboard: Raw): Raw {
 const addCiLane = (config: Raw) => mapDashboards(config, withCiLane);
 
 /**
- * `filter` with `is:has-pr` written as `has:pr`: `is:a|"has-pr"` turns into `(is:a OR has:pr)`.
- * shortcut: rewrites a quoted value holding ` is:has-pr` too; parse the filter if one ever does.
+ * `node` with `is:has-pr` written as `has:pr`: `is:a|has-pr` turns into `is:a OR has:pr`;
+ * `node` itself when it holds no `is:has-pr`.
  */
-const hasPrFilter = (filter: string) =>
-  filter.replaceAll(/(?<=^|[\s(-])is:([\w:|"-]+)/g, (term, values: string) => {
-    const all = values.split("|");
-    const rest = all.filter((value) => value.replaceAll('"', "").toLowerCase() !== "has-pr");
-    if (rest.length === all.length) return term;
-    return rest.length === 0 ? "has:pr" : `(is:${rest.join("|")} OR has:pr)`;
-  });
+function renameHasPrIn(node: FilterNode): FilterNode {
+  if (node.type === "not") {
+    const inner = renameHasPrIn(node.node);
+    return inner === node.node ? node : { ...node, node: inner };
+  }
+  if (node.type === "and" || node.type === "or") {
+    const nodes = node.nodes.map(renameHasPrIn);
+    return nodes.every((child, index) => child === node.nodes[index]) ? node : { ...node, nodes };
+  }
+  if (node.type !== "term" || node.key !== "is") return node;
+  const values = node.values.filter((value) => value.toLowerCase() !== "has-pr");
+  if (values.length === node.values.length) return node;
+  return values.length > 0 ? { type: "or", nodes: [{ ...node, values }, HAS_PR] } : HAS_PR;
+}
+
+/** `filter` with `renameHasPrIn` applied; as written when that changes nothing. */
+function hasPrFilter(filter: string): string {
+  const node = parseOld(filter);
+  if (!node) return filter;
+  const renamed = renameHasPrIn(node);
+  return renamed === node ? filter : printFilter(renamed);
+}
 
 /** Version 2 renamed `is:has-pr` to `has:pr`; `legacyFilter` takes care of a legacy label. */
 const renameHasPr = (config: Raw) =>
