@@ -43,6 +43,7 @@ done with `{ "results", "status" }`; `"full": true` refetches every open issue i
 those changed since the last sync. A repository that is already syncing is refused with `409`.
 
 Without `repo`, every configured repository syncs in the background and the answer is `202` with
-`{ "status" }` at once, never `409`; repositories already syncing are skipped. Follow progress
-by polling `GET /api/version`: a repository is busy while it is in `inFlight`, and a failure
-lands in `lastError`.
+`{ "status", "run" }` at once, never `409`. A call during a running sync-all joins that run and
+adds its repositories to it. Follow progress by polling `GET /api/version`: a repository is busy
+while it is in `inFlight`, the run is done once `runs` reaches `run`, and its failures land in
+`lastError`.
