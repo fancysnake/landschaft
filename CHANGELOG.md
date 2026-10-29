@@ -7,6 +7,24 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [4.4.0] - 2026-10-29
+
+### Added
+
+- Cards show GitHub's issue type as a pill, and the filter bar picks a type, kept in the URL as
+  `type`.
+- `is:draft` picks draft PRs, whose cards carry a `draft` pill.
+- An epic tile counts the open PRs its filter keeps, drafts included, in a `PR` badge.
+- `POST /api/sync` without `repo` answers with the `run` it joined; it ends once
+  `GET /api/version` reports `runs` at least that high.
+
+### Fixed
+
+- The epic strip leaves out closed epics; a starred one keeps its star if reopened.
+- The epic filter keeps blockers past the 20th, up to GitHub's cap of 50.
+- A transient GitHub error on one branch keeps that branch's failed CI jobs.
+- A sync-all started during another joins it, and `lastError` keeps every failure of the run.
+
 ## [4.3.0] - 2026-10-21
 
 ### Added
@@ -261,7 +279,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v4.3.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v4.4.0...HEAD
+[4.4.0]: https://github.com/fancysnake/landschaft/compare/v4.3.0...v4.4.0
 [4.3.0]: https://github.com/fancysnake/landschaft/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/fancysnake/landschaft/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/fancysnake/landschaft/compare/v4.0.0...v4.1.0

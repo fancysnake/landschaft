@@ -22,7 +22,7 @@ sync has landed.
 
 ## Epics
 
-Issues carrying the dashboard's `epicLabel` (in any case) are lifted out of the grid into a strip above it,
+Open issues carrying the dashboard's `epicLabel` (in any case) are lifted out of the grid into a strip above it,
 each with its sub-issue progress from GitHub. Clicking an epic filters the board to its
 sub-issues and to issues it blocks or is blocked by; clicking again clears the filter. The ↗ on a tile opens the epic on GitHub.
 Pull requests that close the epic or any of those issues (GitHub's "linked pull requests")
