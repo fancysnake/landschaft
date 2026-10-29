@@ -1,6 +1,6 @@
 import type { IssueRef, IssueState, ItemKind } from "./types";
 
-import { PULL_STATUS_NAMES, type PullStatusLabel } from "./status";
+import { PULL_STATUS_NAMES, type PullStatusLabel, statusValue } from "./status";
 
 /**
  * Filter expressions for swimlanes and columns, in GitHub search syntax: `key:value` terms,
@@ -170,7 +170,10 @@ export function quoteValue(value: string): string {
   return /[\s()|"\\]/.test(value) ? `"${value.replaceAll(/["\\]/g, "\\$&")}"` : value;
 }
 
-/** `node` as filter text that parses back to it, in parens only where precedence needs them. */
+/**
+ * `node` as filter text that parses back to an equivalent tree, in parens only where precedence
+ * needs them.
+ */
 export function printFilter(node: FilterNode | null): string {
   if (!node) return "";
   if (node.type === "other") return "other";
@@ -291,7 +294,7 @@ const KEYS = {
     "ci-job": (item) => item.kind === "ci-job",
     ...Object.fromEntries(
       PULL_STATUS_NAMES.map((status) => [
-        status.replace(/^is:/, ""),
+        statusValue(status),
         (item: FilterItem) => item.statuses.includes(status),
       ]),
     ),

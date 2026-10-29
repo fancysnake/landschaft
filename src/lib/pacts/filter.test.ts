@@ -42,6 +42,11 @@ describe("parseFilter", () => {
     expect(parseFilter("   ")).toBeNull();
   });
 
+  it("reads values the key no longer takes only when told not to check", () => {
+    expect(() => parseFilter("is:has-pr")).toThrow(/is not valid/);
+    expect(printFilter(parseFilter("is:has-pr", { check: false }))).toBe("is:has-pr");
+  });
+
   it("binds - tightest, then AND, then OR", () => {
     expect(parseFilter("label:a -label:b OR label:c")).toEqual({
       type: "or",
@@ -219,11 +224,6 @@ describe("printFilter", () => {
     for (const text of ["-(label:a OR is:pr) label:b", 'label:"a\\"b" OR (other repo:a/b)']) {
       expect(parseFilter(reprint(text))).toEqual(parseFilter(text));
     }
-  });
-
-  it("reads values the key no longer takes only when told not to check", () => {
-    expect(() => parseFilter("is:has-pr")).toThrow(/is not valid/);
-    expect(printFilter(parseFilter("is:has-pr", { check: false }))).toBe("is:has-pr");
   });
 });
 
