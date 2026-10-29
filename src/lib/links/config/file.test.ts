@@ -358,6 +358,7 @@ describe("config upgrades", () => {
             { id: "d", name: "D", filter: "label:is-has-pr has:sub-issues" },
             { id: "e", name: "E", filter: 'is:"has-pr"' },
             { id: "f", name: "F", filter: 'is:pr|"HAS-PR"' },
+            { id: "g", name: "G", filter: 'label:"x is:has-pr" is:has-pr' },
           ],
         }),
         {
@@ -372,11 +373,12 @@ describe("config upgrades", () => {
     expect(board?.filter).toBe("-has:pr");
     expect(asBoard(board).swimlanes.map(({ filter }) => filter)).toEqual([
       "is:issue has:pr",
-      "label:x ((is:conflicting OR has:pr))",
+      "label:x (is:conflicting OR has:pr)",
       "has:pr",
       "label:is-has-pr has:sub-issues",
       "has:pr",
-      "(is:pr OR has:pr)",
+      "is:pr OR has:pr",
+      'label:"x is:has-pr" has:pr',
     ]);
     expect(inbox?.type === "inbox" && inbox.groups[0]?.filter).toBe("has:pr");
   });

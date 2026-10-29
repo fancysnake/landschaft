@@ -38,8 +38,11 @@ const isSpace = (char: string | undefined) => char !== undefined && /\s/.test(ch
 const isBreak = (char: string | undefined) =>
   char === undefined || isSpace(char) || '()|"'.includes(char);
 
-/** The expression tree, or null for an empty filter (matches everything); throws `FilterError`. */
-export function parseFilter(text: string): FilterNode | null {
+/**
+ * The expression tree, or null for an empty filter (matches everything); throws `FilterError`.
+ * `check: false` takes any value of a known key, for migrations reading values no longer valid.
+ */
+export function parseFilter(text: string, { check = true } = {}): FilterNode | null {
   let pos = 0;
   const skipSpace = () => {
     while (isSpace(text[pos])) pos += 1;
@@ -90,7 +93,7 @@ export function parseFilter(text: string): FilterNode | null {
     for (;;) {
       const at = pos;
       const raw = value();
-      if (spec.check && !spec.check.test(raw)) {
+      if (check && spec.check && !spec.check.test(raw)) {
         throw new FilterError(`${key}:${raw} is not valid; expected ${spec.check.expected}`, at);
       }
       values.push(raw);
@@ -165,6 +168,20 @@ export function filterError(text: string): string | null {
 /** `value` as it must be written in a filter: quoted when it holds a space, paren, `|` or `"`. */
 export function quoteValue(value: string): string {
   return /[\s()|"\\]/.test(value) ? `"${value.replaceAll(/["\\]/g, "\\$&")}"` : value;
+}
+
+/** `node` as filter text that parses back to it, in parens only where precedence needs them. */
+export function printFilter(node: FilterNode | null): string {
+  if (!node) return "";
+  if (node.type === "other") return "other";
+  if (node.type === "term") return `${node.key}:${node.values.map(quoteValue).join("|")}`;
+  const inner = (child: FilterNode, bare: boolean) =>
+    bare ? printFilter(child) : `(${printFilter(child)})`;
+  if (node.type === "not") {
+    return `-${inner(node.node, node.node.type !== "and" && node.node.type !== "or")}`;
+  }
+  const parts = node.nodes.map((child) => inner(child, node.type === "or" || child.type !== "or"));
+  return parts.join(node.type === "or" ? " OR " : " ");
 }
 
 /** Whether `node` uses the term `other` anywhere. */

@@ -8,6 +8,7 @@ import {
   matchesFilter,
   type Offer,
   parseFilter,
+  printFilter,
   quoteValue,
   suggestFilter,
   usesOther,
@@ -200,6 +201,29 @@ describe("askedLabels", () => {
       "c",
     ]);
     expect(askedLabels(null)).toEqual([]);
+  });
+});
+
+const reprint = (text: string) => printFilter(parseFilter(text));
+
+describe("printFilter", () => {
+  it("writes text that parses back to the same tree, parens only where needed", () => {
+    expect(reprint("((label:a OR label:b)) (is:pr)")).toBe("(label:a OR label:b) is:pr");
+    expect(reprint("label:a OR (label:b label:c) OR (label:d OR label:e)")).toBe(
+      "label:a OR label:b label:c OR label:d OR label:e",
+    );
+    expect(reprint('-(label:a label:b) -(-other) AND label:"x y"|z')).toBe(
+      '-(label:a label:b) --other label:"x y"|z',
+    );
+    expect(reprint("")).toBe("");
+    for (const text of ["-(label:a OR is:pr) label:b", 'label:"a\\"b" OR (other repo:a/b)']) {
+      expect(parseFilter(reprint(text))).toEqual(parseFilter(text));
+    }
+  });
+
+  it("reads values the key no longer takes only when told not to check", () => {
+    expect(() => parseFilter("is:has-pr")).toThrow(/is not valid/);
+    expect(printFilter(parseFilter("is:has-pr", { check: false }))).toBe("is:has-pr");
   });
 });
 
