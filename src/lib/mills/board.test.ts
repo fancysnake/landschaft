@@ -970,6 +970,26 @@ describe("buildBoard", () => {
     expect(numbers(board)).toEqual(expect.arrayContaining([10, 11, 12]));
   });
 
+  it("keeps a closed epic in the strip while it is the epic filter", () => {
+    const now = new Date("2026-05-10T00:00:00Z");
+    const closed = {
+      state: "CLOSED" as const,
+      closedAt: "2026-05-09T00:00:00Z",
+      labels: [label("epic")],
+    };
+    const issues = [
+      makeIssue({ number: 10, ...closed }),
+      makeIssue({ number: 11, ...closed }),
+      makeIssue({ number: 12, labels: [label("epic")] }),
+    ];
+    const board = buildBoard(
+      snapshot(issues),
+      { ...DASHBOARD, closedDays: 7 },
+      { ...EVERYONE, query: { epic: "acme/app#10" }, now },
+    );
+    expect(board.epics.map((epic) => epic.number)).toEqual([12, 10]);
+  });
+
   it("ignores hidden repos not on the dashboard", () => {
     const issues = [
       makeIssue({ number: 1 }),
