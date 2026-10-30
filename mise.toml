@@ -1,7 +1,7 @@
 [tools]
 aube = "2.7.0"
 node = "26.11.1"
-hk = "2.5.0"
+hk = "2.8.1"
 pkl = "0.32.1"
 pipx = "1.17.12"
 # vekna supports Python <= 3.14; tasks.update excludes python so --bump skips 3.15. Drop both once
