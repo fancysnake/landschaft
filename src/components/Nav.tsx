@@ -55,6 +55,11 @@ export default function Nav({ path, nav }: Props) {
     const off = flipped.filter((repo) => !selected.includes(repo));
     const on = flipped.filter((repo) => selected.includes(repo));
     setToggleError(null);
+    // Applied now so a click before the reload diffs against what the user already chose.
+    setNav((prev) => ({
+      ...prev,
+      hidden: [...prev.hidden.filter((repo) => !on.includes(repo)), ...off],
+    }));
     // Saving fires CONFIG_SAVED, which reloads the nav and every view.
     void (async () => {
       try {
@@ -62,6 +67,11 @@ export default function Nav({ path, nav }: Props) {
         if (on.length > 0) await api.setHidden({ repos: on, hidden: false });
       } catch (cause) {
         setToggleError(`Switching repositories failed: ${errorMessage(cause)}`);
+        // A failed save fires no reload, so fetch what the server kept.
+        api
+          .nav()
+          .then(setNav)
+          .catch(() => undefined);
       }
     })();
   };
