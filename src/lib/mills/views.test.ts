@@ -5,8 +5,8 @@ import { ConfigSchema } from "../pacts/schema";
 import { InvalidError, NotFoundError } from "../pacts/services";
 import { Views } from "./views";
 
-function views() {
-  const config = ConfigSchema.parse({ repos: [REPO], dashboards: [DASHBOARD] });
+function views(extra: { hiddenRepos?: string[] } = {}) {
+  const config = ConfigSchema.parse({ repos: [REPO], dashboards: [DASHBOARD], ...extra });
   const starred = new Set<string>();
   const store = {
     snapshot: () => ({ issues: [], jobs: [] }),
@@ -34,6 +34,12 @@ describe("Views", () => {
     const { dashboard, board } = await views().board(DASHBOARD.id, {});
     expect(dashboard.id).toBe(DASHBOARD.id);
     expect(board.total).toBe(0);
+  });
+
+  it("reports the repos switched off in the config", async () => {
+    const v = views({ hiddenRepos: [REPO] });
+    expect((await v.board(DASHBOARD.id, {})).hidden).toEqual([REPO]);
+    expect((await v.nav()).hidden).toEqual([REPO]);
   });
 
   it("finds no inbox under a board's id", async () => {

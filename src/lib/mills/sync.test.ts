@@ -540,6 +540,7 @@ describe("startScheduler", () => {
       version: CONFIG_VERSION,
       repos: ["acme/due", "acme/fresh"],
       users: [],
+      hiddenRepos: [],
       refreshMinutes: 5,
       dashboards: [],
     };

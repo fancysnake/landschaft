@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { closedSince, reposToResync, ViewQuerySchema } from "./schema";
+import { closedSince, ConfigSchema, reposToResync } from "./schema";
 
-describe("board query", () => {
-  it("parses hidden repos into a list, empty meaning none hidden", () => {
-    expect(ViewQuerySchema.parse({ hide: "acme/a,acme/b" }).hide).toEqual(["acme/a", "acme/b"]);
-    expect(ViewQuerySchema.parse({ hide: "" }).hide).toEqual([]);
+describe("hidden repos", () => {
+  it("loads a config without them with every repo on", () => {
+    expect(ConfigSchema.parse({ repos: ["acme/a"] }).hiddenRepos).toEqual([]);
+  });
+
+  it("drops a hidden repo that is no longer configured", () => {
+    const config = ConfigSchema.parse({ repos: ["acme/a"], hiddenRepos: ["acme/a", "acme/b"] });
+    expect(config.hiddenRepos).toEqual(["acme/a"]);
   });
 });
 

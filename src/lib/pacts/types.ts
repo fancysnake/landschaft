@@ -225,4 +225,6 @@ export interface NavData {
   dashboards: { id: string; name: string; repos: string[] }[];
   /** The global repos. */
   repos: string[];
+  /** Those of `repos` switched off. */
+  hidden: string[];
 }

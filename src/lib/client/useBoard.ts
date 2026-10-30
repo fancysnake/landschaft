@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 
-import type { ViewQuery } from "../pacts/schema";
+import type { Filters } from "../pacts/schema";
 
 import { api, type BoardResponse, errorMessage } from "./api";
 import { useSynced } from "./useSynced";
@@ -12,9 +12,9 @@ export interface BoardController {
   dismissError(): void;
 }
 
-/** Loads the board for the current query, and again whenever a sync lands. */
-export function useBoard(dashboardId: string, query: ViewQuery): BoardController {
-  const get = useCallback(() => api.board(dashboardId, query), [dashboardId, query]);
+/** Loads the board for the current filters, and again whenever a sync lands. */
+export function useBoard(dashboardId: string, filters: Filters): BoardController {
+  const get = useCallback(() => api.board(dashboardId, filters), [dashboardId, filters]);
   const { data, error, setError, load } = useSynced(get);
 
   const setEpicStarred = useCallback(

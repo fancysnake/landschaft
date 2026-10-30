@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- Repo chips save which repos are off in the config as `hiddenRepos`, shared by every browser;
+  the choice a browser kept before is dropped. `POST /api/hidden-repos` sets it, and
+  `PUT /api/config` leaves it as it is.
+
+### Removed
+
+- The `hide` query parameter of the board, inbox and unmatched endpoints.
+
 ## [4.4.0] - 2026-10-29
 
 ### Added

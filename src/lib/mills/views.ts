@@ -5,9 +5,9 @@ import {
   type Config,
   type Dashboard,
   type DashboardType,
+  type Filters,
   findDashboard,
   type UnmatchedQuery,
-  type ViewQuery,
 } from "../pacts/schema";
 import { InvalidError, NotFoundError, type SyncService, type ViewService } from "../pacts/services";
 import { parseIssueKey } from "../pacts/types";
@@ -60,26 +60,32 @@ export class Views implements ViewService {
         repos: [...scopedRepos(snapshot, { filter }, audience)],
       })),
       repos: config.repos,
+      hidden: config.hiddenRepos,
     };
   }
 
-  async board(id: string, query: ViewQuery) {
+  async board(id: string, filters: Filters) {
     const { config, snapshot, audience, status } = await this.context();
     const dashboard = dashboardOf(config, id, "board");
     const starred = this.deps.store.starredEpics(dashboard.id);
+    const hidden = config.hiddenRepos;
+    const query = { ...filters, hide: hidden };
     const board = buildBoard(snapshot, dashboard, { ...audience, query, starred });
-    return { dashboard, board, status };
+    return { dashboard, board, hidden, status };
   }
 
-  async inbox(id: string, query: ViewQuery) {
+  async inbox(id: string, filters: Filters) {
     const { config, snapshot, audience, status } = await this.context();
     const dashboard = dashboardOf(config, id, "inbox");
+    const hidden = config.hiddenRepos;
+    const query = { ...filters, hide: hidden };
     const inbox = buildInbox(snapshot, dashboard, { ...audience, query });
-    return { dashboard, inbox, status };
+    return { dashboard, inbox, hidden, status };
   }
 
-  async unmatched(query: UnmatchedQuery) {
+  async unmatched({ filter }: Omit<UnmatchedQuery, "hide">) {
     const { config, snapshot, audience, status } = await this.context();
+    const query = { filter, hide: config.hiddenRepos };
     const { items, offer } = unmatchedItems(snapshot, config.dashboards, { ...audience, query });
     return { items, offer, status };
   }

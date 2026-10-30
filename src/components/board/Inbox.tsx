@@ -12,8 +12,8 @@ interface Props {
 
 export default function Inbox({ dashboardId }: Props) {
   const view = useViewRequest();
-  const { request } = view;
-  const get = useCallback(() => api.inbox(dashboardId, request), [dashboardId, request]);
+  const { filters } = view;
+  const get = useCallback(() => api.inbox(dashboardId, filters), [dashboardId, filters]);
   const { data, error, setError } = useSynced(get);
   /** Collapsed state of the groups toggled since the page loaded, by id. */
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
@@ -21,12 +21,13 @@ export default function Inbox({ dashboardId }: Props) {
   if (!data) {
     return <p className="p-6 text-sm text-neutral-500">{error ?? "Loading inbox…"}</p>;
   }
-  const { dashboard, inbox } = data;
+  const { dashboard, inbox, hidden } = data;
   const showRepo = inbox.repos.length > 1;
 
   return (
     <ViewShell
       view={view}
+      hidden={hidden}
       dashboard={dashboard}
       facets={inbox}
       count={`${inbox.total} items`}

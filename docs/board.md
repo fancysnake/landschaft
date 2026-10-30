@@ -96,8 +96,8 @@ sets how a group starts on every page load. An inbox has no epic strip.
 ## Filters
 
 With more than one global repository, chips in the top bar switch each on or off; `all` turns
-every chip on and, once all are on, `none` turns them off. The choice holds on every board, in
-this browser, and after a reload. A dashboard with no items in the repositories switched on is
+every chip on and, once all are on, `none` turns them off. The choice is saved in the config as
+`hiddenRepos`, so it holds on every board and in every browser. A dashboard with no items in the repositories switched on is
 dimmed in the top bar.
 
 Text, assignee, label, type, epic and sort live in the query string, so a filtered view is a

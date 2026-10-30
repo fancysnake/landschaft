@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 
 import type { NavData } from "../lib/pacts/types";
 
-import { api, CONFIG_SAVED } from "../lib/client/api";
+import { api, CONFIG_SAVED, errorMessage } from "../lib/client/api";
 import { repoShortName } from "../lib/client/labels";
-import { useHiddenRepos } from "../lib/client/useHiddenRepos";
 import { SYNCED, useSyncStatus } from "../lib/client/useSyncStatus";
 import { SyncStatus } from "./board/SyncStatus";
 import { Toggles } from "./board/Toggles";
+import { ErrorBanner } from "./ErrorBanner";
 
 interface Props {
   path: string;
@@ -25,8 +25,8 @@ const current = (active: boolean) => (active ? "page" : undefined);
  * dashboard with no items in the repos switched on is dimmed.
  */
 export default function Nav({ path, nav }: Props) {
-  const [{ dashboards, repos }, setNav] = useState(nav);
-  const [hidden, setHidden] = useHiddenRepos();
+  const [{ dashboards, repos, hidden }, setNav] = useState(nav);
+  const [toggleError, setToggleError] = useState<string | null>(null);
   const { status, error, syncing, sync, dismissError } = useSyncStatus();
 
   useEffect(() => {
@@ -50,6 +50,21 @@ export default function Nav({ path, nav }: Props) {
   }, []);
 
   const shown = repos.filter((repo) => !hidden.includes(repo));
+  const setShown = (selected: string[]) => {
+    const flipped = repos.filter((repo) => selected.includes(repo) === hidden.includes(repo));
+    const off = flipped.filter((repo) => !selected.includes(repo));
+    const on = flipped.filter((repo) => selected.includes(repo));
+    setToggleError(null);
+    // Saving fires CONFIG_SAVED, which reloads the nav and every view.
+    void (async () => {
+      try {
+        if (off.length > 0) await api.setHidden({ repos: off, hidden: true });
+        if (on.length > 0) await api.setHidden({ repos: on, hidden: false });
+      } catch (cause) {
+        setToggleError(`Switching repositories failed: ${errorMessage(cause)}`);
+      }
+    })();
+  };
   const inactive = (dashboard: NavData["dashboards"][number]) =>
     dashboard.repos.every((repo) => !shown.includes(repo));
 
@@ -103,8 +118,11 @@ export default function Nav({ path, nav }: Props) {
               .map((repo) => ({ value: repo, label: repoShortName(repo) }))
               .toSorted((a, b) => a.label.localeCompare(b.label))}
             selected={shown}
-            onChange={(selected) => setHidden(repos.filter((repo) => !selected.includes(repo)))}
+            onChange={setShown}
           />
+          {toggleError && (
+            <ErrorBanner error={toggleError} onDismiss={() => setToggleError(null)} />
+          )}
         </div>
       )}
     </nav>

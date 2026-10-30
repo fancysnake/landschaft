@@ -1,9 +1,9 @@
 import type { Offer } from "../pacts/filter";
 import type {
   BoardDashboard,
-  ViewQuery,
   Config,
   Filters,
+  HiddenReposRequest,
   InboxDashboard,
   StarEpicRequest,
   SyncRequest,
@@ -16,12 +16,16 @@ export const CONFIG_SAVED = "landschaft:config-saved";
 export interface BoardResponse {
   dashboard: BoardDashboard;
   board: Board;
+  /** The repos switched off. */
+  hidden: string[];
   status: SyncStatus;
 }
 
 export interface InboxResponse {
   dashboard: InboxDashboard;
   inbox: Inbox;
+  /** The repos switched off. */
+  hidden: string[];
   status: SyncStatus;
 }
 
@@ -83,21 +87,16 @@ export function filtersToQuery(filters: Filters): string {
   return params.toString();
 }
 
-function viewUrl(dashboardId: string, view: "board" | "inbox", { hide, ...filters }: ViewQuery) {
-  const params = new URLSearchParams(filtersToQuery(filters));
-  if (hide?.length) params.set("hide", hide.join(","));
-  return `/api/dashboards/${encodeURIComponent(dashboardId)}/${view}?${params}`;
-}
+const viewUrl = (dashboardId: string, view: "board" | "inbox", filters: Filters) =>
+  `/api/dashboards/${encodeURIComponent(dashboardId)}/${view}?${filtersToQuery(filters)}`;
 
 export const api = {
-  board: (dashboardId: string, query: ViewQuery) =>
-    request<BoardResponse>(viewUrl(dashboardId, "board", query)),
-  inbox: (dashboardId: string, query: ViewQuery) =>
-    request<InboxResponse>(viewUrl(dashboardId, "inbox", query)),
-  unmatched: (hide: string[], filter: string) =>
-    request<UnmatchedResponse>(
-      `/api/unmatched?${new URLSearchParams({ hide: hide.join(","), filter })}`,
-    ),
+  board: (dashboardId: string, filters: Filters) =>
+    request<BoardResponse>(viewUrl(dashboardId, "board", filters)),
+  inbox: (dashboardId: string, filters: Filters) =>
+    request<InboxResponse>(viewUrl(dashboardId, "inbox", filters)),
+  unmatched: (filter: string) =>
+    request<UnmatchedResponse>(`/api/unmatched?${new URLSearchParams({ filter })}`),
   version: () => request<SyncStatus>("/api/version"),
   sync: (body: Pick<SyncRequest, "full">) =>
     request<SyncResponse>("/api/sync", { method: "POST", body: JSON.stringify(body) }),
@@ -111,6 +110,14 @@ export const api = {
     const saved = await request<Config>("/api/config", {
       method: "PUT",
       body: JSON.stringify(config),
+    });
+    window.dispatchEvent(new Event(CONFIG_SAVED));
+    return saved;
+  },
+  setHidden: async (body: HiddenReposRequest) => {
+    const saved = await request<{ hiddenRepos: string[] }>("/api/hidden-repos", {
+      method: "POST",
+      body: JSON.stringify(body),
     });
     window.dispatchEvent(new Event(CONFIG_SAVED));
     return saved;

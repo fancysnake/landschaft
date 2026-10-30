@@ -4,7 +4,6 @@ import type { ItemKind } from "../lib/pacts/types";
 
 import { api } from "../lib/client/api";
 import { useDebouncedText } from "../lib/client/useDebouncedText";
-import { useHiddenRepos } from "../lib/client/useHiddenRepos";
 import { useSynced } from "../lib/client/useSynced";
 import { filterError } from "../lib/pacts/filter";
 import { CardView } from "./board/IssueCard";
@@ -26,7 +25,6 @@ function writeUrl(filter: string) {
 
 /** Open items in the repos switched on that no dashboard places in a cell or inbox group. */
 export default function Unmatched() {
-  const [hidden] = useHiddenRepos();
   // Only a filter that parses reaches the server.
   const [filter, setFilter] = useState(() => {
     const initial = new URLSearchParams(window.location.search).get("filter") ?? "";
@@ -41,7 +39,7 @@ export default function Unmatched() {
     { valid: parses },
   );
 
-  const get = useCallback(() => api.unmatched(hidden, filter), [hidden, filter]);
+  const get = useCallback(() => api.unmatched(filter), [filter]);
   const { data, error, setError } = useSynced(get);
 
   if (!data) {

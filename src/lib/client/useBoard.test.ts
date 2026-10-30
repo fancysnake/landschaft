@@ -2,7 +2,7 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
-import type { ViewQuery } from "../pacts/schema";
+import type { Filters } from "../pacts/schema";
 
 import { api, type BoardResponse } from "./api";
 import { type BoardController, useBoard } from "./useBoard";
@@ -19,18 +19,18 @@ const response = () => ({ status: { version: 1 } }) as BoardResponse;
 
 const roots: Root[] = [];
 
-async function renderBoard(initial: ViewQuery) {
+async function renderBoard(initial: Filters) {
   const root = createRoot(document.createElement("div"));
   roots.push(root);
   const result: { current: BoardController | null } = { current: null };
   const report = (board: BoardController) => {
     result.current = board;
   };
-  function Probe({ filters }: { filters: ViewQuery }) {
+  function Probe({ filters }: { filters: Filters }) {
     report(useBoard("main", filters));
     return null;
   }
-  const render = (filters: ViewQuery) =>
+  const render = (filters: Filters) =>
     act(async () => root.render(createElement(Probe, { filters })));
   await render(initial);
   return { result, render };
@@ -46,8 +46,8 @@ const synced = (version: number) =>
 
 test("a landed sync reloads the board with the current query", async () => {
   vi.mocked(api.board).mockImplementation(() => Promise.resolve(response()));
-  const { render } = await renderBoard({ hide: ["a", "b"] });
-  await render({ hide: ["a"] });
+  const { render } = await renderBoard({ q: "a b" });
+  await render({ q: "a" });
   const calls = vi.mocked(api.board).mock.calls.length;
 
   await synced(1);
@@ -55,7 +55,7 @@ test("a landed sync reloads the board with the current query", async () => {
 
   await synced(2);
   expect(vi.mocked(api.board)).toHaveBeenCalledTimes(calls + 1);
-  expect(vi.mocked(api.board).mock.lastCall?.[1]).toEqual({ hide: ["a"] });
+  expect(vi.mocked(api.board).mock.lastCall?.[1]).toEqual({ q: "a" });
 });
 
 test("a failed star stays reported after the reload", async () => {
@@ -76,8 +76,8 @@ test("a stale board response does not replace a newer one", async () => {
     pending.push({ board, resolve: () => resolve(board) });
     return promise;
   });
-  const { result, render } = await renderBoard({ hide: ["a", "b"] });
-  await render({ hide: ["a"] });
+  const { result, render } = await renderBoard({ q: "a b" });
+  await render({ q: "a" });
 
   const [older, newer] = pending;
   await act(async () => newer.resolve());

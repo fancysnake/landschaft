@@ -9,6 +9,8 @@ import { FilterBar } from "./FilterBar";
 
 interface Props {
   view: ViewRequest;
+  /** The repos switched off. */
+  hidden: string[];
   dashboard: Pick<Dashboard, "name" | "filter" | "type">;
   facets: Facets;
   /** After the name, e.g. "12 issues". */
@@ -27,6 +29,7 @@ interface Props {
 /** A dashboard view's header, error banner, switched-off notice and filter bar over its body. */
 export function ViewShell({
   view,
+  hidden,
   dashboard,
   facets,
   count,
@@ -38,7 +41,7 @@ export function ViewShell({
   className,
   children,
 }: Props) {
-  const { filters, updateFilters, hidden } = view;
+  const { filters, updateFilters } = view;
   return (
     <div className={`flex flex-col gap-4 p-5 ${className}`}>
       <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
