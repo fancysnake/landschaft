@@ -76,5 +76,8 @@ export function snapshot(issues: Issue[], jobs: CiJob[] = []): Snapshot {
   return { issues, jobs };
 }
 
-/** No global users and no known viewer: every item is in scope and `@me` matches nothing. */
-export const EVERYONE: Audience = { users: [], viewer: null };
+/**
+ * No global users, no known viewer and no repo switched off: every item is in scope and `@me`
+ * matches nothing.
+ */
+export const EVERYONE: Audience = { users: [], viewer: null, hidden: [] };

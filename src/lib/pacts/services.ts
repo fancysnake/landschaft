@@ -62,15 +62,13 @@ export interface ViewService {
   board(
     id: string,
     filters: Filters,
-  ): Promise<{ dashboard: BoardDashboard; board: Board; hidden: string[]; status: SyncStatus }>;
+  ): Promise<{ dashboard: BoardDashboard; board: Board; status: SyncStatus }>;
   /** Throws `NotFoundError` unless `id` names an inbox. */
   inbox(
     id: string,
     filters: Filters,
-  ): Promise<{ dashboard: InboxDashboard; inbox: Inbox; hidden: string[]; status: SyncStatus }>;
-  unmatched(
-    query: Omit<UnmatchedQuery, "hide">,
-  ): Promise<{ items: Card[]; offer: Offer; status: SyncStatus }>;
+  ): Promise<{ dashboard: InboxDashboard; inbox: Inbox; status: SyncStatus }>;
+  unmatched(query: UnmatchedQuery): Promise<{ items: Card[]; offer: Offer; status: SyncStatus }>;
   labels(repos: string[]): LabelDef[];
   /**
    * Stars or unstars `epic` on dashboard `id`; returns its starred epics. Throws `NotFoundError`

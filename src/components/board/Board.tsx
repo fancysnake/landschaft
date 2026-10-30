@@ -19,13 +19,12 @@ export default function Board({ dashboardId }: Props) {
   if (!data) {
     return <p className="p-6 text-sm text-neutral-500">{error ?? "Loading board…"}</p>;
   }
-  const { dashboard, board, hidden } = data;
+  const { dashboard, board } = data;
   const showRepo = board.repos.length > 1;
 
   return (
     <ViewShell
       view={view}
-      hidden={hidden}
       dashboard={dashboard}
       facets={board}
       count={`${board.total} issues`}

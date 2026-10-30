@@ -1,15 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { DASHBOARD, REPO } from "../__fixtures__/issues";
+import type { Issue } from "../pacts/types";
+
+import { DASHBOARD, makeIssue, REPO } from "../__fixtures__/issues";
 import { ConfigSchema } from "../pacts/schema";
 import { InvalidError, NotFoundError } from "../pacts/services";
 import { Views } from "./views";
 
-function views(extra: { hiddenRepos?: string[] } = {}) {
+function views(extra: { hiddenRepos?: string[] } = {}, issues: Issue[] = []) {
   const config = ConfigSchema.parse({ repos: [REPO], dashboards: [DASHBOARD], ...extra });
   const starred = new Set<string>();
   const store = {
-    snapshot: () => ({ issues: [], jobs: [] }),
+    snapshot: () => ({ issues, jobs: [] }),
     listLabels: () => [],
     starredEpics: () => new Set(starred),
     setEpicStarred: (_: string, epic: string, on: boolean) =>
@@ -37,8 +39,10 @@ describe("Views", () => {
   });
 
   it("reports the repos switched off in the config", async () => {
-    const v = views({ hiddenRepos: [REPO] });
-    expect((await v.board(DASHBOARD.id, {})).hidden).toEqual([REPO]);
+    const v = views({ hiddenRepos: [REPO] }, [makeIssue({ number: 1 })]);
+    const { board } = await v.board(DASHBOARD.id, {});
+    expect(board.hidden).toEqual([REPO]);
+    expect(board.total).toBe(0);
     expect((await v.nav()).hidden).toEqual([REPO]);
   });
 

@@ -16,16 +16,12 @@ export const CONFIG_SAVED = "landschaft:config-saved";
 export interface BoardResponse {
   dashboard: BoardDashboard;
   board: Board;
-  /** The repos switched off. */
-  hidden: string[];
   status: SyncStatus;
 }
 
 export interface InboxResponse {
   dashboard: InboxDashboard;
   inbox: Inbox;
-  /** The repos switched off. */
-  hidden: string[];
   status: SyncStatus;
 }
 
@@ -81,6 +77,13 @@ async function request<T>(input: string, init: RequestInit = {}): Promise<T> {
   return payload as T;
 }
 
+/** Sends a config change, then tells the islands it was saved. */
+async function saveTo<T>(input: string, method: "PUT" | "POST", body: unknown): Promise<T> {
+  const saved = await request<T>(input, { method, body: JSON.stringify(body) });
+  window.dispatchEvent(new Event(CONFIG_SAVED));
+  return saved;
+}
+
 export function filtersToQuery(filters: Filters): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) if (value) params.set(key, value);
@@ -106,21 +109,9 @@ export const api = {
       { method: "POST", body: JSON.stringify(body) },
     ),
   config: () => request<Config>("/api/config"),
-  saveConfig: async (config: unknown) => {
-    const saved = await request<Config>("/api/config", {
-      method: "PUT",
-      body: JSON.stringify(config),
-    });
-    window.dispatchEvent(new Event(CONFIG_SAVED));
-    return saved;
-  },
+  saveConfig: (config: unknown) => saveTo<Config>("/api/config", "PUT", config),
   setHidden: async (body: HiddenReposRequest) => {
-    const saved = await request<{ hiddenRepos: string[] }>("/api/hidden-repos", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-    window.dispatchEvent(new Event(CONFIG_SAVED));
-    return saved;
+    await saveTo("/api/hidden-repos", "POST", body);
   },
   nav: () => request<NavData>("/api/nav"),
   labels: (repos: string[]) =>

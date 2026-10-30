@@ -20,9 +20,9 @@ localhost only. Errors are `{ "error": "message" }` with a matching status.
 
 `GET /api/dashboards/:id/board?q=&assignee=&label=&type=&epic=&sort=updated&dir=desc`
 returns the grid as cells keyed by swimlane and column id, the epic strip, the repositories
-among the dashboard's items, the label catalogue used for colouring and the `hidden`
-repositories, whose items it leaves out. The React island renders it as-is; all placement logic is server-side
-and unit-tested.
+among the dashboard's items with the `hidden` ones among them, whose items it leaves out, and the
+label catalogue used for colouring. The React island renders it as-is; all placement logic is
+server-side and unit-tested.
 
 `GET /api/dashboards/:id/inbox` takes the same query string and returns the inbox's cards by
 group id, with the same repositories, label catalogue and sort. Each endpoint answers `404` for

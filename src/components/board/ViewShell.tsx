@@ -9,8 +9,6 @@ import { FilterBar } from "./FilterBar";
 
 interface Props {
   view: ViewRequest;
-  /** The repos switched off. */
-  hidden: string[];
   dashboard: Pick<Dashboard, "name" | "filter" | "type">;
   facets: Facets;
   /** After the name, e.g. "12 issues". */
@@ -29,7 +27,6 @@ interface Props {
 /** A dashboard view's header, error banner, switched-off notice and filter bar over its body. */
 export function ViewShell({
   view,
-  hidden,
   dashboard,
   facets,
   count,
@@ -69,7 +66,7 @@ export function ViewShell({
       </header>
 
       {error && <ErrorBanner error={error} onDismiss={onDismissError} />}
-      {facets.repos.length > 0 && facets.repos.every((repo) => hidden.includes(repo)) && (
+      {facets.repos.length > 0 && facets.hidden.length === facets.repos.length && (
         <p className="panel px-3 py-2 text-sm text-neutral-600 shadow-none">
           Every repository with items {where} is switched off in the bar above.
         </p>

@@ -475,11 +475,6 @@ export type Filters = { [K in TextFilterKey]?: string } & {
   dir?: SortDir;
 };
 
-/** What a view is built from: the URL filters plus the repos switched off in the config. */
-export type ViewQuery = Filters & {
-  hide?: string[];
-};
-
 const optionalText = z
   .string()
   .optional()
@@ -495,16 +490,12 @@ export const ViewQuerySchema: z.ZodType<Filters, Record<string, unknown>> = z.ob
   dir: SortDirSchema.optional(),
 });
 
-/** What the unmatched view is built from: the repos switched off and a filter on the items. */
+/** What the unmatched view is built from: a filter on the items. */
 export interface UnmatchedQuery {
-  hide?: string[];
   filter?: string;
 }
 
 /** The unmatched view's query string. */
-export const UnmatchedQuerySchema: z.ZodType<
-  Omit<UnmatchedQuery, "hide">,
-  Record<string, unknown>
-> = z.object({
+export const UnmatchedQuerySchema: z.ZodType<UnmatchedQuery, Record<string, unknown>> = z.object({
   filter: filterText.optional(),
 });

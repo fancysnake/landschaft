@@ -21,13 +21,12 @@ export default function Inbox({ dashboardId }: Props) {
   if (!data) {
     return <p className="p-6 text-sm text-neutral-500">{error ?? "Loading inbox…"}</p>;
   }
-  const { dashboard, inbox, hidden } = data;
+  const { dashboard, inbox } = data;
   const showRepo = inbox.repos.length > 1;
 
   return (
     <ViewShell
       view={view}
-      hidden={hidden}
       dashboard={dashboard}
       facets={inbox}
       count={`${inbox.total} items`}

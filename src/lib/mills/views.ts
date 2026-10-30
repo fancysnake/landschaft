@@ -46,7 +46,7 @@ export class Views implements ViewService {
     return {
       config,
       snapshot: store.snapshot(config.repos),
-      audience: { users: config.users, viewer: await viewer() },
+      audience: { users: config.users, viewer: await viewer(), hidden: config.hiddenRepos },
       status: syncer.status(),
     };
   }
@@ -68,24 +68,19 @@ export class Views implements ViewService {
     const { config, snapshot, audience, status } = await this.context();
     const dashboard = dashboardOf(config, id, "board");
     const starred = this.deps.store.starredEpics(dashboard.id);
-    const hidden = config.hiddenRepos;
-    const query = { ...filters, hide: hidden };
-    const board = buildBoard(snapshot, dashboard, { ...audience, query, starred });
-    return { dashboard, board, hidden, status };
+    const board = buildBoard(snapshot, dashboard, { ...audience, query: filters, starred });
+    return { dashboard, board, status };
   }
 
   async inbox(id: string, filters: Filters) {
     const { config, snapshot, audience, status } = await this.context();
     const dashboard = dashboardOf(config, id, "inbox");
-    const hidden = config.hiddenRepos;
-    const query = { ...filters, hide: hidden };
-    const inbox = buildInbox(snapshot, dashboard, { ...audience, query });
-    return { dashboard, inbox, hidden, status };
+    const inbox = buildInbox(snapshot, dashboard, { ...audience, query: filters });
+    return { dashboard, inbox, status };
   }
 
-  async unmatched({ filter }: Omit<UnmatchedQuery, "hide">) {
+  async unmatched(query: UnmatchedQuery) {
     const { config, snapshot, audience, status } = await this.context();
-    const query = { filter, hide: config.hiddenRepos };
     const { items, offer } = unmatchedItems(snapshot, config.dashboards, { ...audience, query });
     return { items, offer, status };
   }
