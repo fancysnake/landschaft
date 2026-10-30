@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { NavData } from "../lib/pacts/types";
 
@@ -29,25 +29,29 @@ export default function Nav({ path, nav }: Props) {
   const [toggleError, setToggleError] = useState<string | null>(null);
   const { status, error, syncing, sync, dismissError } = useSyncStatus();
 
+  const seq = useRef(0);
+  const saving = useRef(0);
+
+  // A response is dropped once a newer reload has started, or while a toggle is still saving: it
+  // would undo that toggle, and the last save to settle reloads.
+  const reload = useCallback(() => {
+    const mine = ++seq.current;
+    api
+      .nav()
+      .then((next) => {
+        if (mine === seq.current && saving.current === 0) setNav(next);
+      })
+      .catch(() => undefined);
+  }, []);
+
   useEffect(() => {
-    // A response is dropped once a newer reload has started.
-    let seq = 0;
-    const reload = () => {
-      const mine = ++seq;
-      api
-        .nav()
-        .then((next) => {
-          if (mine === seq) setNav(next);
-        })
-        .catch(() => undefined);
-    };
     window.addEventListener(CONFIG_SAVED, reload);
     window.addEventListener(SYNCED, reload);
     return () => {
       window.removeEventListener(CONFIG_SAVED, reload);
       window.removeEventListener(SYNCED, reload);
     };
-  }, []);
+  }, [reload]);
 
   const shown = repos.filter((repo) => !hidden.includes(repo));
   const setShown = (selected: string[]) => {
@@ -60,18 +64,17 @@ export default function Nav({ path, nav }: Props) {
       ...prev,
       hidden: [...prev.hidden.filter((repo) => !on.includes(repo)), ...off],
     }));
-    // Saving fires CONFIG_SAVED, which reloads the nav and every view.
+    // Saving fires CONFIG_SAVED, which reloads every view.
+    saving.current += 1;
     void (async () => {
       try {
         if (off.length > 0) await api.setHidden({ repos: off, hidden: true });
         if (on.length > 0) await api.setHidden({ repos: on, hidden: false });
       } catch (cause) {
         setToggleError(`Switching repositories failed: ${errorMessage(cause)}`);
-        // A failed save fires no reload, so fetch what the server kept.
-        api
-          .nav()
-          .then(setNav)
-          .catch(() => undefined);
+      } finally {
+        saving.current -= 1;
+        if (saving.current === 0) reload();
       }
     })();
   };
