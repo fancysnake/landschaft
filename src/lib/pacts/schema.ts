@@ -164,7 +164,7 @@ const dashboardFilter = z.string().superRefine((text, ctx) => {
 
 /** A config object as read from JSON, before validation. */
 type Raw = Record<string, unknown>;
-const isRaw = (value: unknown): value is Raw =>
+export const isRaw = (value: unknown): value is Raw =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** What every dashboard type has. */
@@ -373,6 +373,8 @@ export const ConfigSchema = z.preprocess(
       repos: z.array(repoName).default([]),
       /** …that these users authored or are assigned to; empty takes everyone's. */
       users: z.array(userName).default([]),
+      /** Repos switched off in the nav; every view leaves their items out. */
+      hiddenRepos: z.array(repoName).default([]),
       refreshMinutes: refreshMinutes.default(5),
       dashboards: z.array(DashboardSchema).default([]),
     })
@@ -380,7 +382,12 @@ export const ConfigSchema = z.preprocess(
       if (!hasUniqueIds(config.dashboards)) {
         ctx.addIssue({ code: "custom", path: ["dashboards"], message: "ids must be unique" });
       }
-    }),
+    })
+    // A repo dropped from `repos` is not kept switched off for when it comes back.
+    .transform((config) => ({
+      ...config,
+      hiddenRepos: config.hiddenRepos.filter((repo) => config.repos.includes(repo)),
+    })),
 );
 
 export type BoardDashboard = Extract<Dashboard, { type: "board" }>;
@@ -447,6 +454,12 @@ export function reposToResync(
 export const StarEpicRequestSchema = z.object({ epic: issueRef, starred: z.boolean() });
 export type StarEpicRequest = z.infer<typeof StarEpicRequestSchema>;
 
+export const HiddenReposRequestSchema = z.object({
+  repos: z.array(repoName),
+  hidden: z.boolean(),
+});
+export type HiddenReposRequest = z.infer<typeof HiddenReposRequestSchema>;
+
 export const SyncRequestSchema = z.object({
   repo: repoName.optional(),
   full: z.boolean().default(false),
@@ -462,42 +475,27 @@ export type Filters = { [K in TextFilterKey]?: string } & {
   dir?: SortDir;
 };
 
-/** What the view endpoints take: the URL filters plus the repos hidden in this browser. */
-export type ViewQuery = Filters & {
-  /** Repos switched off in the nav, kept per browser. */
-  hide?: string[];
-};
-
 const optionalText = z
   .string()
   .optional()
   .transform((value) => (value === "" ? undefined : value));
 
-/** Comma-separated repos, as `hide` carries them. */
-const repoList = z
-  .string()
-  .optional()
-  .transform((value) => value?.split(",").filter(Boolean));
-
 /** The view endpoints' query string; empty strings count as "not set". */
-export const ViewQuerySchema: z.ZodType<ViewQuery, Record<string, unknown>> = z.object({
+export const ViewQuerySchema: z.ZodType<Filters, Record<string, unknown>> = z.object({
   ...(Object.fromEntries(TEXT_FILTER_KEYS.map((key) => [key, optionalText])) as Record<
     TextFilterKey,
     typeof optionalText
   >),
-  hide: repoList,
   sort: SortBySchema.optional(),
   dir: SortDirSchema.optional(),
 });
 
-/** What the unmatched view takes: the repos hidden in this browser and a filter on the items. */
+/** What the unmatched view is built from: a filter on the items. */
 export interface UnmatchedQuery {
-  hide?: string[];
   filter?: string;
 }
 
 /** The unmatched view's query string. */
 export const UnmatchedQuerySchema: z.ZodType<UnmatchedQuery, Record<string, unknown>> = z.object({
-  hide: repoList,
   filter: filterText.optional(),
 });

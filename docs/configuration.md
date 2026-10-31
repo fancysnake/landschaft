@@ -17,6 +17,7 @@ dashboard filters.
 | `version`        | integer              | `0`     | Config format; landschaft upgrades older ones on load                |
 | `repos`          | `owner/repo[]`       | `[]`    | Repositories to sync                                                 |
 | `users`          | `(login \| "@me")[]` | `[]`    | Only items these users created or are assigned to; `[]` = everyone's |
+| `hiddenRepos`    | `owner/repo[]`       | `[]`    | Repositories switched off in the top bar; set there, not in Settings |
 | `refreshMinutes` | 1–1440               | `5`     | Background sync interval for every repository                        |
 | `dashboards`     | `Dashboard[]`        | `[]`    | Boards and inboxes, in tab order                                     |
 

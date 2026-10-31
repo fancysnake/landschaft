@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { InboxDashboard, ViewQuery } from "../pacts/schema";
+import type { Filters, InboxDashboard } from "../pacts/schema";
 
 import {
   DASHBOARD,
@@ -31,8 +31,8 @@ const cell = (laneId: string, colId: string) => cellKey(laneId, colId);
 const numbers = (board: ReturnType<typeof buildBoard>) =>
   board.cells[cell("rest", "todo")]?.map(numberOf);
 /** `numbers` of a `DASHBOARD` board over `issues` under `query`. */
-const shown = (issues: Issue[], query: ViewQuery) =>
-  numbers(buildBoard(snapshot(issues), DASHBOARD, { ...EVERYONE, query }));
+const shown = (issues: Issue[], query: Filters, hidden: string[] = []) =>
+  numbers(buildBoard(snapshot(issues), DASHBOARD, { ...EVERYONE, query, hidden }));
 
 /** A filter hits when it asks for one of the labels `hits`. */
 const hitting =
@@ -94,7 +94,7 @@ describe("scopedRepos", () => {
     ];
     const jobs = [makeJob({ name: "lint", repo: "a/6", authors: ["me"] })];
     const scoped = (filter: string, users: string[]) => [
-      ...scopedRepos(snapshot(issues, jobs), { filter }, { users, viewer: "me" }),
+      ...scopedRepos(snapshot(issues, jobs), { filter }, { ...EVERYONE, users, viewer: "me" }),
     ];
     expect(scoped("label:team", ["@me", "ann"])).toEqual(["a/1", "a/2"]);
     expect(scoped("label:team", [])).toEqual(["a/1", "a/2", "a/5"]);
@@ -131,6 +131,7 @@ describe("unmatchedItems", () => {
       makeIssue({ number: 8, author: "bob" }),
     ];
     const unmatched = unmatchedItems(snapshot(issues), [narrow, wide], {
+      ...EVERYONE,
       users: ["@me"],
       viewer: "me",
     }).items;
@@ -164,10 +165,8 @@ describe("unmatchedItems", () => {
       makeIssue({ number: 10, ...lib, kind: "pr", linked: [{ repo: REPO, number: 1 }] }),
       makeIssue({ number: 11, ...lib, blockedBy: waitsOn(2), blockedByTotal: 1 }),
     ];
-    const unmatched = (hide: string[]) =>
-      unmatchedItems(snapshot(issues), [dashboard], { ...EVERYONE, query: { hide } }).items.map(
-        numberOf,
-      );
+    const unmatched = (hidden: string[]) =>
+      unmatchedItems(snapshot(issues), [dashboard], { ...EVERYONE, hidden }).items.map(numberOf);
     expect(unmatched([])).toEqual([11, 10, 3]);
     expect(unmatched(["acme/lib"])).toEqual([3]);
   });
@@ -306,10 +305,12 @@ describe("buildInbox", () => {
     });
     const hidden = buildInbox(snapshot(all), scoped, {
       ...EVERYONE,
-      query: { dir: "asc", hide: ["acme/lib"] },
+      query: { dir: "asc" },
+      hidden: ["acme/lib"],
     });
     expect(grouped(hidden).bugs).toEqual([2, 3]);
     expect(hidden.repos).toEqual(["acme/app", "acme/lib"]);
+    expect(hidden.hidden).toEqual(["acme/lib"]);
   });
 
   it("strips the labels groups ask for from cards and filter options", () => {
@@ -391,7 +392,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 4, author: "renovate" }),
     ];
     const users = (list: string[], viewer: string | null = null) =>
-      numbers(buildBoard(snapshot(issues), DASHBOARD, { users: list, viewer }));
+      numbers(buildBoard(snapshot(issues), DASHBOARD, { ...EVERYONE, users: list, viewer }));
     expect(users(["ann", "cid"])).toEqual([2, 1]);
     expect(users(["@ME", "ann"], "dan")).toEqual([3, 1]);
     expect(users(["@me", "ann"])).toEqual([1]);
@@ -409,7 +410,11 @@ describe("buildBoard", () => {
       makeIssue({ number: 3, author: "ann", labels: [label("epic")] }),
       makeIssue({ number: 4, author: null }),
     ];
-    const mine = buildBoard(snapshot(issues), dashboard, { users: ["@me"], viewer: "me" });
+    const mine = buildBoard(snapshot(issues), dashboard, {
+      ...EVERYONE,
+      users: ["@me"],
+      viewer: "me",
+    });
     expect(numbers(mine)).toEqual([2, 1]);
     expect(mine.epics).toEqual([]);
     expect(mine.assignees).toEqual(["me"]);
@@ -892,7 +897,7 @@ describe("buildBoard", () => {
     ];
     const epics = buildBoard(snapshot(issues), DASHBOARD, {
       ...EVERYONE,
-      query: { hide: ["acme/other"] },
+      hidden: ["acme/other"],
     }).epics;
     expect(epics.map((e) => [e.number, e.openPrs])).toEqual([
       [11, 0],
@@ -941,7 +946,7 @@ describe("buildBoard", () => {
       makeIssue({ number: 10, labels: [label("epic")] }),
       makeIssue({ number: 11, repo: "acme/other", labels: [label("epic")] }),
     ];
-    const board = buildBoard(snapshot(issues), DASHBOARD, { ...EVERYONE, query: { hide: [REPO] } });
+    const board = buildBoard(snapshot(issues), DASHBOARD, { ...EVERYONE, hidden: [REPO] });
     expect(board.epics.map((epic) => epic.key)).toEqual(["acme/other#11"]);
   });
 
@@ -997,9 +1002,10 @@ describe("buildBoard", () => {
     ];
     const board = buildBoard(snapshot(issues), DASHBOARD, {
       ...EVERYONE,
-      query: { hide: ["acme/gone"] },
+      hidden: ["acme/gone"],
     });
     expect(numbers(board)).toEqual([10, 1]);
+    expect(board.hidden).toEqual([]);
     expect(board.epics.map((epic) => epic.key)).toEqual(["acme/other#10"]);
   });
 
@@ -1026,15 +1032,14 @@ describe("buildBoard", () => {
       makeIssue({ number: 3, repo: "acme/c", state: "CLOSED" }),
     ];
     expect(
-      buildBoard(snapshot(issues), DASHBOARD, { ...EVERYONE, query: { hide: ["acme/b"] } }).repos,
+      buildBoard(snapshot(issues), DASHBOARD, { ...EVERYONE, hidden: ["acme/b"] }).repos,
     ).toEqual(["acme/a", "acme/b"]);
   });
 
   it("hides repos switched off in the nav", () => {
     const issues = [makeIssue({ number: 1 }), makeIssue({ number: 2, repo: "acme/other" })];
-    const hide = ["acme/other", "acme/gone"];
-    expect(shown(issues, { hide })).toEqual([1]);
-    expect(shown(issues, { hide: [REPO, "acme/other"] })).toEqual([]);
+    expect(shown(issues, {}, ["acme/other", "acme/gone"])).toEqual([1]);
+    expect(shown(issues, {}, [REPO, "acme/other"])).toEqual([]);
   });
 
   it("skips epics when no epic label is configured", () => {
@@ -1056,8 +1061,8 @@ const jobs = [
   makeJob({ name: "lint", branch: "fix/y", authors: ["bob"] }),
 ];
 /** Names of the job cards in the catch-all cell under `query`. */
-const shownJobs = (query: ViewQuery) =>
-  buildBoard(snapshot([], jobs), DASHBOARD, { ...EVERYONE, query }).cells[
+const shownJobs = (query: Filters, hidden: string[] = []) =>
+  buildBoard(snapshot([], jobs), DASHBOARD, { ...EVERYONE, query, hidden }).cells[
     cell("rest", "todo")
   ]?.map(numberOf);
 
@@ -1074,7 +1079,11 @@ describe("CI jobs", () => {
   });
 
   it("shows only the jobs of branches the global users have commits in", () => {
-    const mine = buildBoard(snapshot([], jobs), DASHBOARD, { users: ["@me"], viewer: "bob" });
+    const mine = buildBoard(snapshot([], jobs), DASHBOARD, {
+      ...EVERYONE,
+      users: ["@me"],
+      viewer: "bob",
+    });
     expect(mine.cells[cell("rest", "todo")]?.map(numberOf)).toEqual(["lint"]);
   });
 
@@ -1094,7 +1103,7 @@ describe("CI jobs", () => {
     expect(shownJobs({ q: "test" })).toEqual(["test"]);
     expect(shownJobs({ assignee: "bob" })).toEqual([]);
     expect(shownJobs({ epic: "acme/app#1" })).toEqual([]);
-    expect(shownJobs({ hide: [REPO] })).toEqual([]);
+    expect(shownJobs({}, [REPO])).toEqual([]);
   });
 
   it("filters by job name in any case, which hides every issue, and lists the names", () => {

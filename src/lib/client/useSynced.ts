@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { SyncStatus } from "../pacts/types";
 
-import { errorMessage } from "./api";
+import { CONFIG_SAVED, errorMessage } from "./api";
 import { SYNCED } from "./useSyncStatus";
 
 export interface SyncedController<T> {
@@ -13,8 +13,9 @@ export interface SyncedController<T> {
 }
 
 /**
- * Loads with `get` whenever it changes, and again whenever a sync lands. `get` must keep its
- * identity across renders (from `useCallback`, say); a new one each render reloads forever.
+ * Loads with `get` whenever it changes, and again whenever a sync lands or the config is saved.
+ * `get` must keep its identity across renders (from `useCallback`, say); a new one each render
+ * reloads forever.
  */
 export function useSynced<T extends { status: SyncStatus }>(
   get: () => Promise<T>,
@@ -49,8 +50,13 @@ export function useSynced<T extends { status: SyncStatus }>(
     const onSynced = (event: Event) => {
       if ((event as CustomEvent<number>).detail !== versionRef.current) void load();
     };
+    const onSaved = () => void load();
     window.addEventListener(SYNCED, onSynced);
-    return () => window.removeEventListener(SYNCED, onSynced);
+    window.addEventListener(CONFIG_SAVED, onSaved);
+    return () => {
+      window.removeEventListener(SYNCED, onSynced);
+      window.removeEventListener(CONFIG_SAVED, onSaved);
+    };
   }, [load]);
 
   return { data, error, setError, load };

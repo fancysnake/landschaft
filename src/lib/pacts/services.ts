@@ -1,5 +1,5 @@
 import type { Offer } from "./filter";
-import type { BoardDashboard, Config, InboxDashboard, UnmatchedQuery, ViewQuery } from "./schema";
+import type { BoardDashboard, Config, Filters, InboxDashboard, UnmatchedQuery } from "./schema";
 import type { Board, Card, Inbox, LabelDef, NavData, SyncStatus } from "./types";
 
 export class NotFoundError extends Error {
@@ -37,8 +37,13 @@ export interface SyncOptions {
 
 export interface ConfigService {
   load(): Config;
-  /** Validates and saves `config`, then fully resyncs the repos it widened. */
+  /**
+   * Validates and saves `config` with the stored `hiddenRepos`, which `setHidden` owns, then
+   * fully resyncs the repos it widened.
+   */
   save(config: unknown): Config;
+  /** Switches `repos` off or on. Throws `InvalidError` for a repo outside the config. */
+  setHidden(repos: string[], hidden: boolean): Config;
 }
 
 export interface SyncService {
@@ -56,12 +61,12 @@ export interface ViewService {
   /** Throws `NotFoundError` unless `id` names a board. */
   board(
     id: string,
-    query: ViewQuery,
+    filters: Filters,
   ): Promise<{ dashboard: BoardDashboard; board: Board; status: SyncStatus }>;
   /** Throws `NotFoundError` unless `id` names an inbox. */
   inbox(
     id: string,
-    query: ViewQuery,
+    filters: Filters,
   ): Promise<{ dashboard: InboxDashboard; inbox: Inbox; status: SyncStatus }>;
   unmatched(query: UnmatchedQuery): Promise<{ items: Card[]; offer: Offer; status: SyncStatus }>;
   labels(repos: string[]): LabelDef[];

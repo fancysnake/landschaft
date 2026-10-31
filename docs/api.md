@@ -3,38 +3,43 @@
 All endpoints return JSON and carry no authentication: the server is meant to listen on
 localhost only. Errors are `{ "error": "message" }` with a matching status.
 
-| Route                           | Purpose                                               |
-| ------------------------------- | ----------------------------------------------------- |
-| `GET /api/config`               | The whole config, defaults filled in                  |
-| `PUT /api/config`               | Replace the whole config; validated, saved atomically |
-| `GET /api/dashboards/:id/board` | Computed board; the query string is the filter set    |
-| `GET /api/dashboards/:id/inbox` | Computed inbox; same query string as the board        |
-| `GET /api/unmatched?hide=a/b`   | Open items no dashboard places; see [Board](#board)   |
-| `POST /api/sync`                | `{ "repo"?, "full"? }`; see [Sync](#sync)             |
-| `GET /api/version`              | Sync status per repository plus rate-limit budget     |
-| `GET /api/labels?repos=a/b,c/d` | Cached label catalogue for the pickers                |
-| `GET /api/nav`                  | Nav tabs, each with its repos, plus the global repos  |
+| Route                           | Purpose                                                                 |
+| ------------------------------- | ----------------------------------------------------------------------- |
+| `GET /api/config`               | The whole config, defaults filled in                                    |
+| `PUT /api/config`               | Replace the whole config but `hiddenRepos`; validated, saved atomically |
+| `POST /api/hidden-repos`        | `{ "repos", "hidden" }`; switches repositories off or on                |
+| `GET /api/dashboards/:id/board` | Computed board; the query string is the filter set                      |
+| `GET /api/dashboards/:id/inbox` | Computed inbox; same query string as the board                          |
+| `GET /api/unmatched?filter=`    | Open items no dashboard places; see [Board](#board)                     |
+| `POST /api/sync`                | `{ "repo"?, "full"? }`; see [Sync](#sync)                               |
+| `GET /api/version`              | Sync status per repository plus rate-limit budget                       |
+| `GET /api/labels?repos=a/b,c/d` | Cached label catalogue for the pickers                                  |
+| `GET /api/nav`                  | Nav tabs, each with its repos, plus the global and hidden repos         |
 
 ## Board
 
-`GET /api/dashboards/:id/board?q=&hide=&assignee=&label=&type=&epic=&sort=updated&dir=desc`
+`GET /api/dashboards/:id/board?q=&assignee=&label=&type=&epic=&sort=updated&dir=desc`
 returns the grid as cells keyed by swimlane and column id, the epic strip, the repositories
-among the dashboard's items and the label catalogue used for colouring. `hide` lists
-repositories to leave out. The React island renders it as-is; all placement logic is server-side
-and unit-tested.
+among the dashboard's items with the `hidden` ones among them, whose items it leaves out, and the
+label catalogue used for colouring. The React island renders it as-is; all placement logic is
+server-side and unit-tested.
 
 `GET /api/dashboards/:id/inbox` takes the same query string and returns the inbox's cards by
 group id, with the same repositories, label catalogue and sort. Each endpoint answers `404` for
 a dashboard of the other type.
 
-`GET /api/unmatched?hide=&filter=` returns `{ "items", "offer", "status" }`: the open items of
+`GET /api/unmatched?filter=` returns `{ "items", "offer", "status" }`: the open items of
 the global users that no dashboard places in a cell or inbox group, most recently updated first,
-as cards shaped like the board's with every label. `hide` works as on the board; `filter` takes a
+as cards shaped like the board's with every label, leaving out hidden repositories; `filter` takes a
 dashboard filter expression; `offer` holds the repos, labels and users the filter box suggests.
 
 `POST /api/dashboards/:id/starred-epics` with `{ "epic": "owner/repo#12", "starred": true }`
 marks the epic as in active development (`false` clears the mark) and returns the dashboard's
 `starredEpics`. Starring rejects an epic outside the global repositories with `400`.
+
+`POST /api/hidden-repos` with `{ "repos": ["owner/repo"], "hidden": true }` switches those
+repositories off on every view (`false` switches them back on) and returns the config's
+`hiddenRepos`. A repository outside the global ones is rejected with `400`.
 
 ## Sync
 

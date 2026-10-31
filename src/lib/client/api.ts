@@ -1,9 +1,9 @@
 import type { Offer } from "../pacts/filter";
 import type {
   BoardDashboard,
-  ViewQuery,
   Config,
   Filters,
+  HiddenReposRequest,
   InboxDashboard,
   StarEpicRequest,
   SyncRequest,
@@ -77,27 +77,29 @@ async function request<T>(input: string, init: RequestInit = {}): Promise<T> {
   return payload as T;
 }
 
+/** Sends a config change, then tells the islands it was saved. */
+async function saveTo<T>(input: string, method: "PUT" | "POST", body: unknown): Promise<T> {
+  const saved = await request<T>(input, { method, body: JSON.stringify(body) });
+  window.dispatchEvent(new Event(CONFIG_SAVED));
+  return saved;
+}
+
 export function filtersToQuery(filters: Filters): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) if (value) params.set(key, value);
   return params.toString();
 }
 
-function viewUrl(dashboardId: string, view: "board" | "inbox", { hide, ...filters }: ViewQuery) {
-  const params = new URLSearchParams(filtersToQuery(filters));
-  if (hide?.length) params.set("hide", hide.join(","));
-  return `/api/dashboards/${encodeURIComponent(dashboardId)}/${view}?${params}`;
-}
+const viewUrl = (dashboardId: string, view: "board" | "inbox", filters: Filters) =>
+  `/api/dashboards/${encodeURIComponent(dashboardId)}/${view}?${filtersToQuery(filters)}`;
 
 export const api = {
-  board: (dashboardId: string, query: ViewQuery) =>
-    request<BoardResponse>(viewUrl(dashboardId, "board", query)),
-  inbox: (dashboardId: string, query: ViewQuery) =>
-    request<InboxResponse>(viewUrl(dashboardId, "inbox", query)),
-  unmatched: (hide: string[], filter: string) =>
-    request<UnmatchedResponse>(
-      `/api/unmatched?${new URLSearchParams({ hide: hide.join(","), filter })}`,
-    ),
+  board: (dashboardId: string, filters: Filters) =>
+    request<BoardResponse>(viewUrl(dashboardId, "board", filters)),
+  inbox: (dashboardId: string, filters: Filters) =>
+    request<InboxResponse>(viewUrl(dashboardId, "inbox", filters)),
+  unmatched: (filter: string) =>
+    request<UnmatchedResponse>(`/api/unmatched?${new URLSearchParams({ filter })}`),
   version: () => request<SyncStatus>("/api/version"),
   sync: (body: Pick<SyncRequest, "full">) =>
     request<SyncResponse>("/api/sync", { method: "POST", body: JSON.stringify(body) }),
@@ -107,13 +109,9 @@ export const api = {
       { method: "POST", body: JSON.stringify(body) },
     ),
   config: () => request<Config>("/api/config"),
-  saveConfig: async (config: unknown) => {
-    const saved = await request<Config>("/api/config", {
-      method: "PUT",
-      body: JSON.stringify(config),
-    });
-    window.dispatchEvent(new Event(CONFIG_SAVED));
-    return saved;
+  saveConfig: (config: unknown) => saveTo<Config>("/api/config", "PUT", config),
+  setHidden: async (body: HiddenReposRequest) => {
+    await saveTo("/api/hidden-repos", "POST", body);
   },
   nav: () => request<NavData>("/api/nav"),
   labels: (repos: string[]) =>

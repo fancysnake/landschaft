@@ -5,9 +5,9 @@ import {
   type Config,
   type Dashboard,
   type DashboardType,
+  type Filters,
   findDashboard,
   type UnmatchedQuery,
-  type ViewQuery,
 } from "../pacts/schema";
 import { InvalidError, NotFoundError, type SyncService, type ViewService } from "../pacts/services";
 import { parseIssueKey } from "../pacts/types";
@@ -46,7 +46,7 @@ export class Views implements ViewService {
     return {
       config,
       snapshot: store.snapshot(config.repos),
-      audience: { users: config.users, viewer: await viewer() },
+      audience: { users: config.users, viewer: await viewer(), hidden: config.hiddenRepos },
       status: syncer.status(),
     };
   }
@@ -60,21 +60,22 @@ export class Views implements ViewService {
         repos: [...scopedRepos(snapshot, { filter }, audience)],
       })),
       repos: config.repos,
+      hidden: config.hiddenRepos,
     };
   }
 
-  async board(id: string, query: ViewQuery) {
+  async board(id: string, filters: Filters) {
     const { config, snapshot, audience, status } = await this.context();
     const dashboard = dashboardOf(config, id, "board");
     const starred = this.deps.store.starredEpics(dashboard.id);
-    const board = buildBoard(snapshot, dashboard, { ...audience, query, starred });
+    const board = buildBoard(snapshot, dashboard, { ...audience, query: filters, starred });
     return { dashboard, board, status };
   }
 
-  async inbox(id: string, query: ViewQuery) {
+  async inbox(id: string, filters: Filters) {
     const { config, snapshot, audience, status } = await this.context();
     const dashboard = dashboardOf(config, id, "inbox");
-    const inbox = buildInbox(snapshot, dashboard, { ...audience, query });
+    const inbox = buildInbox(snapshot, dashboard, { ...audience, query: filters });
     return { dashboard, inbox, status };
   }
 

@@ -9,7 +9,6 @@ import {
 } from "../pacts/filter";
 import {
   type BoardDashboard,
-  type ViewQuery,
   type Dashboard,
   closedSince,
   type Filters,
@@ -307,12 +306,16 @@ function placer(dashboard: Dashboard, viewer: string | null): (item: FilterItem)
   return (item) => passes(item) && (grid.isEpic(item) || placeOnGrid(grid, item, viewer) !== null);
 }
 
-/** The repo chips, filter options and sort of a view over `items`, offering the `shown` labels. */
+/**
+ * The repo chips, the `hidden` ones among them, filter options and sort of a view over `items`,
+ * offering the `shown` labels.
+ */
 function facetsOf(
   items: FilterItem[],
   shown: LabelShown,
-  filters: ViewQuery,
+  filters: Filters,
   sort: Dashboard["sort"],
+  hidden: string[],
 ): Facets {
   const repos = new Set<string>();
   const assignees = new Set<string>();
@@ -333,8 +336,10 @@ function facetsOf(
     }
     if (item.kind === "ci-job" && item.name !== null) jobs.add(item.name);
   }
+  const chips = [...repos].toSorted();
   return {
-    repos: [...repos].toSorted(),
+    repos: chips,
+    hidden: chips.filter((repo) => hidden.includes(repo)),
     assignees: [...assignees].toSorted(),
     labels: [...labels.values()].toSorted(),
     types: [...types.values()].toSorted(),
@@ -395,20 +400,19 @@ interface UnmatchedOptions extends Audience {
 
 /**
  * Cards for the open items of the global `users` in `issues` that no dashboard places in a
- * cell or group, and of their failed CI `jobs`, outside the query's `hide` repos and passing its
+ * cell or group, and of their failed CI `jobs`, outside the `hidden` repos and passing the query's
  * `filter`, most recently updated first. One a swimlane hides as blocked counts as placed.
  * `offer` completes the filter from all those items, whether they pass `filter` or not.
  */
 export function unmatchedItems(
   { issues, jobs }: Snapshot,
   dashboards: Dashboard[],
-  { users, viewer, query = {} }: UnmatchedOptions,
+  { users, viewer, hidden, query = {} }: UnmatchedOptions,
 ): { items: Card[]; offer: Offer } {
-  const { hide = [] } = query;
   const filter = parseFilter(query.filter ?? "");
   const placers = dashboards.map((dashboard) => placer(dashboard, viewer));
   const placed = (item: FilterItem) => placers.some((places) => places(item));
-  const missed = ({ item }: Entry) => !hide.includes(item.repo) && !placed(item);
+  const missed = ({ item }: Entry) => !hidden.includes(item.repo) && !placed(item);
   // Hidden repos are dropped last: their items still count for `has:pr` and blockers.
   const unmatched = (scope: FilterNode | null) =>
     scopedItems(issues, jobs, users, viewer, scope).entries.filter(missed);
@@ -420,6 +424,7 @@ export function unmatchedItems(
     () => true,
     {},
     sort,
+    [],
   );
   return {
     items: shown
@@ -447,7 +452,7 @@ function* visibleCards(
 
 /** The inputs of a board or inbox; `now` dates the window of recently closed items. */
 interface ViewOptions extends Audience {
-  query?: ViewQuery;
+  query?: Filters;
   now?: Date;
 }
 
@@ -463,7 +468,7 @@ interface BoardOptions extends ViewOptions {
 export function buildBoard(
   { issues, jobs }: Snapshot,
   dashboard: BoardDashboard,
-  { query = {}, users, viewer, starred = new Set(), now = new Date() }: BoardOptions,
+  { query = {}, users, viewer, hidden, starred = new Set(), now = new Date() }: BoardOptions,
 ): Board {
   const axes = compileGrid(dashboard);
   const { scope } = axes;
@@ -478,10 +483,11 @@ export function buildBoard(
     shown,
     query,
     dashboard.sort,
+    hidden,
   );
   const { sort } = facets;
   // After the facets, so a hidden repo keeps its chip.
-  const entries = scoped.entries.filter(({ item }) => !query.hide?.includes(item.repo));
+  const entries = scoped.entries.filter(({ item }) => !hidden.includes(item.repo));
 
   const board: Board = {
     ...facets,
@@ -563,7 +569,7 @@ export function buildBoard(
 export function buildInbox(
   { issues, jobs }: Snapshot,
   dashboard: InboxDashboard,
-  { query = {}, users, viewer, now = new Date() }: ViewOptions,
+  { query = {}, users, viewer, hidden, now = new Date() }: ViewOptions,
 ): Inbox {
   const scope = parseFilter(dashboard.filter);
   const groups = compile(dashboard.groups);
@@ -575,8 +581,9 @@ export function buildInbox(
     shown,
     query,
     dashboard.sort,
+    hidden,
   );
-  const entries = scoped.entries.filter(({ item }) => !query.hide?.includes(item.repo));
+  const entries = scoped.entries.filter(({ item }) => !hidden.includes(item.repo));
   const cards = new Map<string, Card[]>(groups.map((group) => [group.id, []]));
   let total = 0;
   const put = (item: FilterItem, card: Card) => {

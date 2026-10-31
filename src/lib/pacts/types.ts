@@ -108,10 +108,14 @@ export interface Snapshot {
   jobs: CiJob[];
 }
 
-/** Who a view is for: the global `users` (empty for everyone) and the login `@me` stands for. */
+/**
+ * Who a view is for: the global `users` (empty for everyone), the login `@me` stands for and the
+ * repos they switched off.
+ */
 export interface Audience {
   users: string[];
   viewer: string | null;
+  hidden: string[];
 }
 
 export function ciJobKey(job: Pick<CiJob, "repo" | "branch" | "workflow" | "name">): string {
@@ -167,6 +171,8 @@ export interface Epic {
 export interface Facets {
   /** Repos among the dashboard's items, whether shown or not; the view's repo chips. */
   repos: string[];
+  /** The `repos` switched off, whose items the view leaves out. */
+  hidden: string[];
   assignees: string[];
   labels: string[];
   /** GitHub issue types among the dashboard's items. */
@@ -225,4 +231,6 @@ export interface NavData {
   dashboards: { id: string; name: string; repos: string[] }[];
   /** The global repos. */
   repos: string[];
+  /** Those of `repos` switched off. */
+  hidden: string[];
 }

@@ -14,7 +14,7 @@ interface Props {
 
 export default function Board({ dashboardId }: Props) {
   const view = useViewRequest();
-  const { data, error, setEpicStarred, dismissError } = useBoard(dashboardId, view.request);
+  const { data, error, setEpicStarred, dismissError } = useBoard(dashboardId, view.filters);
 
   if (!data) {
     return <p className="p-6 text-sm text-neutral-500">{error ?? "Loading board…"}</p>;

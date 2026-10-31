@@ -38,7 +38,7 @@ export function ViewShell({
   className,
   children,
 }: Props) {
-  const { filters, updateFilters, hidden } = view;
+  const { filters, updateFilters } = view;
   return (
     <div className={`flex flex-col gap-4 p-5 ${className}`}>
       <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -66,7 +66,7 @@ export function ViewShell({
       </header>
 
       {error && <ErrorBanner error={error} onDismiss={onDismissError} />}
-      {facets.repos.length > 0 && facets.repos.every((repo) => hidden.includes(repo)) && (
+      {facets.repos.length > 0 && facets.hidden.length === facets.repos.length && (
         <p className="panel px-3 py-2 text-sm text-neutral-600 shadow-none">
           Every repository with items {where} is switched off in the bar above.
         </p>

@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { NavData } from "../lib/pacts/types";
 
-import { api, CONFIG_SAVED } from "../lib/client/api";
+import { api, CONFIG_SAVED, errorMessage } from "../lib/client/api";
 import { repoShortName } from "../lib/client/labels";
-import { useHiddenRepos } from "../lib/client/useHiddenRepos";
 import { SYNCED, useSyncStatus } from "../lib/client/useSyncStatus";
 import { SyncStatus } from "./board/SyncStatus";
 import { Toggles } from "./board/Toggles";
+import { ErrorBanner } from "./ErrorBanner";
 
 interface Props {
   path: string;
@@ -25,31 +25,59 @@ const current = (active: boolean) => (active ? "page" : undefined);
  * dashboard with no items in the repos switched on is dimmed.
  */
 export default function Nav({ path, nav }: Props) {
-  const [{ dashboards, repos }, setNav] = useState(nav);
-  const [hidden, setHidden] = useHiddenRepos();
+  const [{ dashboards, repos, hidden }, setNav] = useState(nav);
+  const [toggleError, setToggleError] = useState<string | null>(null);
   const { status, error, syncing, sync, dismissError } = useSyncStatus();
 
+  const seq = useRef(0);
+  const saving = useRef(0);
+
+  // A response is dropped once a newer reload has started, or while a toggle is still saving: it
+  // would undo that toggle, and the last save to settle reloads.
+  const reload = useCallback(() => {
+    const mine = ++seq.current;
+    api
+      .nav()
+      .then((next) => {
+        if (mine === seq.current && saving.current === 0) setNav(next);
+      })
+      .catch(() => undefined);
+  }, []);
+
   useEffect(() => {
-    // A response is dropped once a newer reload has started.
-    let seq = 0;
-    const reload = () => {
-      const mine = ++seq;
-      api
-        .nav()
-        .then((next) => {
-          if (mine === seq) setNav(next);
-        })
-        .catch(() => undefined);
-    };
     window.addEventListener(CONFIG_SAVED, reload);
     window.addEventListener(SYNCED, reload);
     return () => {
       window.removeEventListener(CONFIG_SAVED, reload);
       window.removeEventListener(SYNCED, reload);
     };
-  }, []);
+  }, [reload]);
 
   const shown = repos.filter((repo) => !hidden.includes(repo));
+  const setShown = (selected: string[]) => {
+    const flipped = repos.filter((repo) => selected.includes(repo) === hidden.includes(repo));
+    const off = flipped.filter((repo) => !selected.includes(repo));
+    const on = flipped.filter((repo) => selected.includes(repo));
+    setToggleError(null);
+    // Applied now so a click before the reload diffs against what the user already chose.
+    setNav((prev) => ({
+      ...prev,
+      hidden: [...prev.hidden.filter((repo) => !on.includes(repo)), ...off],
+    }));
+    // Saving fires CONFIG_SAVED, which reloads every view.
+    saving.current += 1;
+    void (async () => {
+      try {
+        if (off.length > 0) await api.setHidden({ repos: off, hidden: true });
+        if (on.length > 0) await api.setHidden({ repos: on, hidden: false });
+      } catch (cause) {
+        setToggleError(`Switching repositories failed: ${errorMessage(cause)}`);
+      } finally {
+        saving.current -= 1;
+        if (saving.current === 0) reload();
+      }
+    })();
+  };
   const inactive = (dashboard: NavData["dashboards"][number]) =>
     dashboard.repos.every((repo) => !shown.includes(repo));
 
@@ -103,8 +131,11 @@ export default function Nav({ path, nav }: Props) {
               .map((repo) => ({ value: repo, label: repoShortName(repo) }))
               .toSorted((a, b) => a.label.localeCompare(b.label))}
             selected={shown}
-            onChange={(selected) => setHidden(repos.filter((repo) => !selected.includes(repo)))}
+            onChange={setShown}
           />
+          {toggleError && (
+            <ErrorBanner error={toggleError} onDismiss={() => setToggleError(null)} />
+          )}
         </div>
       )}
     </nav>

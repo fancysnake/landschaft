@@ -1,15 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { DASHBOARD, REPO } from "../__fixtures__/issues";
+import type { Issue } from "../pacts/types";
+
+import { DASHBOARD, makeIssue, REPO } from "../__fixtures__/issues";
 import { ConfigSchema } from "../pacts/schema";
 import { InvalidError, NotFoundError } from "../pacts/services";
 import { Views } from "./views";
 
-function views() {
-  const config = ConfigSchema.parse({ repos: [REPO], dashboards: [DASHBOARD] });
+function views(extra: { hiddenRepos?: string[] } = {}, issues: Issue[] = []) {
+  const config = ConfigSchema.parse({ repos: [REPO], dashboards: [DASHBOARD], ...extra });
   const starred = new Set<string>();
   const store = {
-    snapshot: () => ({ issues: [], jobs: [] }),
+    snapshot: () => ({ issues, jobs: [] }),
     listLabels: () => [],
     starredEpics: () => new Set(starred),
     setEpicStarred: (_: string, epic: string, on: boolean) =>
@@ -34,6 +36,14 @@ describe("Views", () => {
     const { dashboard, board } = await views().board(DASHBOARD.id, {});
     expect(dashboard.id).toBe(DASHBOARD.id);
     expect(board.total).toBe(0);
+  });
+
+  it("reports the repos switched off in the config", async () => {
+    const v = views({ hiddenRepos: [REPO] }, [makeIssue({ number: 1 })]);
+    const { board } = await v.board(DASHBOARD.id, {});
+    expect(board.hidden).toEqual([REPO]);
+    expect(board.total).toBe(0);
+    expect((await v.nav()).hidden).toEqual([REPO]);
   });
 
   it("finds no inbox under a board's id", async () => {
