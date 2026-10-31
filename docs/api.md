@@ -11,7 +11,7 @@ localhost only. Errors are `{ "error": "message" }` with a matching status.
 | `GET /api/dashboards/:id/board` | Computed board; the query string is the filter set                      |
 | `GET /api/dashboards/:id/inbox` | Computed inbox; same query string as the board                          |
 | `GET /api/unmatched?filter=`    | Open items no dashboard places; see [Board](#board)                     |
-| `POST /api/sync`                | `{ "repo"?, "full"? }`; see [Sync](#sync)                               |
+| `POST /api/sync`                | `{ "repos"?, "full"? }`; see [Sync](#sync)                              |
 | `GET /api/version`              | Sync status per repository plus rate-limit budget                       |
 | `GET /api/labels?repos=a/b,c/d` | Cached label catalogue for the pickers                                  |
 | `GET /api/nav`                  | Nav tabs, each with its repos, plus the global and hidden repos         |
@@ -43,12 +43,10 @@ repositories off on every view (`false` switches them back on) and returns the c
 
 ## Sync
 
-`POST /api/sync` with `{ "repo": "owner/repo" }` syncs that repository and answers once it is
-done with `{ "results", "status" }`; `"full": true` refetches every open issue instead of only
-those changed since the last sync. A repository that is already syncing is refused with `409`.
-
-Without `repo`, every configured repository syncs in the background and the answer is `202` with
-`{ "status", "run" }` at once, never `409`. A call during a running sync-all joins that run and
-adds its repositories to it. Follow progress by polling `GET /api/version`: a repository is busy
-while it is in `inFlight`, the run is done once `runs` reaches `run`, and its failures land in
-`lastError`.
+`POST /api/sync` syncs every configured repository in the background, or with
+`{ "repos": ["owner/repo"] }` just those, and answers `202` with `{ "status", "run" }` at once,
+never `409`; a repository that is not configured is refused with `400`. `"full": true` refetches
+every open issue instead of only those changed since the last sync. A call during a running
+sync-all joins that run and adds its repositories to it. Follow progress by polling
+`GET /api/version`: a repository is busy while it is in `inFlight`, the run is done once `runs`
+reaches `run`, and its failures land in `lastError`.

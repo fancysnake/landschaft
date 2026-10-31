@@ -12,9 +12,8 @@ interface Props {
 }
 
 /**
- * A chip per repo: switches it on or off, shows its sync age, syncs it, and shows it alone, or
- * every repo again when it already is alone. Ends with a switch that turns them all on, or all
- * off once they are all on.
+ * A chip per repo: switches it on or off, shows its sync age, syncs it, and shows it alone unless
+ * it already is. Ends with a switch that turns them all on, or all off once they are all on.
  */
 export function RepoChips({ repos, shown, status, onChange, onSync }: Props) {
   const now = useNow();
@@ -58,21 +57,23 @@ export function RepoChips({ repos, shown, status, onChange, onSync }: Props) {
               aria-label={`Sync ${repo}`}
               title={`Sync ${repo}`}
               onClick={() => onSync(repo)}
-              className={`px-1.5 text-neutral-500 hover:text-neutral-900 disabled:text-neutral-300 ${
-                busy ? "animate-pulse" : ""
-              }`}
+              className={`pl-1.5 text-neutral-500 hover:text-neutral-900 disabled:text-neutral-300 ${
+                alone ? "rounded-r-full pr-3" : "pr-1.5"
+              } ${busy ? "animate-pulse" : ""}`}
             >
               ↻
             </button>
-            <button
-              type="button"
-              aria-label={alone ? "Show every repository" : `Show only ${repo}`}
-              title={alone ? "Show every repository" : `Show only ${repo}`}
-              onClick={() => onChange(alone ? repos : [repo])}
-              className="rounded-r-full pr-3 pl-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-900"
-            >
-              {alone ? "all" : "only"}
-            </button>
+            {!alone && (
+              <button
+                type="button"
+                aria-label={`Show only ${repo}`}
+                title={`Show only ${repo}`}
+                onClick={() => onChange([repo])}
+                className="rounded-r-full pr-3 pl-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-900"
+              >
+                only
+              </button>
+            )}
           </div>
         );
       })}

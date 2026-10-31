@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { NavData } from "../lib/pacts/types";
 
 import { api, CONFIG_SAVED, errorMessage } from "../lib/client/api";
-import { staleRepos, SYNCED, useSyncStatus } from "../lib/client/useSyncStatus";
+import { SYNCED, useSyncStatus } from "../lib/client/useSyncStatus";
 import { RepoChips } from "./board/RepoChips";
 import { SyncStatus } from "./board/SyncStatus";
 import { ErrorBanner } from "./ErrorBanner";
@@ -68,12 +68,7 @@ export default function Nav({ path, nav }: Props) {
     void (async () => {
       try {
         if (off.length > 0) await api.setHidden({ repos: off, hidden: true });
-        if (on.length > 0) {
-          await api.setHidden({ repos: on, hidden: false });
-          // Their cache is as old as when they were switched off.
-          const stale = staleRepos(status, on);
-          if (stale.length > 0) void sync(false, stale);
-        }
+        if (on.length > 0) await api.setHidden({ repos: on, hidden: false });
       } catch (cause) {
         setToggleError(`Switching repositories failed: ${errorMessage(cause)}`);
       } finally {
@@ -118,7 +113,7 @@ export default function Nav({ path, nav }: Props) {
               status={status}
               syncing={syncing}
               error={error}
-              onSync={(full) => void sync(full)}
+              onSync={(full) => void sync({ full })}
               onDismissError={dismissError}
             />
           )}
@@ -134,7 +129,7 @@ export default function Nav({ path, nav }: Props) {
             shown={shown}
             status={status}
             onChange={setShown}
-            onSync={(repo) => void sync(false, [repo])}
+            onSync={(repo) => void sync({ repos: [repo] })}
           />
           {toggleError && (
             <ErrorBanner error={toggleError} onDismiss={() => setToggleError(null)} />

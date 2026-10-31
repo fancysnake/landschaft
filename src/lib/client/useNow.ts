@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 
-/** The current time, refreshed every `everyMs`, for relative ages. */
-export function useNow(everyMs = 15_000): number {
+const EVERY_MS = 15_000;
+
+/** The current time, refreshed every 15 s, for relative ages. */
+export function useNow(): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), everyMs);
+    const timer = setInterval(() => setNow(Date.now()), EVERY_MS);
     return () => clearInterval(timer);
-  }, [everyMs]);
+  }, []);
   return now;
 }

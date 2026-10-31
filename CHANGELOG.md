@@ -10,10 +10,9 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Added
 
 - Repo chips show each repo's sync age (red, with the error on hover, after a failed sync), sync
-  that repo alone with `↻`, and show it as the only repo with `only`; on the only repo shown,
-  `all` turns every repo back on. Switching a repo on syncs it unless it synced within the last
-  minute. `POST /api/sync` takes `repos` to queue just those, and `/api/version` reports each
-  repo's last sync and error in `repos`.
+  that repo alone with `↻`, and show it as the only repo with `only`. `POST /api/sync` takes
+  `repos` to queue just those, and `/api/version` reports each repo's last sync and error in
+  `repos`.
 
 ### Changed
 
@@ -24,6 +23,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Removed
 
 - The `hide` query parameter of the board, inbox and unmatched endpoints.
+- `repo` in the `POST /api/sync` body; send `repos: ["owner/repo"]` instead.
 
 ## [4.4.0] - 2026-10-29
 
