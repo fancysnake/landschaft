@@ -3,6 +3,7 @@ import type { CiJob, FetchedIssue, LabelDef, PullStatus, Snapshot, SyncState } f
 /** The cache the sync writes. */
 export interface SyncStore {
   getSyncState(repo: string): SyncState | null;
+  listSyncStates(): SyncState[];
   setSyncState(repo: string, patch: Partial<Omit<SyncState, "repo">>): void;
   upsertIssues(issues: FetchedIssue[]): void;
   /** After a full sync: anything still open that the forge did not list is closed. */

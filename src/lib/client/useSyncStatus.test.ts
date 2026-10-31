@@ -74,6 +74,42 @@ test("a sync waits for its run and reports the errors it ended with", async () =
   expect(result.current!.syncing).toBe(false);
 });
 
+test("an older run answering last does not end the wait for a newer one", async () => {
+  vi.mocked(api.version)
+    .mockResolvedValueOnce(status(1))
+    .mockResolvedValueOnce(status(2, { runs: 2 }))
+    .mockResolvedValue(status(3, { runs: 3, lastError: "rate limited" }));
+  const answers: ((run: number) => void)[] = [];
+  vi.mocked(api.sync).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        answers.push((run) => resolve({ status: status(1, { runs: 1 }), run }));
+      }),
+  );
+
+  const result = await renderStatus();
+  let older!: Promise<void>, newer!: Promise<void>;
+  act(() => {
+    older = result.current!.sync({ repos: ["o/a"] });
+    newer = result.current!.sync({ repos: ["o/b"] });
+  });
+  await act(async () => {
+    answers[1]!(3);
+    await newer;
+  });
+  await act(async () => {
+    answers[0]!(2);
+    await older;
+  });
+
+  await poll();
+  expect(result.current!.syncing).toBe(true);
+
+  await poll();
+  expect(result.current!.error).toBe("rate limited");
+  expect(result.current!.syncing).toBe(false);
+});
+
 test("a refused sync is reported", async () => {
   vi.mocked(api.version).mockResolvedValue(status(1));
   vi.mocked(api.sync).mockRejectedValue(new Error("409"));

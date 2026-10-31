@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { SyncRequest } from "../pacts/schema";
 import type { SyncStatus } from "../pacts/types";
 
 import { api, errorMessage } from "./api";
@@ -12,7 +13,8 @@ export interface SyncController {
   status: SyncStatus | null;
   error: string | null;
   syncing: boolean;
-  sync(full?: boolean): Promise<void>;
+  /** Queues `repos`, or every configured repo, one at a time on the server. */
+  sync(request?: Partial<Pick<SyncRequest, "full" | "repos">>): Promise<void>;
   dismissError(): void;
 }
 
@@ -60,12 +62,13 @@ export function useSyncStatus(): SyncController {
   }, [poll]);
 
   const sync = useCallback(
-    async (full = false) => {
+    async (request: Parameters<SyncController["sync"]>[0] = {}) => {
       setSyncing(true);
       setError(null);
       try {
-        const response = await api.sync({ full });
-        awaitedRun.current = response.run;
+        const response = await api.sync(request);
+        // Responses can land out of order; wait for the newest run any of them joined.
+        awaitedRun.current = Math.max(awaitedRun.current ?? 0, response.run);
         apply(response.status);
       } catch (cause) {
         setError(`Sync failed: ${errorMessage(cause)}`);

@@ -66,6 +66,11 @@ export class Syncer implements SyncService {
       lastError: this.lastError,
       rateRemaining: this.rateRemaining,
       inFlight: [...this.inFlight],
+      repos: Object.fromEntries(
+        this.db
+          .listSyncStates()
+          .map(({ repo, lastSyncAt, lastError }) => [repo, { lastSyncAt, lastError }]),
+      ),
       viewer: this.viewerLogin,
     };
   }
