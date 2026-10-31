@@ -7,12 +7,22 @@ import { api, errorMessage } from "./api";
 const POLL_MS = 4000;
 /** Tells the boards on this page that synced data landed; `detail` is the new version. */
 export const SYNCED = "landschaft:synced";
+const STALE_MS = 60_000;
+
+/** Those of `repos` not synced within the last minute. */
+export function staleRepos(status: SyncStatus | null, repos: string[], now = Date.now()) {
+  return repos.filter((repo) => {
+    const last = status?.repos[repo]?.lastSyncAt;
+    return !last || now - Date.parse(last) >= STALE_MS;
+  });
+}
 
 export interface SyncController {
   status: SyncStatus | null;
   error: string | null;
   syncing: boolean;
-  sync(full?: boolean): Promise<void>;
+  /** Queues `repos`, or every configured repo, one at a time on the server. */
+  sync(full?: boolean, repos?: string[]): Promise<void>;
   dismissError(): void;
 }
 
@@ -60,11 +70,11 @@ export function useSyncStatus(): SyncController {
   }, [poll]);
 
   const sync = useCallback(
-    async (full = false) => {
+    async (full = false, repos?: string[]) => {
       setSyncing(true);
       setError(null);
       try {
-        const response = await api.sync({ full });
+        const response = await api.sync({ full, repos });
         awaitedRun.current = response.run;
         apply(response.status);
       } catch (cause) {

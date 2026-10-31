@@ -3,10 +3,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { NavData } from "../lib/pacts/types";
 
 import { api, CONFIG_SAVED, errorMessage } from "../lib/client/api";
-import { repoShortName } from "../lib/client/labels";
-import { SYNCED, useSyncStatus } from "../lib/client/useSyncStatus";
+import { staleRepos, SYNCED, useSyncStatus } from "../lib/client/useSyncStatus";
+import { RepoChips } from "./board/RepoChips";
 import { SyncStatus } from "./board/SyncStatus";
-import { Toggles } from "./board/Toggles";
 import { ErrorBanner } from "./ErrorBanner";
 
 interface Props {
@@ -69,7 +68,12 @@ export default function Nav({ path, nav }: Props) {
     void (async () => {
       try {
         if (off.length > 0) await api.setHidden({ repos: off, hidden: true });
-        if (on.length > 0) await api.setHidden({ repos: on, hidden: false });
+        if (on.length > 0) {
+          await api.setHidden({ repos: on, hidden: false });
+          // Their cache is as old as when they were switched off.
+          const stale = staleRepos(status, on);
+          if (stale.length > 0) void sync(false, stale);
+        }
       } catch (cause) {
         setToggleError(`Switching repositories failed: ${errorMessage(cause)}`);
       } finally {
@@ -125,13 +129,12 @@ export default function Nav({ path, nav }: Props) {
       </div>
       {repos.length > 1 && (
         <div className="border-t border-neutral-100 px-4 py-2">
-          <Toggles
-            label="Repositories"
-            options={repos
-              .map((repo) => ({ value: repo, label: repoShortName(repo) }))
-              .toSorted((a, b) => a.label.localeCompare(b.label))}
-            selected={shown}
+          <RepoChips
+            repos={repos}
+            shown={shown}
+            status={status}
             onChange={setShown}
+            onSync={(repo) => void sync(false, [repo])}
           />
           {toggleError && (
             <ErrorBanner error={toggleError} onDismiss={() => setToggleError(null)} />

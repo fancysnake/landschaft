@@ -23,7 +23,10 @@ export const POST = route(async ({ locals, request }) => {
       throw new ApiError(502, error instanceof Error ? error.message : String(error));
     }
   }
+  const configured = config.load().repos;
+  const unknown = body.repos?.filter((repo) => !configured.includes(repo)) ?? [];
+  if (unknown.length > 0) throw new ApiError(400, `not configured: ${unknown.join(", ")}`);
   // The run ends once /api/version reports `runs >= run`, its failures in `lastError`.
-  void syncer.syncAll(config.load().repos, { full: body.full });
+  void syncer.syncAll(body.repos ?? configured, { full: body.full });
   return json({ status: syncer.status(), run: syncer.currentRun }, 202);
 });

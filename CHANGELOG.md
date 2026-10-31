@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- Repo chips show each repo's sync age (red, with the error on hover, after a failed sync), sync
+  that repo alone with `↻`, and show it as the only repo with `only`; on the only repo shown,
+  `all` turns every repo back on. Switching a repo on syncs it unless it synced within the last
+  minute. `POST /api/sync` takes `repos` to queue just those, and `/api/version` reports each
+  repo's last sync and error in `repos`.
+
 ### Changed
 
 - Repo chips save which repos are off in the config as `hiddenRepos`, shared by every browser;

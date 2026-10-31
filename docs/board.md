@@ -100,6 +100,11 @@ every chip on and, once all are on, `none` turns them off. The choice is saved i
 `hiddenRepos`, so it holds on every board and in every browser. A dashboard with no items in the repositories switched on is
 dimmed in the top bar.
 
+Each chip shows how long ago its repository last synced, in red with the error on hover when the
+last attempt failed. `↻` syncs that repository alone. `only` switches every other repository off;
+on the one repository left, it reads `all` and switches them all back on. Switching a repository
+on syncs it, unless it synced within the last minute.
+
 Text, assignee, label, type, epic and sort live in the query string, so a filtered view is a
 link you can bookmark or send. Empty values count as unset. Type is GitHub's issue type, shown
 on each typed card; the type filter hides PRs and jobs.

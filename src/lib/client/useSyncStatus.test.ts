@@ -5,7 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import type { SyncStatus } from "../pacts/types";
 
 import { api } from "./api";
-import { SYNCED, type SyncController, useSyncStatus } from "./useSyncStatus";
+import { staleRepos, SYNCED, type SyncController, useSyncStatus } from "./useSyncStatus";
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
@@ -82,4 +82,20 @@ test("a refused sync is reported", async () => {
   await act(() => result.current!.sync());
 
   expect(result.current!.error).toBe("Sync failed: 409");
+});
+
+test("a repo is stale once its last sync is a minute old, or when it never synced", () => {
+  const now = Date.parse("2026-05-01T12:00:00Z");
+  const synced = status(1, {
+    repos: {
+      "acme/fresh": { lastSyncAt: "2026-05-01T11:59:30Z", lastError: null },
+      "acme/old": { lastSyncAt: "2026-05-01T11:59:00Z", lastError: null },
+      "acme/failed": { lastSyncAt: null, lastError: "boom" },
+    },
+  });
+  expect(staleRepos(synced, ["acme/fresh", "acme/old", "acme/failed", "acme/new"], now)).toEqual([
+    "acme/old",
+    "acme/failed",
+    "acme/new",
+  ]);
 });

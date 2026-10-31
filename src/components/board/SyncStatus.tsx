@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
-
 import type { SyncStatus as Status } from "../../lib/pacts/types";
 
 import { relativeTime } from "../../lib/client/labels";
+import { useNow } from "../../lib/client/useNow";
 
 interface Props {
   status: Status;
@@ -14,11 +13,7 @@ interface Props {
 }
 
 export function SyncStatus({ status, syncing, error, onSync, onDismissError }: Props) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 15_000);
-    return () => clearInterval(timer);
-  }, []);
+  const now = useNow();
 
   const busy = syncing || status.inFlight.length > 0;
   return (

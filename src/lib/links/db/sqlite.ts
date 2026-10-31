@@ -141,6 +141,14 @@ interface SyncStateRow {
   updated_at: string | null;
 }
 
+const toSyncState = (row: SyncStateRow): SyncState => ({
+  repo: row.repo,
+  lastSyncAt: row.last_sync_at,
+  lastFullSyncAt: row.last_full_sync_at,
+  lastError: row.last_error,
+  updatedAt: row.updated_at,
+});
+
 function placeholders(count: number): string {
   return Array.from({ length: count }, () => "?").join(", ");
 }
@@ -431,14 +439,12 @@ export class Db implements SyncStore, ViewStore {
     const row = this.db.prepare("SELECT * FROM sync_state WHERE repo = ?").get(repo) as
       | SyncStateRow
       | undefined;
-    if (!row) return null;
-    return {
-      repo: row.repo,
-      lastSyncAt: row.last_sync_at,
-      lastFullSyncAt: row.last_full_sync_at,
-      lastError: row.last_error,
-      updatedAt: row.updated_at,
-    };
+    return row ? toSyncState(row) : null;
+  }
+
+  listSyncStates(): SyncState[] {
+    const rows = this.db.prepare("SELECT * FROM sync_state").all() as unknown as SyncStateRow[];
+    return rows.map(toSyncState);
   }
 
   setSyncState(repo: string, patch: Partial<Omit<SyncState, "repo">>): void {

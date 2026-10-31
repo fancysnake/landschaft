@@ -499,6 +499,17 @@ describe("Syncer", () => {
     ).toContain(null);
   });
 
+  it("reports each repo's last sync and error in the status", async () => {
+    const { gh } = fakeGithub([[]]);
+    db.setSyncState("acme/bad", { lastError: "boom" });
+    const syncer = syncerWith(db, gh);
+    await syncer.syncRepo(REPO);
+    expect(syncer.status().repos).toEqual({
+      "acme/bad": { lastSyncAt: null, lastError: "boom" },
+      [REPO]: { lastSyncAt: now.toISOString(), lastError: null },
+    });
+  });
+
   it("aborts when the rate limit is nearly gone and more pages remain", async () => {
     const { gh } = fakeGithub([[toNode(1)], [toNode(2)]], 50);
     const syncer = syncerWith(db, gh);
