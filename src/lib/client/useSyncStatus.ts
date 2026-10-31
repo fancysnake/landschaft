@@ -67,7 +67,8 @@ export function useSyncStatus(): SyncController {
       setError(null);
       try {
         const response = await api.sync(request);
-        awaitedRun.current = response.run;
+        // Responses can land out of order; wait for the newest run any of them joined.
+        awaitedRun.current = Math.max(awaitedRun.current ?? 0, response.run);
         apply(response.status);
       } catch (cause) {
         setError(`Sync failed: ${errorMessage(cause)}`);
