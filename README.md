@@ -138,7 +138,8 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
   epic) show up too.
 - Open **pull requests** are cards like issues.
 - Repo chips in the top bar switch each global repository on or off for every board, saved in
-  the config; a dashboard with no items in the repos switched on is dimmed.
+  the config; a dashboard with no items in the repos switched on is dimmed. Each chip shows its
+  repo's sync age, syncs it alone, and can show it as the only repo.
 - Filters (text, assignee, label, issue type, epic, sort) live in the URL, so a view is a link.
 
 <!-- --8<-- [end:placement] -->

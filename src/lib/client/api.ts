@@ -101,7 +101,7 @@ export const api = {
   unmatched: (filter: string) =>
     request<UnmatchedResponse>(`/api/unmatched?${new URLSearchParams({ filter })}`),
   version: () => request<SyncStatus>("/api/version"),
-  sync: (body: Pick<SyncRequest, "full">) =>
+  sync: (body: Partial<Pick<SyncRequest, "full" | "repos">>) =>
     request<SyncResponse>("/api/sync", { method: "POST", body: JSON.stringify(body) }),
   setEpicStarred: (dashboardId: string, body: StarEpicRequest) =>
     request<{ starredEpics: string[] }>(

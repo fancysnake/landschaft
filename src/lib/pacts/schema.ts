@@ -461,7 +461,8 @@ export const HiddenReposRequestSchema = z.object({
 export type HiddenReposRequest = z.infer<typeof HiddenReposRequestSchema>;
 
 export const SyncRequestSchema = z.object({
-  repo: repoName.optional(),
+  /** What a sync-all queues instead of every configured repo. */
+  repos: z.array(repoName).optional(),
   full: z.boolean().default(false),
 });
 export type SyncRequest = z.infer<typeof SyncRequestSchema>;

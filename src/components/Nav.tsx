@@ -3,10 +3,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { NavData } from "../lib/pacts/types";
 
 import { api, CONFIG_SAVED, errorMessage } from "../lib/client/api";
-import { repoShortName } from "../lib/client/labels";
 import { SYNCED, useSyncStatus } from "../lib/client/useSyncStatus";
+import { RepoChips } from "./board/RepoChips";
 import { SyncStatus } from "./board/SyncStatus";
-import { Toggles } from "./board/Toggles";
 import { ErrorBanner } from "./ErrorBanner";
 
 interface Props {
@@ -114,7 +113,7 @@ export default function Nav({ path, nav }: Props) {
               status={status}
               syncing={syncing}
               error={error}
-              onSync={(full) => void sync(full)}
+              onSync={(full) => void sync({ full })}
               onDismissError={dismissError}
             />
           )}
@@ -125,13 +124,12 @@ export default function Nav({ path, nav }: Props) {
       </div>
       {repos.length > 1 && (
         <div className="border-t border-neutral-100 px-4 py-2">
-          <Toggles
-            label="Repositories"
-            options={repos
-              .map((repo) => ({ value: repo, label: repoShortName(repo) }))
-              .toSorted((a, b) => a.label.localeCompare(b.label))}
-            selected={shown}
+          <RepoChips
+            repos={repos}
+            shown={shown}
+            status={status}
             onChange={setShown}
+            onSync={(repo) => void sync({ repos: [repo] })}
           />
           {toggleError && (
             <ErrorBanner error={toggleError} onDismiss={() => setToggleError(null)} />
