@@ -488,9 +488,10 @@ describe("Syncer", () => {
     const second = syncer.syncAll(["acme/other"], { full: true });
     expect(second).toBe(first);
     expect(syncer.currentRun).toBe(1);
+    expect(syncer.status()).toMatchObject({ inFlight: [REPO], queued: ["acme/other"] });
     gate.resolve(undefined);
     await second;
-    expect(syncer.status().runs).toBe(1);
+    expect(syncer.status()).toMatchObject({ runs: 1, inFlight: [], queued: [] });
     expect(syncer.currentRun).toBe(2);
     expect(
       pageCalls(calls)

@@ -14,7 +14,7 @@ localhost only. Errors are `{ "error": "message" }` with a matching status.
 | `POST /api/sync`                | `{ "repos"?, "full"? }`; see [Sync](#sync)                              |
 | `GET /api/version`              | Sync status per repository plus rate-limit budget                       |
 | `GET /api/labels?repos=a/b,c/d` | Cached label catalogue for the pickers                                  |
-| `GET /api/nav`                  | Nav tabs, each with its repos, plus the global and hidden repos         |
+| `GET /api/nav`                  | Nav tabs with their repos, global and hidden repos, refresh interval    |
 
 ## Board
 
@@ -48,5 +48,6 @@ repositories off on every view (`false` switches them back on) and returns the c
 never `409`; a repository that is not configured is refused with `400`. `"full": true` refetches
 every open issue instead of only those changed since the last sync. A call during a running
 sync-all joins that run and adds its repositories to it. Follow progress by polling
-`GET /api/version`: a repository is busy while it is in `inFlight`, the run is done once `runs`
+`GET /api/version`: a repository is waiting while it is in `queued` and busy while it is in
+`inFlight`, the run is done once `runs`
 reaches `run`, and its failures land in `lastError`.

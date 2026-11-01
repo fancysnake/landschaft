@@ -17,8 +17,8 @@ everything the token does. Two kinds of pass:
   `closedDays` grows past the longest, and on demand from the full resync button in the top bar.
 
 The top bar shows the sync status on every page, with the remaining rate-limit budget and the
-Refresh and full resync buttons. It polls `/api/version`, and an open board reloads itself when a
-sync has landed.
+Refresh and full resync buttons. Both sync only the repositories switched on, and are disabled
+when none is. It polls `/api/version`, and an open board reloads itself when a sync has landed.
 
 ## Epics
 
@@ -100,9 +100,14 @@ every chip on and, once all are on, `none` turns them off. The choice is saved i
 `hiddenRepos`, so it holds on every board and in every browser. A dashboard with no items in the repositories switched on is
 dimmed in the top bar.
 
-Each chip shows how long ago its repository last synced, in red with the error on hover when the
-last attempt failed. `↻` syncs that repository alone. `only` switches every other repository off,
-and is gone from the one repository left.
+A chip's dot is filled when its repository is on and a ring when off. Its colour says how fresh
+the last sync is, counted in refresh intervals: green within two, amber within six, orange after
+that or never synced, red when the last sync failed (the error is in the arrow's tooltip). It is
+a sky-blue ring while the repository waits its turn and pulses sky blue while it syncs. Hovering or focusing a chip shows three buttons over its name: the eye
+switches the repository on or off, the arrow syncs it alone (its tooltip says how long ago it
+last synced), and the frame switches every other repository off. On the one repository left the
+frame is pressed; pressing it again switches back on the repositories that were on before, or
+all of them once the page has been reloaded.
 
 Text, assignee, label, type, epic and sort live in the query string, so a filtered view is a
 link you can bookmark or send. Empty values count as unset. Type is GitHub's issue type, shown

@@ -66,6 +66,7 @@ export class Syncer implements SyncService {
       lastError: this.lastError,
       rateRemaining: this.rateRemaining,
       inFlight: [...this.inFlight],
+      queued: [...this.queue.keys()],
       repos: Object.fromEntries(
         this.db
           .listSyncStates()
