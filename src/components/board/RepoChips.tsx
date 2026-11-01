@@ -3,6 +3,14 @@ import type { SyncStatus } from "../../lib/pacts/types";
 import { relativeTime, repoShortName } from "../../lib/client/labels";
 import { useNow } from "../../lib/client/useNow";
 
+type SyncPhase = "idle" | "syncing" | "queued";
+
+const SYNC_PHASE: Record<SyncPhase, { label(repo: string): string; icon: string }> = {
+  idle: { label: (repo) => `Sync ${repo}`, icon: "" },
+  syncing: { label: (repo) => `Syncing ${repo}`, icon: "motion-safe:animate-spin text-sky-600" },
+  queued: { label: (repo) => `${repo} is queued`, icon: "motion-safe:animate-pulse" },
+};
+
 interface Props {
   repos: string[];
   shown: string[];
@@ -26,8 +34,12 @@ export function RepoChips({ repos, shown, status, onChange, onSync }: Props) {
         const on = shown.includes(repo);
         const alone = on && shown.length === 1;
         const sync = status?.repos[repo];
-        const busy = Boolean(status?.inFlight.includes(repo));
-        const queued = Boolean(status?.queued.includes(repo));
+        const phase: SyncPhase = status?.inFlight.includes(repo)
+          ? "syncing"
+          : status?.queued.includes(repo)
+            ? "queued"
+            : "idle";
+        const syncLabel = SYNC_PHASE[phase].label(repo);
         return (
           <div
             key={repo}
@@ -54,19 +66,15 @@ export function RepoChips({ repos, shown, status, onChange, onSync }: Props) {
             </button>
             <button
               type="button"
-              disabled={busy || queued}
-              aria-label={`Sync ${repo}`}
-              title={busy ? `Syncing ${repo}` : queued ? `${repo} is queued` : `Sync ${repo}`}
+              disabled={phase !== "idle"}
+              aria-label={syncLabel}
+              title={syncLabel}
               onClick={() => onSync(repo)}
               className={`pl-1.5 text-neutral-500 hover:text-neutral-900 disabled:text-neutral-300 ${
                 alone ? "rounded-r-full pr-3" : "pr-1.5"
               }`}
             >
-              <span
-                className={`inline-block ${busy ? "animate-spin text-sky-600" : queued ? "animate-pulse" : ""}`}
-              >
-                ↻
-              </span>
+              <span className={`inline-block ${SYNC_PHASE[phase].icon}`}>↻</span>
             </button>
             {!alone && (
               <button

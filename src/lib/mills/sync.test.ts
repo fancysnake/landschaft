@@ -469,24 +469,6 @@ describe("Syncer", () => {
     expect(syncer.status()).toMatchObject({ runs: 1, lastError: "acme/bad: boom" });
   });
 
-  it("lists the repos a sync-all has yet to reach as queued", async () => {
-    const gate = deferred();
-    const { gh: real } = fakeGithub([[]]);
-    const gh: GithubClient = {
-      gql: async <T>(query: string, variables: Record<string, unknown>): Promise<T> => {
-        await gate.promise;
-        return real.gql<T>(query, variables);
-      },
-    };
-    const syncer = syncerWith(db, gh);
-    const run = syncer.syncAll([REPO, "acme/other"]);
-    await vi.waitFor(() => expect(syncer.inFlight.has(REPO)).toBe(true));
-    expect(syncer.status()).toMatchObject({ inFlight: [REPO], queued: ["acme/other"] });
-    gate.resolve(undefined);
-    await run;
-    expect(syncer.status()).toMatchObject({ inFlight: [], queued: [] });
-  });
-
   it("adds a sync-all's repos to the running one, keeping their full flag", async () => {
     const gate = deferred();
     const { gh: real, calls } = fakeGithub([[]]);
@@ -506,9 +488,10 @@ describe("Syncer", () => {
     const second = syncer.syncAll(["acme/other"], { full: true });
     expect(second).toBe(first);
     expect(syncer.currentRun).toBe(1);
+    expect(syncer.status()).toMatchObject({ inFlight: [REPO], queued: ["acme/other"] });
     gate.resolve(undefined);
     await second;
-    expect(syncer.status().runs).toBe(1);
+    expect(syncer.status()).toMatchObject({ runs: 1, inFlight: [], queued: [] });
     expect(syncer.currentRun).toBe(2);
     expect(
       pageCalls(calls)

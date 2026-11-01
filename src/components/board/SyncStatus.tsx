@@ -22,7 +22,11 @@ export function SyncStatus({ status, syncing, allOff, error, onSync, onDismissEr
     <div className="flex items-center gap-2 text-sm text-neutral-600">
       <span
         className={`inline-block h-2 w-2 rounded-full ${
-          busy ? "animate-pulse bg-sky-500" : status.lastError ? "bg-red-500" : "bg-emerald-500"
+          busy
+            ? "bg-sky-500 motion-safe:animate-pulse"
+            : status.lastError
+              ? "bg-red-500"
+              : "bg-emerald-500"
         }`}
       />
       <span title={status.lastError ?? undefined}>
