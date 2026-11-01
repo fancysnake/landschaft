@@ -221,6 +221,8 @@ export interface SyncStatus {
   lastError: string | null;
   rateRemaining: number | null;
   inFlight: string[];
+  /** Repos the running sync-all has yet to reach. */
+  queued: string[];
   /** Each repo with a sync state: its last successful sync, and its last attempt's error. */
   repos: Record<string, Pick<SyncState, "lastSyncAt" | "lastError">>;
   /** Login the token belongs to; what `@me` in a dashboard's users stands for. */

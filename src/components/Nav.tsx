@@ -112,8 +112,9 @@ export default function Nav({ path, nav }: Props) {
             <SyncStatus
               status={status}
               syncing={syncing}
+              allOff={shown.length === 0}
               error={error}
-              onSync={(full) => void sync({ full })}
+              onSync={(full) => void sync({ full, repos: shown })}
               onDismissError={dismissError}
             />
           )}

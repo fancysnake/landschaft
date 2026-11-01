@@ -17,8 +17,8 @@ everything the token does. Two kinds of pass:
   `closedDays` grows past the longest, and on demand from the full resync button in the top bar.
 
 The top bar shows the sync status on every page, with the remaining rate-limit budget and the
-Refresh and full resync buttons. It polls `/api/version`, and an open board reloads itself when a
-sync has landed.
+Refresh and full resync buttons. Both sync only the repositories switched on, and are disabled
+when none is. It polls `/api/version`, and an open board reloads itself when a sync has landed.
 
 ## Epics
 
@@ -101,7 +101,8 @@ every chip on and, once all are on, `none` turns them off. The choice is saved i
 dimmed in the top bar.
 
 Each chip shows how long ago its repository last synced, in red with the error on hover when the
-last attempt failed. `↻` syncs that repository alone. `only` switches every other repository off,
+last attempt failed. `↻` syncs that repository alone; it pulses while the repository waits its
+turn and spins while it syncs. `only` switches every other repository off,
 and is gone from the one repository left.
 
 Text, assignee, label, type, epic and sort live in the query string, so a filtered view is a

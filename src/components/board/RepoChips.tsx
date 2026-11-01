@@ -27,6 +27,7 @@ export function RepoChips({ repos, shown, status, onChange, onSync }: Props) {
         const alone = on && shown.length === 1;
         const sync = status?.repos[repo];
         const busy = Boolean(status?.inFlight.includes(repo));
+        const queued = Boolean(status?.queued.includes(repo));
         return (
           <div
             key={repo}
@@ -53,15 +54,19 @@ export function RepoChips({ repos, shown, status, onChange, onSync }: Props) {
             </button>
             <button
               type="button"
-              disabled={busy}
+              disabled={busy || queued}
               aria-label={`Sync ${repo}`}
-              title={`Sync ${repo}`}
+              title={busy ? `Syncing ${repo}` : queued ? `${repo} is queued` : `Sync ${repo}`}
               onClick={() => onSync(repo)}
               className={`pl-1.5 text-neutral-500 hover:text-neutral-900 disabled:text-neutral-300 ${
                 alone ? "rounded-r-full pr-3" : "pr-1.5"
-              } ${busy ? "animate-pulse" : ""}`}
+              }`}
             >
-              ↻
+              <span
+                className={`inline-block ${busy ? "animate-spin text-sky-600" : queued ? "animate-pulse" : ""}`}
+              >
+                ↻
+              </span>
             </button>
             {!alone && (
               <button

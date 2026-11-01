@@ -25,6 +25,7 @@ function views(extra: { hiddenRepos?: string[] } = {}, issues: Issue[] = []) {
       lastError: null,
       rateRemaining: null,
       inFlight: [],
+      queued: [],
       repos: {},
       viewer: null,
     }),
