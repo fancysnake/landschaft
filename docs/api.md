@@ -14,7 +14,7 @@ localhost only. Errors are `{ "error": "message" }` with a matching status.
 | `POST /api/sync`                | `{ "repos"?, "full"? }`; see [Sync](#sync)                              |
 | `GET /api/version`              | Sync status per repository plus rate-limit budget                       |
 | `GET /api/labels?repos=a/b,c/d` | Cached label catalogue for the pickers                                  |
-| `GET /api/nav`                  | Nav tabs, each with its repos, plus the global and hidden repos         |
+| `GET /api/nav`                  | Nav tabs with their repos, global and hidden repos, refresh interval    |
 
 ## Board
 

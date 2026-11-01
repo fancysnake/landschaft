@@ -21,6 +21,18 @@ export function relativeTime(iso: string | null, now = Date.now()): string {
   return `${Math.round(hours / 24)} d ago`;
 }
 
+export type SyncAge = "fresh" | "late" | "stale";
+
+/**
+ * Fresh within two refresh intervals (the scheduler and a sequential run add delay), late within
+ * six, stale after that or never synced.
+ */
+export function syncAge(iso: string | null, refreshMinutes: number, now = Date.now()): SyncAge {
+  if (!iso) return "stale";
+  const intervals = (now - Date.parse(iso)) / (refreshMinutes * 60_000);
+  return intervals <= 2 ? "fresh" : intervals <= 6 ? "late" : "stale";
+}
+
 export function repoShortName(repo: string): string {
   return repo.split("/")[1] ?? repo;
 }

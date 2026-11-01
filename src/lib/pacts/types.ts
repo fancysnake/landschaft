@@ -237,4 +237,5 @@ export interface NavData {
   repos: string[];
   /** Those of `repos` switched off. */
   hidden: string[];
+  refreshMinutes: number;
 }
