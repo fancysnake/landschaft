@@ -52,8 +52,9 @@ export function route(
       return await handler(context);
     } catch (error) {
       if (error instanceof ApiError) return json({ error: error.message }, error.status);
-      const expected = errors.find(([kind]) => error instanceof kind);
-      if (expected && error instanceof Error) return json({ error: error.message }, expected[1]);
+      for (const [kind, status] of errors) {
+        if (error instanceof kind) return json({ error: error.message }, status);
+      }
       if (error instanceof ZodError) {
         return json({ error: "validation failed", issues: error.issues }, 400);
       }

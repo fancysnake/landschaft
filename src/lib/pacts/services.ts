@@ -55,14 +55,13 @@ export interface SyncService {
   /** Adds `repos` to the running sync-all, or starts one; resolves when it ends. Never rejects. */
   syncAll(repos: string[], options?: SyncOptions): Promise<void>;
   /**
-   * Queues `repos`, or every configured repo, onto a sync-all without waiting for it. Throws
-   * `InvalidError` for a repo outside the config.
+   * Queues `repos`, or every configured repo, onto a sync-all without waiting for it, and returns
+   * that run's number; it ends once `runs` reaches it. Throws `InvalidError` for a repo outside
+   * the config.
    */
-  start(repos?: string[], options?: SyncOptions): void;
+  start(repos?: string[], options?: SyncOptions): number;
   /** Syncs the configured repos whose last sync is older than the refresh interval. Never rejects. */
   syncDue(): Promise<void>;
-  /** The sync-all run a `syncAll` call starts or joins now; it ends once `runs` reaches it. */
-  readonly currentRun: number;
 }
 
 export interface ViewService {

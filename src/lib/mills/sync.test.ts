@@ -9,7 +9,7 @@ import { Db } from "../links/db/sqlite";
 import { GithubForge } from "../links/forge/github/forge";
 import { ConfigSchema } from "../pacts/config";
 import { InvalidError, SyncBusyError } from "../pacts/services";
-import { type SyncDeps, Syncer } from "./sync";
+import { closedSince, type SyncDeps, Syncer } from "./sync";
 
 function toNode(number: number, state: "OPEN" | "CLOSED" = "OPEN"): IssueNode {
   const issue = makeIssue({ number, state });
@@ -336,7 +336,7 @@ describe("Syncer", () => {
     expect(statusCalls(calls)).toHaveLength(1);
     const flagged = db.listIssues([REPO]).filter((issue) => issue.statuses.length > 0);
     expect(flagged).toHaveLength(50);
-    expect(syncer.rateRemaining).toBe(50);
+    expect(syncer.status().rateRemaining).toBe(50);
   });
 
   it("reads jobs of the red and default branches alone and replaces the cached ones", async () => {
@@ -491,16 +491,17 @@ describe("Syncer", () => {
       lastSyncAt: "2026-05-01T11:00:00.000Z",
       lastFullSyncAt: "2026-05-01T11:00:00.000Z",
     });
-    const syncer = syncerWith(db, gh);
+    const syncer = syncerWith(db, gh, {
+      config: () => ConfigSchema.parse({ repos: [REPO, "acme/other"] }),
+    });
     const first = syncer.syncAll([REPO]);
     await vi.waitFor(() => expect(syncer.status().inFlight).toContain(REPO));
-    const second = syncer.syncAll(["acme/other"], { full: true });
-    expect(second).toBe(first);
-    expect(syncer.currentRun).toBe(1);
+    expect(syncer.start(["acme/other"], { full: true })).toBe(1);
     gate.resolve(undefined);
-    await second;
+    await first;
     expect(syncer.status().runs).toBe(1);
-    expect(syncer.currentRun).toBe(2);
+    expect(syncer.start([])).toBe(2);
+    await syncer.syncAll([]);
     expect(
       pageCalls(calls)
         .filter((c) => c.variables.name === "other")
@@ -577,6 +578,33 @@ describe("Syncer.syncDue", () => {
     expect(syncAll).not.toHaveBeenCalled();
     expect(syncer.status().lastError).toBe("config: bad json");
     db.close();
+  });
+
+  it("records a sync state that fails to load and syncs nothing", async () => {
+    const db = new Db(":memory:");
+    const syncer = syncerWith(db, fakeGithub([]).gh);
+    vi.spyOn(db, "getSyncState").mockImplementation(() => {
+      throw new Error("disk I/O error");
+    });
+    const syncAll = vi.spyOn(syncer, "syncAll");
+
+    await syncer.syncDue();
+
+    expect(syncAll).not.toHaveBeenCalled();
+    expect(syncer.status().lastError).toBe("due repos: disk I/O error");
+    db.close();
+  });
+});
+
+describe("closedSince", () => {
+  const at = new Date("2026-05-10T00:00:00Z");
+
+  it("goes back the window's days from now", () => {
+    expect(closedSince(7, at)).toBe(Date.parse("2026-05-03T00:00:00Z"));
+  });
+
+  it("keeps nothing closed for an empty window", () => {
+    expect(closedSince(0, at)).toBe(Number.POSITIVE_INFINITY);
   });
 });
 

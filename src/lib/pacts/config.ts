@@ -428,12 +428,6 @@ export function findDashboard(config: Config, dashboardId: string): Dashboard | 
   return config.dashboards.find((dashboard) => dashboard.id === dashboardId);
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** The earliest close time, in ms, a window of `days` back from `now` keeps; Infinity for 0. */
-export const closedSince = (days: number, now: Date): number =>
-  days > 0 ? now.getTime() - days * DAY_MS : Number.POSITIVE_INFINITY;
-
 /** Where the config is kept; `save` validates before it writes. */
 export interface ConfigStore {
   load(): Config;

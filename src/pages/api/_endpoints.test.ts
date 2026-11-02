@@ -17,7 +17,7 @@ import { POST as hiddenRepos } from "./hidden-repos";
 import { POST as sync } from "./sync";
 
 let db: Db;
-let services: Services & { sync: Syncer };
+let services: Services;
 
 beforeEach(() => {
   db = new Db(":memory:");

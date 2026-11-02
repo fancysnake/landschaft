@@ -1,6 +1,5 @@
 import {
   type BoardDashboard,
-  closedSince,
   type Dashboard,
   type InboxDashboard,
   OTHER_LOOKS_AT,
@@ -36,6 +35,7 @@ import {
   type Inbox,
   type UnmatchedQuery,
 } from "../pacts/views";
+import { closedSince } from "./sync";
 
 /** A swimlane or column with its filter parsed; a null `node` matches everything. */
 export interface Group {

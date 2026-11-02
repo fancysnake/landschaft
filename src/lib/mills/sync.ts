@@ -1,8 +1,8 @@
+import type { Config, Dashboard } from "../pacts/config";
 import type { SyncStore } from "../pacts/db";
 import type { CiJob } from "../pacts/issues";
 import type { SyncStatus } from "../pacts/sync";
 
-import { closedSince, type Config, type Dashboard } from "../pacts/config";
 import {
   CI_BATCH,
   type CiBranch,
@@ -31,19 +31,25 @@ export interface SyncDeps {
 export const closedDays = (config: { dashboards: Pick<Dashboard, "closedDays">[] }): number =>
   Math.max(0, ...config.dashboards.map((dashboard) => dashboard.closedDays));
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** The earliest close time, in ms, a window of `days` back from `now` keeps; Infinity for 0. */
+export const closedSince = (days: number, now: Date): number =>
+  days > 0 ? now.getTime() - days * DAY_MS : Number.POSITIVE_INFINITY;
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
 export class Syncer implements SyncService {
-  version = 0;
+  private version = 0;
   /** Sync-all runs finished. */
-  runs = 0;
-  lastSyncAt: string | null = null;
+  private runs = 0;
+  private lastSyncAt: string | null = null;
   /** Written by sync-all runs alone; a repo's own error stays in its sync state. */
   private lastError: string | null = null;
-  rateRemaining: number | null = null;
-  viewerLogin: string | null = null;
+  private rateRemaining: number | null = null;
+  private viewerLogin: string | null = null;
   private readonly inFlight = new Set<string>();
   private readonly db: SyncStore;
   private readonly forge: Forge;
@@ -107,11 +113,13 @@ export class Syncer implements SyncService {
     return this.running;
   }
 
-  start(repos?: string[], options: SyncOptions = {}): void {
+  start(repos?: string[], options: SyncOptions = {}): number {
     const configured = this.config().repos;
     const unknown = repos?.filter((repo) => !configured.includes(repo)) ?? [];
     if (unknown.length > 0) throw new InvalidError(`not configured: ${unknown.join(", ")}`);
+    const run = this.runs + 1;
     void this.syncAll(repos ?? configured, options);
+    return run;
   }
 
   async syncDue(): Promise<void> {
@@ -122,18 +130,19 @@ export class Syncer implements SyncService {
       this.lastError = `config: ${errorMessage(error)}`;
       return;
     }
-    const now = this.now().getTime();
-    const due = config.repos.filter((repo) => {
-      if (this.inFlight.has(repo)) return false;
-      const lastSyncAt = this.db.getSyncState(repo)?.lastSyncAt;
-      return !lastSyncAt || now - Date.parse(lastSyncAt) >= config.refreshMinutes * 60_000;
-    });
+    let due: string[];
+    try {
+      const now = this.now().getTime();
+      due = config.repos.filter((repo) => {
+        if (this.inFlight.has(repo)) return false;
+        const lastSyncAt = this.db.getSyncState(repo)?.lastSyncAt;
+        return !lastSyncAt || now - Date.parse(lastSyncAt) >= config.refreshMinutes * 60_000;
+      });
+    } catch (error) {
+      this.lastError = `due repos: ${errorMessage(error)}`;
+      return;
+    }
     if (due.length > 0) await this.syncAll(due);
-  }
-
-  /** The sync-all run a `syncAll` call starts or joins now; it ends once `runs` reaches it. */
-  get currentRun(): number {
-    return this.runs + 1;
   }
 
   private async drainQueue(): Promise<void> {

@@ -15,9 +15,9 @@ export const POST = route(
     }
     const { repos, full } = SyncRequestSchema.parse(raw);
     const { sync } = locals.services;
-    sync.start(repos, { full });
+    const run = sync.start(repos, { full });
     // The run ends once /api/version reports `runs >= run`, its failures in `lastError`.
-    return json({ status: sync.status(), run: sync.currentRun }, 202);
+    return json({ status: sync.status(), run }, 202);
   },
   [[InvalidError, 400]],
 );
