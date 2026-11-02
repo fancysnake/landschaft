@@ -2,29 +2,27 @@ import { type ReactNode, useState } from "react";
 
 import type { SyncStatus } from "../../lib/pacts/types";
 
-import { relativeTime, repoShortName, type SyncAge, syncAge } from "../../lib/client/labels";
+import {
+  repoShortName,
+  type RepoSyncView,
+  repoSyncView,
+  type SyncTone,
+} from "../../lib/client/labels";
 import { useNow } from "../../lib/client/useNow";
 
-type SyncPhase = "idle" | "syncing" | "queued";
-
-const SYNC_LABEL: Record<SyncPhase, (repo: string) => string> = {
-  idle: (repo) => `Sync ${repo}`,
-  syncing: (repo) => `Syncing ${repo}`,
-  queued: (repo) => `${repo} is queued`,
-};
-
-const AGE_DOT: Record<SyncAge, { fill: string; ring: string }> = {
+const DOT: Record<SyncTone, { fill: string; ring: string }> = {
+  syncing: { fill: "bg-sky-500 motion-safe:animate-pulse", ring: "ring-sky-500" },
+  queued: { fill: "bg-sky-500", ring: "ring-sky-500" },
+  failed: { fill: "bg-red-500", ring: "ring-red-500" },
   fresh: { fill: "bg-emerald-500", ring: "ring-emerald-500" },
   late: { fill: "bg-amber-400", ring: "ring-amber-400" },
   stale: { fill: "bg-orange-600", ring: "ring-orange-600" },
 };
 
-/** Filled when the repo is on, a ring when off; the colour says how fresh its sync is. */
-function dotClass(phase: SyncPhase, age: SyncAge, on: boolean, failed: boolean): string {
-  if (phase === "syncing") return "bg-sky-500 motion-safe:animate-pulse";
-  if (phase === "queued") return "ring-[1.5px] ring-sky-500 ring-inset";
-  if (failed) return on ? "bg-red-500" : "ring-[1.5px] ring-red-500 ring-inset";
-  return on ? AGE_DOT[age].fill : `ring-[1.5px] ring-inset ${AGE_DOT[age].ring}`;
+/** Filled when the repo is on, a ring when off; always filled syncing, always a ring queued. */
+function dotClass(tone: SyncTone, on: boolean): string {
+  const filled = tone === "syncing" || (tone !== "queued" && on);
+  return filled ? DOT[tone].fill : `ring-[1.5px] ring-inset ${DOT[tone].ring}`;
 }
 
 /** Lucide icon paths (ISC), inlined: three icons do not earn a dependency. */
@@ -78,6 +76,65 @@ const FOCUS = (
 const ACTION =
   "grid size-5 place-items-center rounded-full hover:bg-white hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-sky-600 disabled:text-neutral-300 disabled:hover:bg-transparent";
 
+interface ChipProps {
+  repo: string;
+  on: boolean;
+  alone: boolean;
+  view: RepoSyncView;
+  onToggle(): void;
+  onSync(): void;
+  onOnly(): void;
+}
+
+function RepoChip({ repo, on, alone, view, onToggle, onSync, onOnly }: ChipProps) {
+  return (
+    <div
+      className={`group relative flex h-5.5 min-w-19 items-center justify-center rounded-full border px-2 text-xs ${
+        on
+          ? "border-neutral-300 bg-neutral-100 text-neutral-900"
+          : "border-neutral-200 bg-white text-neutral-400"
+      }`}
+    >
+      <span className="flex items-center gap-1.5 transition duration-150 group-focus-within:opacity-30 group-focus-within:blur-[1.5px] group-hover:opacity-30 group-hover:blur-[1.5px] motion-reduce:transition-none">
+        <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${dotClass(view.tone, on)}`} />
+        {repoShortName(repo)}
+      </span>
+      <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 motion-reduce:transition-none">
+        <button
+          type="button"
+          aria-pressed={on}
+          aria-label={repo}
+          title={on ? `Hide ${repo}` : `Show ${repo}`}
+          onClick={onToggle}
+          className={`${ACTION} text-neutral-700`}
+        >
+          <Icon>{on ? EYE_OFF : EYE}</Icon>
+        </button>
+        <button
+          type="button"
+          disabled={view.phase !== "idle"}
+          aria-label={view.label}
+          title={view.label}
+          onClick={onSync}
+          className={`${ACTION} ${view.failed ? "text-red-700" : "text-neutral-700"}`}
+        >
+          <Icon>{ROTATE}</Icon>
+        </button>
+        <button
+          type="button"
+          aria-pressed={alone}
+          aria-label={`Show only ${repo}`}
+          title={alone ? "Show the repos from before" : `Show only ${repo}`}
+          onClick={onOnly}
+          className={`${ACTION} ${alone ? "bg-white text-sky-700" : "text-neutral-700"}`}
+        >
+          <Icon>{FOCUS}</Icon>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 interface Props {
   repos: string[];
   shown: string[];
@@ -97,77 +154,29 @@ export function RepoChips({ repos, shown, status, refreshMinutes, onChange, onSy
   const [beforeOnly, setBeforeOnly] = useState<string[]>([]);
   const allOn = repos.every((repo) => shown.includes(repo));
   const sorted = repos.toSorted((a, b) => repoShortName(a).localeCompare(repoShortName(b)));
+  const isAlone = (repo: string) => shown.length === 1 && shown[0] === repo;
+
+  function toggleOnly(repo: string) {
+    if (isAlone(repo)) return onChange(beforeOnly.length > 0 ? beforeOnly : repos);
+    setBeforeOnly(shown);
+    onChange([repo]);
+  }
 
   return (
     <div role="group" aria-label="Repositories" className="flex flex-wrap items-center gap-1">
       {sorted.map((repo) => {
         const on = shown.includes(repo);
-        const alone = on && shown.length === 1;
-        const sync = status?.repos[repo];
-        const failed = Boolean(sync?.lastError);
-        const age = syncAge(sync?.lastSyncAt ?? null, refreshMinutes, now);
-        const phase: SyncPhase = status?.inFlight.includes(repo)
-          ? "syncing"
-          : status?.queued.includes(repo)
-            ? "queued"
-            : "idle";
-        const synced = failed
-          ? `last sync failed: ${sync?.lastError}`
-          : `synced ${relativeTime(sync?.lastSyncAt ?? null, now)}`;
-        const syncLabel = `${SYNC_LABEL[phase](repo)} (${synced})`;
         return (
-          <div
+          <RepoChip
             key={repo}
-            className={`group relative flex h-5.5 min-w-19 items-center justify-center rounded-full border px-2 text-xs ${
-              on
-                ? "border-neutral-300 bg-neutral-100 text-neutral-900"
-                : "border-neutral-200 bg-white text-neutral-400"
-            }`}
-          >
-            <span className="flex items-center gap-1.5 transition duration-150 group-focus-within:opacity-30 group-focus-within:blur-[1.5px] group-hover:opacity-30 group-hover:blur-[1.5px] motion-reduce:transition-none">
-              <span
-                aria-hidden
-                className={`size-1.5 shrink-0 rounded-full ${dotClass(phase, age, on, failed)}`}
-              />
-              {repoShortName(repo)}
-            </span>
-            <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 motion-reduce:transition-none">
-              <button
-                type="button"
-                aria-pressed={on}
-                aria-label={repo}
-                title={on ? `Hide ${repo}` : `Show ${repo}`}
-                onClick={() => onChange(on ? shown.filter((r) => r !== repo) : [...shown, repo])}
-                className={`${ACTION} text-neutral-700`}
-              >
-                <Icon>{on ? EYE_OFF : EYE}</Icon>
-              </button>
-              <button
-                type="button"
-                disabled={phase !== "idle"}
-                aria-label={syncLabel}
-                title={syncLabel}
-                onClick={() => onSync(repo)}
-                className={`${ACTION} ${failed ? "text-red-700" : "text-neutral-700"}`}
-              >
-                <Icon>{ROTATE}</Icon>
-              </button>
-              <button
-                type="button"
-                aria-pressed={alone}
-                aria-label={`Show only ${repo}`}
-                title={alone ? "Show the repos from before" : `Show only ${repo}`}
-                onClick={() => {
-                  if (alone) return onChange(beforeOnly.length > 1 ? beforeOnly : repos);
-                  setBeforeOnly(shown);
-                  onChange([repo]);
-                }}
-                className={`${ACTION} ${alone ? "bg-white text-sky-700" : "text-neutral-700"}`}
-              >
-                <Icon>{FOCUS}</Icon>
-              </button>
-            </div>
-          </div>
+            repo={repo}
+            on={on}
+            alone={isAlone(repo)}
+            view={repoSyncView(repo, status, refreshMinutes, now)}
+            onToggle={() => onChange(on ? shown.filter((r) => r !== repo) : [...shown, repo])}
+            onSync={() => onSync(repo)}
+            onOnly={() => toggleOnly(repo)}
+          />
         );
       })}
       <button

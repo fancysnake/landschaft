@@ -212,6 +212,11 @@ export interface SyncState {
   updatedAt: string | null;
 }
 
+/** Refresh intervals elapsed since `lastSyncAt`. */
+export function syncIntervals(lastSyncAt: string, refreshMinutes: number, now: number): number {
+  return (now - Date.parse(lastSyncAt)) / (refreshMinutes * 60_000);
+}
+
 export interface SyncStatus {
   version: number;
   /** Sync-all runs finished since the server started. */

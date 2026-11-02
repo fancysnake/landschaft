@@ -1,5 +1,4 @@
 import type { SyncStore } from "../pacts/db";
-import type { CiJob, SyncStatus } from "../pacts/types";
 
 import {
   type CiBranch,
@@ -15,6 +14,7 @@ import {
   type SyncResult,
   type SyncService,
 } from "../pacts/services";
+import { type CiJob, type SyncStatus, syncIntervals } from "../pacts/types";
 
 const FULL_SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const SINCE_OVERLAP_MS = 2 * 60 * 1000;
@@ -289,7 +289,7 @@ export function startScheduler(
       const state = syncer.db.getSyncState(repo);
       return (
         !state?.lastSyncAt ||
-        Date.now() - Date.parse(state.lastSyncAt) >= config.refreshMinutes * 60_000
+        syncIntervals(state.lastSyncAt, config.refreshMinutes, Date.now()) >= 1
       );
     });
     if (due.length > 0) await syncer.syncAll(due);
