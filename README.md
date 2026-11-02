@@ -3,7 +3,7 @@
 <!-- --8<-- [start:what] -->
 
 Local kanban dashboards over GitHub issues. _Landschaft_ is German for "landscape": the point
-is to see the whole terrain of a project at once, spot what is next and how far each epic has
+is to see the whole terrain of a project at once, spot what is next and how far each issue has
 come, without paying for GitHub Projects.
 
 <!-- --8<-- [end:what] -->
@@ -108,7 +108,7 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
 - Terms:
   - `label:`, `repo:`, `author:`, `assignee:` and `user:` (author or assignee), where `@me` is
     the account behind the token.
-  - `is:issue`, `is:pr`, `is:blocked` (has an open blocker), `is:blocking` (blocks an open
+  - `is:issue`, `is:pr`, `is:blocked` (has an open blocker or parent issue), `is:blocking` (blocks an open
     issue), `is:closed` (closed or merged; see the dashboard's `closedDays`).
   - `has:parent-issue`, `has:sub-issues`, `parent-issue:owner/repo#12`.
   - PR statuses from GitHub: `is:conflicting` (merge conflicts), `is:ci:failed` (the last
@@ -127,20 +127,17 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
   not. Issues that fit no lane or no column are left off the board.
 - **Unmatched**, a tab in the top bar, lists the open items of the global users that no
   dashboard places in a cell or inbox group, in the repos switched on. An item a swimlane hides
-  as blocked counts as placed, and so do a board's epics and an item that misses one board's
+  as blocked counts as placed, and so does an item that misses one board's
   grid but lands on another's. Issues, PRs and CI jobs get a column each; a filter, kept in `?filter=`, narrows
   them.
 - **Hide blocked** (per swimlane) drops issues that have at least one open blocker
-  (GitHub "blocked by" relationships).
-- Issues carrying the **epic label** appear in the strip above the board with sub-issue
-  progress; clicking one filters the board to its sub-issues and to issues it blocks or is
-  blocked by; ↗ opens it on GitHub. Pull requests linked to any of those issues (or to the
-  epic) show up too.
+  (GitHub "blocked by" relationships) or an open parent issue. A sub-issue waits on its
+  parent, so the parent is the card to pick up.
 - Open **pull requests** are cards like issues.
 - Repo chips in the top bar switch each global repository on or off for every board, saved in
   the config; a dashboard with no items in the repos switched on is dimmed. Each chip shows its
   repo's sync age, syncs it alone, and can show it as the only repo.
-- Filters (text, assignee, label, issue type, epic, sort) live in the URL, so a view is a link.
+- Filters (text, assignee, label, issue type, sort) live in the URL, so a view is a link.
 
 <!-- --8<-- [end:placement] -->
 

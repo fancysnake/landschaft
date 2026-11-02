@@ -30,7 +30,6 @@ import {
   type Inbox,
   type Issue,
   issueKey,
-  type IssueRef,
   type LabelRef,
   type Snapshot,
 } from "../pacts/types";
@@ -64,12 +63,14 @@ export function placeIn<T extends Group>(
   return groups.filter((group) => accepted.has(group));
 }
 
-/** Blocked while any blocker is open. Prefers the blocker's cached row over the snapshot state. */
+/**
+ * Blocked while its parent or any blocker is open, so the parent is what gets picked up. Prefers
+ * the cached row over the snapshot state.
+ */
 export function isBlocked(issue: Issue, byKey: Map<string, Issue>): boolean {
   if (issue.blockedByTotal > issue.blockedBy.length) return true;
-  return issue.blockedBy.some(
-    (blocker) =>
-      (byKey.get(issueKey(blocker.repo, blocker.number))?.state ?? blocker.state) === "OPEN",
+  return [...(issue.parent ? [issue.parent] : []), ...issue.blockedBy].some(
+    (ref) => (byKey.get(issueKey(ref.repo, ref.number))?.state ?? ref.state) === "OPEN",
   );
 }
 
@@ -141,45 +142,24 @@ const jobCard = (job: CiJob, labels: LabelRef[]): CiJobCard => ({
   labels,
 });
 
-/**
- * Keys of the epic's blockers, its sub-issues and the issues it blocks, plus the PRs
- * linked to the epic or to any of those.
- */
-function relatedTo(epicKey: string, byKey: Map<string, Issue>): Set<string> {
-  const issues = [...byKey.values()];
-  const base = new Set([
-    ...(byKey.get(epicKey)?.blockedBy ?? []).map(keyOf),
-    ...issues.filter((issue) => issue.parent && keyOf(issue.parent) === epicKey).map(keyOf),
-    ...issues.filter((issue) => issue.blockedBy.some((b) => keyOf(b) === epicKey)).map(keyOf),
-  ]);
-  const hits = (ref: IssueRef) => keyOf(ref) === epicKey || base.has(keyOf(ref));
-  const linked = issues.filter((issue) => issue.linked.some(hits)).map(keyOf);
-  return new Set([...base, ...linked]);
-}
-
-/** Whether an item, with its card `key` and the `text` the search box matches, shows. */
-type BarFilter = (item: FilterItem, key: string, text: string) => boolean;
+/** Whether an item, with the `text` the search box matches, shows. */
+type BarFilter = (item: FilterItem, text: string) => boolean;
 
 /** Whether a card or the filter bar offers a label. */
 type LabelShown = (label: { name: string }) => boolean;
 
-/**
- * Text, assignee, label, type, job and epic filters as one predicate; an unset filter passes
- * everything.
- */
-function barFilter(filters: Filters, byKey: Map<string, Issue>): BarFilter {
+/** Text, assignee, label, type and job filters as one predicate; an unset filter passes everything. */
+function barFilter(filters: Filters): BarFilter {
   const query = filters.q?.trim().toLowerCase();
-  const related = filters.epic ? relatedTo(filters.epic, byKey) : null;
   const wantedLabel = filters.label && labelKey(filters.label);
   const wantedType = filters.type?.toLowerCase();
   const wantedJob = filters.job?.toLowerCase();
-  return (item, key, text) =>
+  return (item, text) =>
     (!query || text.toLowerCase().includes(query)) &&
     (!filters.assignee || item.assignees.some((a) => a.login === filters.assignee)) &&
     (!wantedLabel || item.labels.some((l) => labelKey(l.name) === wantedLabel)) &&
     (!wantedType || (item.issueType !== null && item.issueType.toLowerCase() === wantedType)) &&
-    (!wantedJob || item.name?.toLowerCase() === wantedJob) &&
-    (!related || related.has(key));
+    (!wantedJob || item.name?.toLowerCase() === wantedJob);
 }
 
 function compareBy(by: SortBy, dir: SortDir) {
@@ -208,12 +188,11 @@ function inScope(
   return (item) => matchesFilter(base, item, { viewer }) && matchesFilter(scope, item, { viewer });
 }
 
-/** An issue or failed CI job: its item, card `key`, the `text` the search box matches, its card. */
+/** An issue or failed CI job: its item, the `text` the search box matches, its card. */
 interface Entry {
   item: Item | JobItem;
-  key: string;
   text: string;
-  card: (labels: LabelRef[], isEpic: boolean) => Card;
+  card: (labels: LabelRef[]) => Card;
 }
 
 /** `issues` by key, and the entries a view picks its cards from. */
@@ -244,35 +223,24 @@ function scopedItems(
     const item = itemOf(issue);
     return {
       item,
-      key: keyOf(item),
       text: `${item.number} ${item.title}`,
-      card: (labels, isEpic) => toCard(item, labels, isEpic),
+      card: (labels) => toCard(item, labels),
     };
   });
   const jobEntries = jobs.map((job): Entry => ({
     item: jobItem(job, byKey),
-    key: ciJobKey(job),
     text: `${job.name} ${job.branch}`,
     card: (labels) => jobCard(job, labels),
   }));
   return { byKey, entries: [...issueEntries, ...jobEntries].filter(({ item }) => passes(item)) };
 }
 
-/** The dashboard's filter, swimlanes, columns and `epicLabel` (as a `labelKey`), parsed. */
-function compileGrid(dashboard: BoardDashboard) {
-  const epicLabel = dashboard.epicLabel && labelKey(dashboard.epicLabel);
-  return {
-    scope: parseFilter(dashboard.filter),
-    swimlanes: compile(dashboard.swimlanes),
-    columns: compile(dashboard.columns),
-    epicLabel,
-    /** An issue with the board's `epicLabel`. */
-    isEpic: (item: FilterItem): boolean =>
-      item.kind === "issue" &&
-      epicLabel !== undefined &&
-      item.labels.some((label) => labelKey(label.name) === epicLabel),
-  };
-}
+/** The dashboard's filter, swimlanes and columns, parsed. */
+const compileGrid = (dashboard: BoardDashboard) => ({
+  scope: parseFilter(dashboard.filter),
+  swimlanes: compile(dashboard.swimlanes),
+  columns: compile(dashboard.columns),
+});
 
 /** The swimlanes and columns `item` lands in, or null when it misses either. */
 function placeOnGrid<L extends Group, C extends Group>(
@@ -295,7 +263,7 @@ function firstGroup<G extends Group>(
   return groups.find((group) => matchesFilter(group.node, item, { viewer, other: true }));
 }
 
-/** Whether the dashboard shows `item` in a cell, group or epic strip, blocked-hiding aside. */
+/** Whether the dashboard shows `item` in a cell or group, blocked-hiding aside. */
 function placer(dashboard: Dashboard, viewer: string | null): (item: FilterItem) => boolean {
   const passes = inScope([], viewer, parseFilter(dashboard.filter));
   if (dashboard.type === "inbox") {
@@ -303,7 +271,7 @@ function placer(dashboard: Dashboard, viewer: string | null): (item: FilterItem)
     return (item) => passes(item) && firstGroup(groups, item, viewer) !== undefined;
   }
   const grid = compileGrid(dashboard);
-  return (item) => passes(item) && (grid.isEpic(item) || placeOnGrid(grid, item, viewer) !== null);
+  return (item) => passes(item) && placeOnGrid(grid, item, viewer) !== null;
 }
 
 /**
@@ -348,17 +316,14 @@ function facetsOf(
   };
 }
 
-/**
- * Whether a card keeps a label: all but the ones `nodes` ask for and the `epicLabel`, compared
- * by `labelKey`.
- */
-function labelShown(nodes: (FilterNode | null)[], epicLabel?: string): LabelShown {
-  const structural = new Set([...nodes.flatMap(askedLabels), ...(epicLabel ? [epicLabel] : [])]);
+/** Whether a card keeps a label: all but the ones `nodes` ask for, compared by `labelKey`. */
+function labelShown(nodes: (FilterNode | null)[]): LabelShown {
+  const structural = new Set(nodes.flatMap(askedLabels));
   return (label) => !structural.has(labelKey(label.name));
 }
 
 /** `item` as a card showing `labels`. */
-const toCard = (item: Item, labels: LabelRef[], isEpic: boolean): Card => ({
+const toCard = (item: Item, labels: LabelRef[]): Card => ({
   key: keyOf(item),
   kind: item.kind,
   repo: item.repo,
@@ -371,7 +336,6 @@ const toCard = (item: Item, labels: LabelRef[], isEpic: boolean): Card => ({
   labels,
   progress: item.subIssues.total > 0 ? item.subIssues : null,
   blocked: item.blocked,
-  isEpic,
   statuses: item.statuses,
   hasPr: item.hasPr,
   createdAt: item.createdAt,
@@ -427,38 +391,25 @@ export function unmatchedItems(
     [],
   );
   return {
-    items: shown
-      .map(({ item, card }) => card(item.labels, false))
-      .toSorted(compareBy(sort.by, sort.dir)),
+    items: shown.map(({ item, card }) => card(item.labels)).toSorted(compareBy(sort.by, sort.dir)),
     offer: { labels, repos, users: assignees },
   };
 }
 
-/** How a view picks and labels its cards; `isEpic` marks epic cards. */
-interface CardRules {
-  wanted: BarFilter;
-  shown: LabelShown;
-  isEpic: (item: FilterItem) => boolean;
-}
-
-/** Cards of the `entries` that pass `wanted`, with their items. */
+/** Cards of the `entries` that pass `wanted`, showing the `shown` labels, with their items. */
 function* visibleCards(
   entries: Entry[],
-  { wanted, shown, isEpic }: CardRules,
+  wanted: BarFilter,
+  shown: LabelShown,
 ): Generator<[FilterItem, Card]> {
-  for (const { item, key, text, card } of entries)
-    if (wanted(item, key, text)) yield [item, card(item.labels.filter(shown), isEpic(item))];
+  for (const { item, text, card } of entries)
+    if (wanted(item, text)) yield [item, card(item.labels.filter(shown))];
 }
 
 /** The inputs of a board or inbox; `now` dates the window of recently closed items. */
 interface ViewOptions extends Audience {
   query?: Filters;
   now?: Date;
-}
-
-/** The inputs of a board; `starred` epic keys lead the epic strip. */
-interface BoardOptions extends ViewOptions {
-  starred?: ReadonlySet<string>;
 }
 
 /**
@@ -468,16 +419,16 @@ interface BoardOptions extends ViewOptions {
 export function buildBoard(
   { issues, jobs }: Snapshot,
   dashboard: BoardDashboard,
-  { query = {}, users, viewer, hidden, starred = new Set(), now = new Date() }: BoardOptions,
+  { query = {}, users, viewer, hidden, now = new Date() }: ViewOptions,
 ): Board {
   const axes = compileGrid(dashboard);
   const { scope } = axes;
   const cutoff = closedSince(dashboard.closedDays, now);
   const scoped = scopedItems(issues, jobs, users, viewer, scope, cutoff);
-  const shown = labelShown(
-    [scope, ...[...axes.swimlanes, ...axes.columns].map((group) => group.node)],
-    axes.epicLabel,
-  );
+  const shown = labelShown([
+    scope,
+    ...[...axes.swimlanes, ...axes.columns].map((group) => group.node),
+  ]);
   const facets = facetsOf(
     scoped.entries.map(({ item }) => item),
     shown,
@@ -495,7 +446,6 @@ export function buildBoard(
     laneTotals: {},
     columnTotals: {},
     hiddenBlocked: {},
-    epics: [],
     total: 0,
   };
   for (const lane of dashboard.swimlanes) {
@@ -526,39 +476,11 @@ export function buildBoard(
       board.columnTotals[column.id] = (board.columnTotals[column.id] ?? 0) + 1;
   };
 
-  const rules = { wanted: barFilter(query, scoped.byKey), shown, isEpic: axes.isEpic };
-  for (const [item, card] of visibleCards(entries, rules)) put(item, card);
+  for (const [item, card] of visibleCards(entries, barFilter(query), shown)) put(item, card);
 
   const compare = compareBy(sort.by, sort.dir);
   for (const [key, cards] of Object.entries(board.cells))
     board.cells[key] = cards.toSorted(compare);
-  const isStarred = (issue: Issue) => starred.has(keyOf(issue));
-  // The epic strip ignores the filter bar, so it doesn't come from the cards. Closed epics show
-  // only as cards, unless one is the epic filter, which needs its tile to be cleared.
-  const inStrip = (item: Entry["item"]): item is Item =>
-    item.kind !== "ci-job" &&
-    (item.state === "OPEN" || keyOf(item) === query.epic) &&
-    axes.isEpic(item);
-  board.epics = entries
-    .map(({ item }) => item)
-    .filter(inStrip)
-    .toSorted((a, b) => Number(isStarred(b)) - Number(isStarred(a)) || compare(a, b))
-    .map((issue) => {
-      const related = relatedTo(keyOf(issue), scoped.byKey);
-      return {
-        key: keyOf(issue),
-        repo: issue.repo,
-        number: issue.number,
-        title: issue.title,
-        url: issue.url,
-        progress: issue.subIssues.total > 0 ? issue.subIssues : null,
-        starred: isStarred(issue),
-        // From `entries`, as the epic filter is, so the badge counts what a click shows.
-        openPrs: entries.filter(
-          ({ item, key }) => item.kind === "pr" && item.state === "OPEN" && related.has(key),
-        ).length,
-      };
-    });
   return board;
 }
 
@@ -592,8 +514,7 @@ export function buildInbox(
     cards.get(group.id)!.push(card);
     total += 1;
   };
-  const rules = { wanted: barFilter(query, scoped.byKey), shown, isEpic: () => false };
-  for (const [item, card] of visibleCards(entries, rules)) put(item, card);
+  for (const [item, card] of visibleCards(entries, barFilter(query), shown)) put(item, card);
   const compare = compareBy(facets.sort.by, facets.sort.dir);
   return {
     ...facets,

@@ -5,7 +5,6 @@ import type {
   Filters,
   HiddenReposRequest,
   InboxDashboard,
-  StarEpicRequest,
   SyncRequest,
 } from "../pacts/schema";
 import type { Board, Card, Inbox, LabelDef, NavData, SyncStatus } from "../pacts/types";
@@ -103,11 +102,6 @@ export const api = {
   version: () => request<SyncStatus>("/api/version"),
   sync: (body: Partial<Pick<SyncRequest, "full" | "repos">>) =>
     request<SyncResponse>("/api/sync", { method: "POST", body: JSON.stringify(body) }),
-  setEpicStarred: (dashboardId: string, body: StarEpicRequest) =>
-    request<{ starredEpics: string[] }>(
-      `/api/dashboards/${encodeURIComponent(dashboardId)}/starred-epics`,
-      { method: "POST", body: JSON.stringify(body) },
-    ),
   config: () => request<Config>("/api/config"),
   saveConfig: (config: unknown) => saveTo<Config>("/api/config", "PUT", config),
   setHidden: async (body: HiddenReposRequest) => {
