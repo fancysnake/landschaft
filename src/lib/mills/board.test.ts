@@ -751,6 +751,24 @@ describe("buildBoard", () => {
     expect(numbers(board)).toEqual([3, 2]);
   });
 
+  it("matches is:blocking on an open parent of an open sub-issue", () => {
+    const dashboard = {
+      ...DASHBOARD,
+      swimlanes: [
+        { id: "blocking", name: "Blocking", filter: "is:blocking", hideBlocked: false },
+        ...DASHBOARD.swimlanes,
+      ],
+    };
+    const issues = [
+      makeIssue({ number: 1 }),
+      makeIssue({ number: 2, parent: { repo: REPO, number: 1, state: "OPEN" } }),
+      makeIssue({ number: 3 }),
+      makeIssue({ number: 4, state: "CLOSED", parent: { repo: REPO, number: 3, state: "OPEN" } }),
+    ];
+    const board = buildBoard(snapshot(issues), dashboard, EVERYONE);
+    expect(board.cells[cell("blocking", "todo")]?.map(numberOf)).toEqual([1]);
+  });
+
   it("sorts cells by the dashboard sort, overridable per request", () => {
     const issues = [makeIssue({ number: 1 }), makeIssue({ number: 3 }), makeIssue({ number: 2 })];
     const byDefault = buildBoard(snapshot(issues), DASHBOARD, EVERYONE);

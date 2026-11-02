@@ -26,9 +26,8 @@ export interface Assignee {
   avatarUrl: string;
 }
 
-export interface Blocker {
-  repo: string;
-  number: number;
+/** An issue ref with the state it had when it was synced. */
+export interface StatedRef extends IssueRef {
   state: IssueState;
 }
 
@@ -55,9 +54,9 @@ export interface Issue {
   closedAt: string | null;
   labels: LabelRef[];
   assignees: Assignee[];
-  parent: Blocker | null;
+  parent: StatedRef | null;
   subIssues: Progress;
-  blockedBy: Blocker[];
+  blockedBy: StatedRef[];
   /** Total from GitHub; larger than blockedBy.length when the list was truncated. */
   blockedByTotal: number;
   /** Issues a PR closes when merged; empty for issues. */

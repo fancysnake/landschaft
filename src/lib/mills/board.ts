@@ -32,6 +32,7 @@ import {
   issueKey,
   type LabelRef,
   type Snapshot,
+  type StatedRef,
 } from "../pacts/types";
 
 /** A swimlane or column with its filter parsed; a null `node` matches everything. */
@@ -63,13 +64,19 @@ export function placeIn<T extends Group>(
   return groups.filter((group) => accepted.has(group));
 }
 
+/** What `issue` waits on: its parent and its blockers. */
+const blockersOf = (issue: Issue): StatedRef[] => [
+  ...(issue.parent ? [issue.parent] : []),
+  ...issue.blockedBy,
+];
+
 /**
  * Blocked while its parent or any blocker is open, so the parent is what gets picked up. Prefers
  * the cached row over the snapshot state.
  */
 export function isBlocked(issue: Issue, byKey: Map<string, Issue>): boolean {
   if (issue.blockedByTotal > issue.blockedBy.length) return true;
-  return [...(issue.parent ? [issue.parent] : []), ...issue.blockedBy].some(
+  return blockersOf(issue).some(
     (ref) => (byKey.get(issueKey(ref.repo, ref.number))?.state ?? ref.state) === "OPEN",
   );
 }
@@ -88,7 +95,7 @@ type Item = Issue & FilterItem;
 export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Issue) => Item {
   const opened = issues.filter((issue) => issue.state === "OPEN");
   const withPr = new Set(opened.flatMap((pr) => pr.linked.map(keyOf)));
-  const blocking = new Set(opened.flatMap((issue) => issue.blockedBy.map(keyOf)));
+  const blocking = new Set(opened.flatMap((issue) => blockersOf(issue).map(keyOf)));
   return (issue) => ({
     ...issue,
     authors: issue.author === null ? [] : [issue.author],
@@ -195,12 +202,6 @@ interface Entry {
   card: (labels: LabelRef[]) => Card;
 }
 
-/** `issues` by key, and the entries a view picks its cards from. */
-interface Scoped {
-  byKey: Map<string, Issue>;
-  entries: Entry[];
-}
-
 /**
  * The open `issues`, those closed at or after `cutoff` (ms), and the failed CI `jobs` that one
  * of the global `users` (empty for everyone) is in and that pass `scope`.
@@ -212,7 +213,7 @@ function scopedItems(
   viewer: string | null,
   scope: FilterNode | null = null,
   cutoff = Number.POSITIVE_INFINITY,
-): Scoped {
+): Entry[] {
   const byKey = new Map(issues.map((issue) => [keyOf(issue), issue]));
   // From all of `issues`, not just the open ones.
   const itemOf = itemsOf(issues, byKey);
@@ -232,7 +233,7 @@ function scopedItems(
     text: `${job.name} ${job.branch}`,
     card: (labels) => jobCard(job, labels),
   }));
-  return { byKey, entries: [...issueEntries, ...jobEntries].filter(({ item }) => passes(item)) };
+  return [...issueEntries, ...jobEntries].filter(({ item }) => passes(item));
 }
 
 /** The dashboard's filter, swimlanes and columns, parsed. */
@@ -352,9 +353,7 @@ export function scopedRepos(
   { users, viewer }: Audience,
 ): Set<string> {
   const scope = parseFilter(dashboard.filter);
-  return new Set(
-    scopedItems(issues, jobs, users, viewer, scope).entries.map(({ item }) => item.repo),
-  );
+  return new Set(scopedItems(issues, jobs, users, viewer, scope).map(({ item }) => item.repo));
 }
 
 /** The inputs of the unmatched view. */
@@ -379,7 +378,7 @@ export function unmatchedItems(
   const missed = ({ item }: Entry) => !hidden.includes(item.repo) && !placed(item);
   // Hidden repos are dropped last: their items still count for `has:pr` and blockers.
   const unmatched = (scope: FilterNode | null) =>
-    scopedItems(issues, jobs, users, viewer, scope).entries.filter(missed);
+    scopedItems(issues, jobs, users, viewer, scope).filter(missed);
   const shown = unmatched(filter);
   const all = filter ? unmatched(null) : shown;
   const sort = { by: "updated", dir: "desc" } as const;
@@ -430,7 +429,7 @@ export function buildBoard(
     ...[...axes.swimlanes, ...axes.columns].map((group) => group.node),
   ]);
   const facets = facetsOf(
-    scoped.entries.map(({ item }) => item),
+    scoped.map(({ item }) => item),
     shown,
     query,
     dashboard.sort,
@@ -438,7 +437,7 @@ export function buildBoard(
   );
   const { sort } = facets;
   // After the facets, so a hidden repo keeps its chip.
-  const entries = scoped.entries.filter(({ item }) => !hidden.includes(item.repo));
+  const entries = scoped.filter(({ item }) => !hidden.includes(item.repo));
 
   const board: Board = {
     ...facets,
@@ -499,13 +498,13 @@ export function buildInbox(
   const scoped = scopedItems(issues, jobs, users, viewer, scope, cutoff);
   const shown = labelShown([scope, ...groups.map((group) => group.node)]);
   const facets = facetsOf(
-    scoped.entries.map(({ item }) => item),
+    scoped.map(({ item }) => item),
     shown,
     query,
     dashboard.sort,
     hidden,
   );
-  const entries = scoped.entries.filter(({ item }) => !hidden.includes(item.repo));
+  const entries = scoped.filter(({ item }) => !hidden.includes(item.repo));
   const cards = new Map<string, Card[]>(groups.map((group) => [group.id, []]));
   let total = 0;
   const put = (item: FilterItem, card: Card) => {

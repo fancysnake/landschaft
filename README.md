@@ -109,7 +109,7 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
   - `label:`, `repo:`, `author:`, `assignee:` and `user:` (author or assignee), where `@me` is
     the account behind the token.
   - `is:issue`, `is:pr`, `is:blocked` (has an open blocker or parent issue), `is:blocking` (blocks an open
-    issue), `is:closed` (closed or merged; see the dashboard's `closedDays`).
+    issue or is an open sub-issue's parent), `is:closed` (closed or merged; see the dashboard's `closedDays`).
   - `has:parent-issue`, `has:sub-issues`, `parent-issue:owner/repo#12`.
   - PR statuses from GitHub: `is:conflicting` (merge conflicts), `is:ci:failed` (the last
     commit shows GitHub's red ✗), `is:ci:running` (a check has not finished),
@@ -131,8 +131,7 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
   grid but lands on another's. Issues, PRs and CI jobs get a column each; a filter, kept in `?filter=`, narrows
   them.
 - **Hide blocked** (per swimlane) drops issues that have at least one open blocker
-  (GitHub "blocked by" relationships) or an open parent issue. A sub-issue waits on its
-  parent, so the parent is the card to pick up.
+  (GitHub "blocked by" relationships) or an open parent issue.
 - Open **pull requests** are cards like issues.
 - Repo chips in the top bar switch each global repository on or off for every board, saved in
   the config; a dashboard with no items in the repos switched on is dimmed. Each chip shows its

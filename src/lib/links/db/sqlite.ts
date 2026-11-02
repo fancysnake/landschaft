@@ -3,7 +3,6 @@ import { DatabaseSync } from "node:sqlite";
 import type { SyncStore, ViewStore } from "../../pacts/db";
 import type {
   Assignee,
-  Blocker,
   CiJob,
   FetchedIssue,
   Issue,
@@ -14,6 +13,7 @@ import type {
   LabelRef,
   PullStatus,
   Snapshot,
+  StatedRef,
   SyncState,
 } from "../../pacts/types";
 
@@ -64,7 +64,6 @@ CREATE TABLE IF NOT EXISTS sync_state (
   last_error TEXT,
   updated_at TEXT
 );
-DROP TABLE IF EXISTS starred_epics;
 CREATE TABLE IF NOT EXISTS ci_jobs (
   repo TEXT NOT NULL,
   branch TEXT NOT NULL,
@@ -150,7 +149,7 @@ function placeholders(count: number): string {
   return Array.from({ length: count }, () => "?").join(", ");
 }
 
-function rowToIssue(row: IssueRow, blockedBy: Blocker[]): Issue {
+function rowToIssue(row: IssueRow, blockedBy: StatedRef[]): Issue {
   return {
     kind: row.kind as IssueKind,
     repo: row.repo,
@@ -171,6 +170,8 @@ function rowToIssue(row: IssueRow, blockedBy: Blocker[]): Issue {
         ? {
             repo: row.parent_repo,
             number: row.parent_number,
+            // shortcut: a row synced before parent_state existed reads its parent as OPEN until the
+            // full resync migrate() forces; remove once no database predates the column.
             state: (row.parent_state ?? "OPEN") as IssueState,
           }
         : null,
@@ -211,6 +212,8 @@ export class Db implements SyncStore, ViewStore {
 
   /** Adds missing columns; a new column forces a full resync to fill it. */
   private migrate(): void {
+    // shortcut: drops the old starred-epics table; remove once no database predates plain epics.
+    this.db.exec("DROP TABLE IF EXISTS starred_epics");
     const columns = new Set(
       (this.db.prepare("PRAGMA table_info(issues)").all() as unknown as { name: string }[]).map(
         (column) => column.name,
@@ -308,7 +311,7 @@ export class Db implements SyncStore, ViewStore {
     const blockerRows = this.db
       .prepare(`SELECT * FROM blocked_by WHERE repo IN (${placeholders(repos.length)})`)
       .all(...repos) as unknown as BlockerRow[];
-    const blockers = new Map<string, Blocker[]>();
+    const blockers = new Map<string, StatedRef[]>();
     for (const b of blockerRows) {
       const key = `${b.repo}#${b.number}`;
       const list = blockers.get(key) ?? [];

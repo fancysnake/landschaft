@@ -25,7 +25,10 @@ sync has landed.
 An issue with sub-issues is a card like any other, with its sub-issue progress from GitHub. Each
 open sub-issue counts as blocked while its parent is open: it gets the red `blocked` tint,
 `is:blocked` matches it, and a swimlane with `hideBlocked` drops it. The parent is the card to
-pick up. An `epic` label is a label like any other.
+pick up, and `is:blocking` matches it. An `epic` label is a label like any other.
+
+A parent or blocker in a repository outside `repos` is only seen through the state saved with
+the issue it blocks. Once it closes, that issue stays blocked until its next full sync.
 
 ## Pull requests
 
