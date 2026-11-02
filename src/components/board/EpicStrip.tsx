@@ -1,4 +1,4 @@
-import type { Epic } from "../../lib/pacts/types";
+import type { Epic } from "../../lib/pacts/views";
 
 import { EpicTile } from "./EpicTile";
 

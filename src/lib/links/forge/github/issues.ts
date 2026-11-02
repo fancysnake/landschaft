@@ -1,5 +1,5 @@
 import type { IssuesPage, PageOptions, PullStatusPage } from "../../../pacts/forge";
-import type { FetchedIssue, IssueState, LabelDef, PullStatus } from "../../../pacts/types";
+import type { FetchedIssue, IssueState, LabelDef, PullStatus } from "../../../pacts/issues";
 
 import { PULL_STATUS_NAMES, type PullStatusLabel } from "../../../pacts/status";
 import {

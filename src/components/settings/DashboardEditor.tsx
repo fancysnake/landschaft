@@ -1,5 +1,5 @@
 import type { Offer } from "../../lib/pacts/filter";
-import type { LabelDef } from "../../lib/pacts/types";
+import type { LabelDef } from "../../lib/pacts/issues";
 
 import {
   type BoardDashboard,
@@ -11,7 +11,7 @@ import {
   type SortBy,
   type SortDir,
   withType,
-} from "../../lib/pacts/schema";
+} from "../../lib/pacts/config";
 import { Field } from "./Field";
 import { FilterInput } from "./FilterInput";
 import { LabelPicker } from "./LabelPicker";

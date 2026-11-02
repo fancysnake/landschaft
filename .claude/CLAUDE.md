@@ -34,21 +34,24 @@ type-checked (`astro check`), not formatted.
 - `bin/landschaft.js` — CLI for consumers (`dev|build|start`): runs Astro with `root` = this
   package; config, DB and the production build (`dist/`, fully bundled via `ssr.noExternal` in the CLI's build call)
   live in the consumer's cwd. Plain JS, `@ts-check`.
-- `src/lib/pacts/` — contracts shared by server and client: `schema.ts` (zod schemas + types:
-  config, filters), `types.ts` (runtime data shapes: Issue, Card, Board, SyncStatus),
+- `src/lib/pacts/` — contracts shared by server and client, by noun or port: `config.ts`
+  (config zod schemas, upgrades, `ConfigStore`), `web.ts` (API request shapes), `issues.ts`
+  (cached forge data), `views.ts` (Board, Inbox, Card, Filters), `sync.ts` (SyncStatus),
   `filter.ts` (filter language), `status.ts` (pull status labels), `services.ts` (the services
-  gates call, their shared errors), `forge.ts`, `db.ts` and `config.ts` (protocols the links
-  implement).
-- `src/lib/mills/` — Node-only logic: `board.ts` (**pure** board builder), `sync.ts` (Syncer +
-  scheduler), `views.ts` and `config.ts` (the view and config services).
+  gates call, their shared errors), `forge.ts` and `db.ts` (protocols the links implement).
+- `src/lib/specs.ts` — business constants (sync ages, rate floor); only `mills` import it.
+- `src/lib/mills/` — Node-only logic: `board.ts` (**pure** board builder), `sync.ts` (Syncer,
+  which repos are due), `views.ts` and `config.ts` (the view and config services).
 - `src/lib/links/` — Node-only adapters: `config/file.ts` (JSON file, atomic save),
   `db/sqlite.ts` (SQLite), `forge/github/client.ts` (GraphQL transport, token),
   `forge/github/issues.ts` (issue and PR sync queries), `forge/github/ci.ts` (failed CI job queries),
   `forge/github/forge.ts` (`GithubForge`, the `Forge` over those queries).
-- `src/lib/inits.ts` — process singleton that wires links into mills; `src/middleware.ts` puts
-  its `Services` on `context.locals` (typed in `src/env.d.ts`).
+- `src/lib/gates/timer/node.ts` — the sync timer, a gate `inits` starts with the `Syncer`.
+- `src/lib/inits.ts` — process singleton that reads `LANDSCHAFT_*` env and wires links into
+  mills; `src/middleware.ts` puts its `Services` on `context.locals` (typed in `src/env.d.ts`).
 - `src/pages/api/**` — JSON endpoints over `locals.services`, all wrapped in `route()` from
-  `_route.ts` (endpoint helpers; Astro skips `_`-prefixed files when routing).
+  `_route.ts` (endpoint helpers; Astro skips `_`-prefixed files when routing). Each endpoint
+  passes `route()` the service errors it answers; `_endpoints.test.ts` calls them.
 - `src/lib/client/` — fetch wrappers, `useBoard` (polling), URL filters, `move` (list reorder).
 - `src/components/board/` and `src/components/settings/` — React islands mounted with
   `client:only="react"` from `src/pages/d/[id].astro` and `src/pages/settings.astro`.
@@ -58,10 +61,12 @@ type-checked (`astro check`), not formatted.
 
 ## Conventions
 
-- Imports run inward: `pacts` import no other layer; `links` and `mills` import `pacts` only;
-  gates (`src/pages`, `src/layouts`, `src/components`, `src/lib/client`) import `pacts` and each
-  other, and reach services through `locals.services`; `inits.ts` and `middleware.ts` import
-  anything. `.oxlintrc.json` enforces this, type imports included, plus `import/no-cycle`. Tests
+- Imports run inward: `pacts` import no other layer; `specs` (`src/lib/specs.ts`) import
+  nothing; `mills` import `pacts` and `specs`; `links` import `pacts` only; gates
+  (`src/pages`, `src/layouts`, `src/components`, `src/lib/client`, `src/lib/gates`) import
+  `pacts` and each other, and reach services through `locals.services`; `inits.ts` and
+  `middleware.ts` import anything but `specs`. `pacts`, `specs` and `mills` import no `node:*`
+  module. `.oxlintrc.json` enforces this, type imports included, plus `import/no-cycle`. Tests
   and `__fixtures__` are exempt.
 - Board logic stays pure and unit-tested in `board.ts`; endpoints only glue.
 - Sync is sequential on purpose (rate limits); `no-await-in-loop` is off for that reason.

@@ -1,4 +1,4 @@
-import type { IssueRef, IssueState, ItemKind } from "./types";
+import type { IssueRef, IssueState, ItemKind } from "./issues";
 
 import { PULL_STATUS_NAMES, type PullStatusLabel, statusValue } from "./status";
 

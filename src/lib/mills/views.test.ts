@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { Issue } from "../pacts/types";
+import type { Issue } from "../pacts/issues";
 
 import { DASHBOARD, makeIssue, REPO } from "../__fixtures__/issues";
-import { ConfigSchema } from "../pacts/schema";
+import { ConfigSchema } from "../pacts/config";
 import { InvalidError, NotFoundError } from "../pacts/services";
 import { Views } from "./views";
 

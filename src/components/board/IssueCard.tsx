@@ -1,5 +1,6 @@
+import type { LabelRef } from "../../lib/pacts/issues";
 import type { PullStatusLabel } from "../../lib/pacts/status";
-import type { Card, CiJobCard, IssueItemCard, LabelRef } from "../../lib/pacts/types";
+import type { Card, CiJobCard, IssueItemCard } from "../../lib/pacts/views";
 
 import { labelStyle, relativeTime, repoShortName } from "../../lib/client/labels";
 import { ProgressBar } from "./ProgressBar";

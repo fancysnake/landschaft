@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 
-import type { Filters } from "../pacts/schema";
+import type { Filters } from "../pacts/views";
 
 import { api, type BoardResponse, errorMessage } from "./api";
 import { useSynced } from "./useSynced";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { closedSince, ConfigSchema, reposToResync } from "./schema";
+import { closedSince, ConfigSchema } from "./config";
 
 describe("hidden repos", () => {
   it("loads a config without them with every repo on", () => {
@@ -22,26 +22,5 @@ describe("closedSince", () => {
 
   it("keeps nothing closed for an empty window", () => {
     expect(closedSince(0, now)).toBe(Number.POSITIVE_INFINITY);
-  });
-});
-
-const config = (repos: string[], ...windows: number[]) => ({
-  repos,
-  dashboards: windows.map((closedDays) => ({ closedDays })),
-});
-
-describe("reposToResync", () => {
-  it("resyncs every repo when the closed window grew", () => {
-    expect(reposToResync(config(["acme/a"], 0, 3), config(["acme/a", "acme/b"], 7))).toEqual([
-      "acme/a",
-      "acme/b",
-    ]);
-  });
-
-  it("resyncs only the added repos otherwise", () => {
-    expect(reposToResync(config(["acme/a"], 7), config(["acme/a", "acme/b"], 3))).toEqual([
-      "acme/b",
-    ]);
-    expect(reposToResync(config(["acme/a"], 7), config(["acme/a"], 7))).toEqual([]);
   });
 });

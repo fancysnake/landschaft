@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { Filters, InboxDashboard } from "../pacts/schema";
+import type { InboxDashboard } from "../pacts/config";
+import type { Filters } from "../pacts/views";
 
 import {
   DASHBOARD,
@@ -12,7 +13,8 @@ import {
   snapshot,
 } from "../__fixtures__/issues";
 import { askedLabels, type FilterNode } from "../pacts/filter";
-import { type Card, cellKey, type Issue } from "../pacts/types";
+import { type Issue } from "../pacts/issues";
+import { type Card, cellKey } from "../pacts/views";
 import {
   buildBoard,
   buildInbox,

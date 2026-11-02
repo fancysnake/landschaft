@@ -1,4 +1,13 @@
 import {
+  type BoardDashboard,
+  closedSince,
+  type Dashboard,
+  type InboxDashboard,
+  OTHER_LOOKS_AT,
+  type SortBy,
+  type SortDir,
+} from "../pacts/config";
+import {
   askedLabels,
   type FilterItem,
   type FilterNode,
@@ -8,32 +17,25 @@ import {
   parseFilter,
 } from "../pacts/filter";
 import {
-  type BoardDashboard,
-  type Dashboard,
-  closedSince,
-  type Filters,
-  type InboxDashboard,
-  OTHER_LOOKS_AT,
-  type SortBy,
-  type SortDir,
-  type UnmatchedQuery,
-} from "../pacts/schema";
-import {
-  type Audience,
-  type Board,
-  type Card,
-  cellKey,
   type CiJob,
-  type CiJobCard,
   ciJobKey,
-  type Facets,
-  type Inbox,
   type Issue,
   issueKey,
   type IssueRef,
   type LabelRef,
   type Snapshot,
-} from "../pacts/types";
+} from "../pacts/issues";
+import {
+  type Audience,
+  type Board,
+  type Card,
+  cellKey,
+  type CiJobCard,
+  type Facets,
+  type Filters,
+  type Inbox,
+  type UnmatchedQuery,
+} from "../pacts/views";
 
 /** A swimlane or column with its filter parsed; a null `node` matches everything. */
 export interface Group {

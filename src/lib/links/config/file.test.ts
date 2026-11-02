@@ -9,7 +9,7 @@ import {
   ConfigSchema,
   type Dashboard,
   findDashboard,
-} from "../../pacts/schema";
+} from "../../pacts/config";
 import { loadConfig, saveConfig } from "./file";
 
 const minimal = {

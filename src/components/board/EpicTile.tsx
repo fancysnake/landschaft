@@ -1,4 +1,4 @@
-import type { Epic } from "../../lib/pacts/types";
+import type { Epic } from "../../lib/pacts/views";
 
 import { ProgressBar } from "./ProgressBar";
 import { TONE } from "./tone";
