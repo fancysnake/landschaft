@@ -1,51 +1,60 @@
+import type { Config, Dashboard } from "../pacts/config";
 import type { SyncStore } from "../pacts/db";
+import type { CiJob } from "../pacts/issues";
 
 import {
-  type CiBranch,
   CI_BATCH,
+  type CiBranch,
   type Forge,
   type PageOptions,
   STATUS_BATCH,
 } from "../pacts/forge";
-import { closedSince, type Config } from "../pacts/schema";
 import {
+  InvalidError,
   SyncBusyError,
   type SyncOptions,
   type SyncResult,
   type SyncService,
 } from "../pacts/services";
-import { type CiJob, type SyncStatus, syncIntervals } from "../pacts/types";
-
-const FULL_SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-const SINCE_OVERLAP_MS = 2 * 60 * 1000;
-const RATE_FLOOR = 200;
+import { type SyncStatus, syncIntervals } from "../pacts/sync";
+import { FULL_SYNC_MAX_AGE_MS, RATE_FLOOR, SINCE_OVERLAP_MS } from "../specs";
 
 export interface SyncDeps {
   db: SyncStore;
   forge: Forge;
+  /** Read on every use, so settings changes apply without a restart. */
+  config: () => Config;
   now?: () => Date;
-  /** How many days of closed items a full sync fetches besides the open ones. */
-  closedDays?: () => number;
 }
+
+/** The longest window any dashboard shows closed items for, in days; what a full sync fetches. */
+export const closedDays = (config: { dashboards: Pick<Dashboard, "closedDays">[] }): number =>
+  Math.max(0, ...config.dashboards.map((dashboard) => dashboard.closedDays));
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** The earliest close time, in ms, a window of `days` back from `now` keeps; Infinity for 0. */
+export const closedSince = (days: number, now: Date): number =>
+  days > 0 ? now.getTime() - days * DAY_MS : Number.POSITIVE_INFINITY;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
 export class Syncer implements SyncService {
-  version = 0;
+  private version = 0;
   /** Sync-all runs finished. */
-  runs = 0;
-  lastSyncAt: string | null = null;
+  private runs = 0;
+  private lastSyncAt: string | null = null;
   /** Written by sync-all runs alone; a repo's own error stays in its sync state. */
-  lastError: string | null = null;
-  rateRemaining: number | null = null;
-  viewerLogin: string | null = null;
-  readonly inFlight = new Set<string>();
-  readonly db: SyncStore;
+  private lastError: string | null = null;
+  private rateRemaining: number | null = null;
+  private viewerLogin: string | null = null;
+  private readonly inFlight = new Set<string>();
+  private readonly db: SyncStore;
   private readonly forge: Forge;
+  private readonly config: () => Config;
   private readonly now: () => Date;
-  private readonly closedDays: () => number;
   private viewerPromise: Promise<string> | null = null;
   /** Repos the running sync-all has yet to reach, each with its `full` flag. */
   private readonly queue = new Map<string, boolean>();
@@ -54,8 +63,8 @@ export class Syncer implements SyncService {
   constructor(deps: SyncDeps) {
     this.db = deps.db;
     this.forge = deps.forge;
+    this.config = deps.config;
     this.now = deps.now ?? (() => new Date());
-    this.closedDays = deps.closedDays ?? (() => 0);
   }
 
   status(): SyncStatus {
@@ -105,9 +114,36 @@ export class Syncer implements SyncService {
     return this.running;
   }
 
-  /** The sync-all run a `syncAll` call starts or joins now; it ends once `runs` reaches it. */
-  get currentRun(): number {
-    return this.runs + 1;
+  start(repos?: string[], options: SyncOptions = {}): number {
+    const configured = this.config().repos;
+    const unknown = repos?.filter((repo) => !configured.includes(repo)) ?? [];
+    if (unknown.length > 0) throw new InvalidError(`not configured: ${unknown.join(", ")}`);
+    const run = this.runs + 1;
+    void this.syncAll(repos ?? configured, options);
+    return run;
+  }
+
+  async syncDue(): Promise<void> {
+    let config: Config;
+    try {
+      config = this.config();
+    } catch (error) {
+      this.lastError = `config: ${errorMessage(error)}`;
+      return;
+    }
+    let due: string[];
+    try {
+      const now = this.now().getTime();
+      due = config.repos.filter((repo) => {
+        if (this.inFlight.has(repo)) return false;
+        const lastSyncAt = this.db.getSyncState(repo)?.lastSyncAt ?? null;
+        return syncIntervals(lastSyncAt, config.refreshMinutes, now) >= 1;
+      });
+    } catch (error) {
+      this.lastError = `due repos: ${errorMessage(error)}`;
+      return;
+    }
+    if (due.length > 0) await this.syncAll(due);
   }
 
   private async drainQueue(): Promise<void> {
@@ -148,7 +184,7 @@ export class Syncer implements SyncService {
       const seen = new Set<number>();
       const query: Omit<PageOptions, "after"> = { since, states: full ? "open" : "all" };
       let upserted = 0;
-      const cutoff = closedSince(full ? this.closedDays() : 0, startedAt);
+      const cutoff = closedSince(full ? closedDays(this.config()) : 0, startedAt);
       const closedFrom = Number.isFinite(cutoff) ? new Date(cutoff).toISOString() : null;
       const fetchers: Forge["issuesPage"][] = [
         (r, o) => this.forge.issuesPage(r, o),
@@ -261,43 +297,4 @@ export class Syncer implements SyncService {
       throw new Error(`GitHub rate limit nearly exhausted (${rateRemaining} left), sync aborted`);
     }
   }
-}
-
-/**
- * Every tick, syncs each configured repo whose last sync is older than the refresh interval.
- * Re-reads the config each tick, so settings changes apply without a restart. Returns a stop
- * function.
- */
-export function startScheduler(
-  syncer: Syncer,
-  getConfig: () => Config,
-  options: { tickMs?: number; firstDelayMs?: number } = {},
-): () => void {
-  const tickMs = options.tickMs ?? 60_000;
-  let stopped = false;
-  const tick = async () => {
-    if (stopped) return;
-    let config: Config;
-    try {
-      config = getConfig();
-    } catch (error) {
-      syncer.lastError = `config: ${errorMessage(error)}`;
-      return;
-    }
-    const due = config.repos.filter((repo) => {
-      if (syncer.inFlight.has(repo)) return false;
-      const lastSyncAt = syncer.db.getSyncState(repo)?.lastSyncAt ?? null;
-      return syncIntervals(lastSyncAt, config.refreshMinutes, Date.now()) >= 1;
-    });
-    if (due.length > 0) await syncer.syncAll(due);
-  };
-  const first = setTimeout(() => void tick(), options.firstDelayMs ?? 1000);
-  const interval = setInterval(() => void tick(), tickMs);
-  first.unref();
-  interval.unref();
-  return () => {
-    stopped = true;
-    clearTimeout(first);
-    clearInterval(interval);
-  };
 }

@@ -1,19 +1,15 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname } from "node:path";
 
-import { type Config, ConfigSchema } from "../../pacts/schema";
+import { type Config, ConfigSchema } from "../../pacts/config";
 
-export function configPath(): string {
-  return resolve(process.env.LANDSCHAFT_CONFIG ?? "landschaft.config.json");
-}
-
-export function loadConfig(file = configPath()): Config {
+export function loadConfig(file: string): Config {
   if (!existsSync(file)) return ConfigSchema.parse({});
   return ConfigSchema.parse(JSON.parse(readFileSync(file, "utf8")));
 }
 
 /** Validates, then writes through a temp file so a crash never leaves a half-written config. */
-export function saveConfig(config: unknown, file = configPath()): Config {
+export function saveConfig(config: unknown, file: string): Config {
   const parsed = ConfigSchema.parse(config);
   mkdirSync(dirname(file), { recursive: true });
   const tmp = `${file}.tmp`;

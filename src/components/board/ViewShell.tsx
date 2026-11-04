@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 
 import type { ViewRequest } from "../../lib/client/useViewRequest";
-import type { Dashboard } from "../../lib/pacts/schema";
-import type { Facets } from "../../lib/pacts/types";
+import type { Dashboard } from "../../lib/pacts/config";
+import type { Facets } from "../../lib/pacts/views";
 
 import { ErrorBanner } from "../ErrorBanner";
 import { FilterBar } from "./FilterBar";

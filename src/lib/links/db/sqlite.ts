@@ -14,8 +14,8 @@ import type {
   PullStatus,
   Snapshot,
   StatedRef,
-  SyncState,
-} from "../../pacts/types";
+} from "../../pacts/issues";
+import type { SyncState } from "../../pacts/sync";
 
 import { isPullStatusLabel } from "../../pacts/status";
 
@@ -195,14 +195,10 @@ const ADDED_COLUMNS = [
   ["parent_state", "TEXT"],
 ] as const;
 
-export function dbPath(): string {
-  return process.env.LANDSCHAFT_DB ?? "landschaft.db";
-}
-
 export class Db implements SyncStore, ViewStore {
   private readonly db: DatabaseSync;
 
-  constructor(file = dbPath()) {
+  constructor(file: string) {
     this.db = new DatabaseSync(file);
     this.db.exec("PRAGMA journal_mode = WAL");
     this.db.exec("PRAGMA busy_timeout = 5000");

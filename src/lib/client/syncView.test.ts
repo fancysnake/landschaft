@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { SyncStatus } from "../pacts/types";
+import type { SyncStatus } from "../pacts/sync";
 
 import { repoSyncView, syncAge } from "./syncView";
 

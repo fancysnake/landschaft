@@ -1,7 +1,20 @@
 import type { ConfigStore } from "../pacts/config";
 
-import { type Config, isRaw, reposToResync } from "../pacts/schema";
+import { type Config, type Dashboard, isRaw } from "../pacts/config";
 import { type ConfigService, InvalidError, type SyncService } from "../pacts/services";
+import { closedDays } from "./sync";
+
+type Scope = { repos: string[]; dashboards: Pick<Dashboard, "closedDays">[] };
+
+/**
+ * The repos a full sync must fetch once the config goes from `previous` to `next`: every one when
+ * the closed window grew, since the older closed items are missing, otherwise the added ones.
+ */
+export function reposToResync(previous: Scope, next: Scope): string[] {
+  if (closedDays(next) > closedDays(previous)) return next.repos;
+  const before = new Set(previous.repos);
+  return next.repos.filter((repo) => !before.has(repo));
+}
 
 export class ConfigKeeper implements ConfigService {
   constructor(

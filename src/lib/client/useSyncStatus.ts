@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { SyncRequest } from "../pacts/schema";
-import type { SyncStatus } from "../pacts/types";
+import type { SyncStatus } from "../pacts/sync";
+import type { SyncRequest } from "../pacts/web";
 
 import { api, errorMessage } from "./api";
 

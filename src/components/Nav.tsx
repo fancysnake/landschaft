@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { NavData } from "../lib/pacts/types";
+import type { NavData } from "../lib/pacts/views";
 
 import { api, CONFIG_SAVED, errorMessage } from "../lib/client/api";
 import { SYNCED, useSyncStatus } from "../lib/client/useSyncStatus";

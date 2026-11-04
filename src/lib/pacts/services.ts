@@ -1,6 +1,8 @@
+import type { BoardDashboard, Config, InboxDashboard } from "./config";
 import type { Offer } from "./filter";
-import type { BoardDashboard, Config, Filters, InboxDashboard, UnmatchedQuery } from "./schema";
-import type { Board, Card, Inbox, LabelDef, NavData, SyncStatus } from "./types";
+import type { LabelDef } from "./issues";
+import type { SyncStatus } from "./sync";
+import type { Board, Card, Filters, Inbox, NavData, UnmatchedQuery } from "./views";
 
 export class NotFoundError extends Error {
   constructor(message: string) {
@@ -52,8 +54,14 @@ export interface SyncService {
   syncRepo(repo: string, options?: SyncOptions): Promise<SyncResult>;
   /** Adds `repos` to the running sync-all, or starts one; resolves when it ends. Never rejects. */
   syncAll(repos: string[], options?: SyncOptions): Promise<void>;
-  /** The sync-all run a `syncAll` call starts or joins now; it ends once `runs` reaches it. */
-  readonly currentRun: number;
+  /**
+   * Queues `repos`, or every configured repo, onto a sync-all without waiting for it, and returns
+   * that run's number; it ends once `runs` reaches it. Throws `InvalidError` for a repo outside
+   * the config.
+   */
+  start(repos?: string[], options?: SyncOptions): number;
+  /** Syncs the configured repos whose last sync is older than the refresh interval. Never rejects. */
+  syncDue(): Promise<void>;
 }
 
 export interface ViewService {

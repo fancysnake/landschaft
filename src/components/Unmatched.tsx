@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 
-import type { ItemKind } from "../lib/pacts/types";
+import type { ItemKind } from "../lib/pacts/issues";
 
 import { api } from "../lib/client/api";
 import { useDebouncedText } from "../lib/client/useDebouncedText";

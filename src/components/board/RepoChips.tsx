@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import type { SyncStatus } from "../../lib/pacts/types";
+import type { SyncStatus } from "../../lib/pacts/sync";
 
 import { repoShortName } from "../../lib/client/labels";
 import {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { SyncStatus } from "../pacts/types";
+import type { SyncStatus } from "../pacts/sync";
 
 import { CONFIG_SAVED, errorMessage } from "./api";
 import { SYNCED } from "./useSyncStatus";

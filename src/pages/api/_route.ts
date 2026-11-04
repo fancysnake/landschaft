@@ -2,8 +2,6 @@ import type { APIContext, APIRoute } from "astro";
 
 import { ZodError, type ZodType } from "zod";
 
-import { InvalidError, NotFoundError, SyncBusyError } from "../../lib/pacts/services";
-
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -38,16 +36,25 @@ export function parseQuery<T>(schema: ZodType<T>, url: URL): T {
   return schema.parse(Object.fromEntries(url.searchParams));
 }
 
-/** Wraps a handler so thrown errors become JSON responses with a fitting status. */
-export function route(handler: (context: APIContext) => Promise<Response> | Response): APIRoute {
+/** A service error class the endpoint answers with `status`. */
+export type ErrorStatus = [new (...args: never[]) => Error, status: number];
+
+/**
+ * Wraps a handler so thrown errors become JSON responses: `errors` for the service errors this
+ * endpoint expects, 400 for bad input, 500 for anything else.
+ */
+export function route(
+  handler: (context: APIContext) => Promise<Response> | Response,
+  errors: ErrorStatus[] = [],
+): APIRoute {
   return async (context) => {
     try {
       return await handler(context);
     } catch (error) {
       if (error instanceof ApiError) return json({ error: error.message }, error.status);
-      if (error instanceof NotFoundError) return json({ error: error.message }, 404);
-      if (error instanceof InvalidError) return json({ error: error.message }, 400);
-      if (error instanceof SyncBusyError) return json({ error: error.message }, 409);
+      for (const [kind, status] of errors) {
+        if (error instanceof kind) return json({ error: error.message }, status);
+      }
       if (error instanceof ZodError) {
         return json({ error: "validation failed", issues: error.issues }, 400);
       }

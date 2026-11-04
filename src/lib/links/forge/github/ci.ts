@@ -1,7 +1,7 @@
 import type { CiBranch, CiBranchesPage, CiJobsPage } from "../../../pacts/forge";
-import type { CiJob } from "../../../pacts/types";
+import type { CiJob } from "../../../pacts/issues";
 
-import { ciJobKey } from "../../../pacts/types";
+import { ciJobKey } from "../../../pacts/issues";
 import {
   type GithubClient,
   GithubError,

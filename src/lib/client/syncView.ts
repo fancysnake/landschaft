@@ -1,4 +1,4 @@
-import { type SyncStatus, syncIntervals } from "../pacts/types";
+import { type SyncStatus, syncIntervals } from "../pacts/sync";
 import { relativeTime } from "./labels";
 
 export type SyncAge = "fresh" | "late" | "stale";

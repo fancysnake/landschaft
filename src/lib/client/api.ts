@@ -1,13 +1,9 @@
+import type { BoardDashboard, Config, InboxDashboard } from "../pacts/config";
 import type { Offer } from "../pacts/filter";
-import type {
-  BoardDashboard,
-  Config,
-  Filters,
-  HiddenReposRequest,
-  InboxDashboard,
-  SyncRequest,
-} from "../pacts/schema";
-import type { Board, Card, Inbox, LabelDef, NavData, SyncStatus } from "../pacts/types";
+import type { LabelDef } from "../pacts/issues";
+import type { SyncStatus } from "../pacts/sync";
+import type { Board, Card, Filters, Inbox, NavData } from "../pacts/views";
+import type { HiddenReposRequest, SyncRequest } from "../pacts/web";
 
 /** Tells the islands on this page that the config was saved. */
 export const CONFIG_SAVED = "landschaft:config-saved";

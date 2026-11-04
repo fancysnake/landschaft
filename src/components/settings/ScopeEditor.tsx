@@ -1,4 +1,4 @@
-import { type Config, repoName, userName } from "../../lib/pacts/schema";
+import { type Config, repoName, userName } from "../../lib/pacts/config";
 import { ChipList } from "./ChipList";
 import { Field } from "./Field";
 

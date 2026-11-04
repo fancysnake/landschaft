@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 
-import type { LabelDef } from "../../lib/pacts/types";
+import type { LabelDef } from "../../lib/pacts/issues";
 
 import { api, errorMessage } from "../../lib/client/api";
 import { move } from "../../lib/client/move";
-import { type Config, type Dashboard, withType } from "../../lib/pacts/schema";
+import { type Config, type Dashboard, withType } from "../../lib/pacts/config";
 import { DashboardEditor } from "./DashboardEditor";
 import { MoveButtons } from "./MoveButtons";
 import { ScopeEditor } from "./ScopeEditor";

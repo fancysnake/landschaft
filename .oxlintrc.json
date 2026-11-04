@@ -33,8 +33,28 @@
           {
             "patterns": [
               {
-                "regex": "^\\.\\./",
+                "regex": "^(\\./)*\\.\\./",
                 "message": "pacts import nothing first-party outside pacts."
+              },
+              {
+                "regex": "^node:",
+                "message": "pacts and mills import nothing with side effects."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/lib/specs.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": ".*",
+                "message": "specs are plain constants; they import nothing."
               }
             ]
           }
@@ -49,8 +69,12 @@
           {
             "patterns": [
               {
-                "regex": "^(\\.\\./)+(.*/)?(links|inits|client|components|layouts|pages)(/|$)",
+                "regex": "^(\\./)*(\\.\\./)+(.*/)?(links|gates|inits|client|components|layouts|pages)(\\.ts)?(/|$)",
                 "message": "mills import pacts only."
+              },
+              {
+                "regex": "^node:",
+                "message": "pacts and mills import nothing with side effects."
               }
             ]
           }
@@ -65,7 +89,7 @@
           {
             "patterns": [
               {
-                "regex": "^(\\.\\./)+(.*/)?(mills|inits|client|components|layouts|pages)(/|$)",
+                "regex": "^(\\./)*(\\.\\./)+(.*/)?(mills|specs|gates|inits|client|components|layouts|pages)(\\.ts)?(/|$)",
                 "message": "links import pacts only."
               }
             ]
@@ -74,15 +98,37 @@
       }
     },
     {
-      "files": ["src/pages/**", "src/layouts/**", "src/components/**", "src/lib/client/**"],
+      "files": [
+        "src/pages/**",
+        "src/layouts/**",
+        "src/components/**",
+        "src/lib/client/**",
+        "src/lib/gates/**"
+      ],
       "rules": {
         "no-restricted-imports": [
           "error",
           {
             "patterns": [
               {
-                "regex": "^\\.{1,2}/(.*/)?(mills|links|inits)(/|$)",
+                "regex": "^\\.{1,2}/(.*/)?(mills|specs|links|inits)(\\.ts)?(/|$)",
                 "message": "gates import pacts only; services come from locals."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/lib/inits.ts", "src/middleware.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^\\.{1,2}/(.*/)?specs(\\.ts)?(/|$)",
+                "message": "specs are for mills alone; inits wires, it does not decide."
               }
             ]
           }
