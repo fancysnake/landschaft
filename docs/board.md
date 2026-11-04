@@ -11,7 +11,10 @@
 Sync is sequential per repository, on purpose: GitHub's GraphQL rate limit is shared across
 everything the token does. Two kinds of pass:
 
-- **Incremental** — issues updated since the last run, every `refreshMinutes`.
+- **Incremental** — issues updated since the last run, every `refreshMinutes`. The background
+  sync splits that interval by the number of repositories and syncs one at a time, the stalest
+  first: repositories switched on before those switched off. A repository whose sync fails is
+  retried after the interval too, or at once with Refresh.
 - **Full** — every open issue, plus every item updated within the longest `closedDays` of
   any dashboard, once a day, for repositories just added in settings, after a dashboard's
   `closedDays` grows past the longest, and on demand from the full resync button in the top bar.

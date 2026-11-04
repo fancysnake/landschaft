@@ -60,7 +60,11 @@ export interface SyncService {
    * the config.
    */
   start(repos?: string[], options?: SyncOptions): number;
-  /** Syncs the configured repos whose last sync is older than the refresh interval. Never rejects. */
+  /**
+   * Syncs the stalest repo due, those that are on first, at most once per refresh interval split
+   * by the configured repos; skips while a sync runs. Due: last attempt older than the interval.
+   * Never rejects.
+   */
   syncDue(): Promise<void>;
 }
 

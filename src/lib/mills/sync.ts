@@ -59,6 +59,8 @@ export class Syncer implements SyncService {
   /** Repos the running sync-all has yet to reach, each with its `full` flag. */
   private readonly queue = new Map<string, boolean>();
   private running: Promise<void> | null = null;
+  /** When `syncDue` last started a sync, in ms. */
+  private lastTickAt = Number.NEGATIVE_INFINITY;
 
   constructor(deps: SyncDeps) {
     this.db = deps.db;
@@ -124,6 +126,7 @@ export class Syncer implements SyncService {
   }
 
   async syncDue(): Promise<void> {
+    if (this.running || this.inFlight.size > 0) return;
     let config: Config;
     try {
       config = this.config();
@@ -131,19 +134,32 @@ export class Syncer implements SyncService {
       this.lastError = `config: ${errorMessage(error)}`;
       return;
     }
-    let due: string[];
+    let repo: string | undefined;
     try {
       const now = this.now().getTime();
-      due = config.repos.filter((repo) => {
-        if (this.inFlight.has(repo)) return false;
-        const lastSyncAt = this.db.getSyncState(repo)?.lastSyncAt ?? null;
-        return syncIntervals(lastSyncAt, config.refreshMinutes, now) >= 1;
-      });
+      const slotMs = (config.refreshMinutes * 60_000) / config.repos.length;
+      if (now - this.lastTickAt < slotMs) return;
+      repo = this.stalestDue(config, now);
+      if (repo) this.lastTickAt = now;
     } catch (error) {
       this.lastError = `due repos: ${errorMessage(error)}`;
       return;
     }
-    if (due.length > 0) await this.syncAll(due);
+    if (repo) await this.syncAll([repo]);
+  }
+
+  /**
+   * The due repo with the oldest sync attempt, repos that are on first. Attempts rather than
+   * successes, so a failing repo waits its turn instead of staying the stalest.
+   */
+  private stalestDue(config: Config, now: number): string | undefined {
+    const off = (repo: string) => Number(config.hiddenRepos.includes(repo));
+    return config.repos
+      .map((repo) => ({ repo, attempt: this.db.getSyncState(repo)?.updatedAt ?? null }))
+      .filter(({ attempt }) => syncIntervals(attempt, config.refreshMinutes, now) >= 1)
+      .toSorted(
+        (a, b) => off(a.repo) - off(b.repo) || (a.attempt ?? "").localeCompare(b.attempt ?? ""),
+      )[0]?.repo;
   }
 
   private async drainQueue(): Promise<void> {

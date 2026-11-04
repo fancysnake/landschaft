@@ -18,8 +18,8 @@ Astro 7 in SSR mode (`@astrojs/node`, standalone) with React 19 islands, Tailwin
 - `src/lib/specs.ts` — business constants the sync obeys (full-sync age, `since` overlap, rate
   floor); only `mills` read them.
 - `src/lib/mills/sync.ts` — the `Syncer`: sequential, incremental and full passes, and which
-  repos are due once their last sync is `refreshMinutes` old.
-- `src/lib/gates/timer/node.ts` — the timer that asks the `Syncer` for a due sync every minute.
+  repo syncs next: the stalest past `refreshMinutes`, one per the interval split by the repos.
+- `src/lib/gates/timer/node.ts` — the timer that asks the `Syncer` for a due sync every five seconds.
 - `src/lib/mills/board.ts` — the **pure** board builder. Everything
   about placement lives here and is unit-tested against fixtures.
 - `src/lib/inits.ts` — one DB handle, GitHub client and timer per process, booted by
