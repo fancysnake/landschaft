@@ -31,14 +31,13 @@ dashboard filters.
 | `id`         | `[a-z0-9_-]{1,32}`                         | required                             | In the URL (`/d/:id`); immutable once saved                                         |
 | `name`       | string                                     | required                             | Shown in the header                                                                 |
 | `filter`     | string                                     | `""`                                 | Narrows the base set, e.g. `repo:acme/app\|acme/lib user:@me`; `""` = all of it     |
-| `epicLabel`  | string                                     | none                                 | Issues with this label form the epic strip above the board                          |
 | `sort`       | `{ by: created\|updated, dir: asc\|desc }` | `{ "by": "updated", "dir": "desc" }` | Default card order; the URL can override it                                         |
 | `closedDays` | 0–365                                      | `0`                                  | Keeps items closed within this many days; see [Closed items](board.md#closed-items) |
 | `swimlanes`  | `Swimlane[]`, at least one                 | required (board)                     | Rows                                                                                |
 | `columns`    | `Column[]`, at least one                   | required (board)                     | Columns                                                                             |
 | `groups`     | `Group[]`                                  | `[]` (inbox)                         | Inbox groups, in order                                                              |
 
-`epicLabel`, `swimlanes` and `columns` belong to boards, `groups` to inboxes; the other fields
+`swimlanes` and `columns` belong to boards, `groups` to inboxes; the other fields
 to both. Switching the type in Settings keeps the shared fields and starts the rest afresh.
 
 ## Swimlane and column
@@ -48,7 +47,7 @@ to both. Switching the type in Settings keeps the shared fields and starts the r
 | `id`          | `[a-z0-9_-]{1,32}`  | required | Unique within its axis; keys the board's cells                                                                                                                                                        |
 | `name`        | string              | required | Header text                                                                                                                                                                                           |
 | `filter`      | string              | `other`  | Items this entry takes, in GitHub search syntax; `""` = everything, `other` = what no lane above / column to the right took; omitted = `other` minus a `-(…)` for each entry `other` does not look at |
-| `hideBlocked` | boolean (swimlanes) | `false`  | Drop issues with at least one open blocker, and show how many it dropped                                                                                                                              |
+| `hideBlocked` | boolean (swimlanes) | `false`  | Drop issues with an open blocker or parent issue, and show how many it dropped                                                                                                                        |
 
 ## Inbox group
 

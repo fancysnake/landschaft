@@ -26,9 +26,8 @@ export interface Assignee {
   avatarUrl: string;
 }
 
-export interface Blocker {
-  repo: string;
-  number: number;
+/** An issue ref with the state it had when it was synced. */
+export interface StatedRef extends IssueRef {
   state: IssueState;
 }
 
@@ -55,9 +54,9 @@ export interface Issue {
   closedAt: string | null;
   labels: LabelRef[];
   assignees: Assignee[];
-  parent: { repo: string; number: number } | null;
+  parent: StatedRef | null;
   subIssues: Progress;
-  blockedBy: Blocker[];
+  blockedBy: StatedRef[];
   /** Total from GitHub; larger than blockedBy.length when the list was truncated. */
   blockedByTotal: number;
   /** Issues a PR closes when merged; empty for issues. */
@@ -76,12 +75,6 @@ export interface PullStatus {
 
 export function issueKey(repo: string, number: number): string {
   return `${repo}#${number}`;
-}
-
-export function parseIssueKey(key: string): { repo: string; number: number } | null {
-  const match = /^([^#]+)#(\d+)$/.exec(key);
-  if (!match) return null;
-  return { repo: match[1]!, number: Number(match[2]) };
 }
 
 /**
@@ -146,25 +139,11 @@ export interface IssueItemCard {
   labels: LabelRef[];
   progress: Progress | null;
   blocked: boolean;
-  isEpic: boolean;
   statuses: PullStatusLabel[];
   /** An open PR closes it. */
   hasPr: boolean;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface Epic {
-  key: string;
-  repo: string;
-  number: number;
-  title: string;
-  url: string;
-  progress: Progress | null;
-  /** Marked as in active development on this dashboard. */
-  starred: boolean;
-  /** Open PRs that close the epic or an issue related to it. */
-  openPrs: number;
 }
 
 /** What the filter bar and repo chips need from any dashboard view. */
@@ -195,7 +174,6 @@ export interface Board extends Facets {
   /** Issues shown in each column; one in several lanes counts once. */
   columnTotals: Record<string, number>;
   hiddenBlocked: Record<string, number>;
-  epics: Epic[];
   /** Issues shown in at least one cell; one in several cells counts once. */
   total: number;
 }

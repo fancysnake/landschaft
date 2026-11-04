@@ -244,7 +244,7 @@ describe("global scope migration", () => {
     const epic = ConfigSchema.parse({
       dashboards: [{ ...minimal.dashboards[1], epicLabel: "epic" }],
     });
-    expect(asBoard(epic.dashboards[0]).epicLabel).toBe("epic");
+    expect(epic.dashboards[0]).not.toHaveProperty("epicLabel");
     const slow = minimal.dashboards.map((d) => ({ ...d, refreshMinutes: 10 }));
     expect(ConfigSchema.parse({ dashboards: slow }).refreshMinutes).toBe(10);
   });

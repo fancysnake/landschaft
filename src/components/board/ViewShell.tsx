@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import type { ViewRequest } from "../../lib/client/useViewRequest";
 import type { Dashboard } from "../../lib/pacts/schema";
-import type { Epic, Facets } from "../../lib/pacts/types";
+import type { Facets } from "../../lib/pacts/types";
 
 import { ErrorBanner } from "../ErrorBanner";
 import { FilterBar } from "./FilterBar";
@@ -17,9 +17,6 @@ interface Props {
   where: string;
   error: string | null;
   onDismissError(): void;
-  epics?: Epic[];
-  /** Between the notices and the filter bar. */
-  above?: ReactNode;
   className: string;
   children: ReactNode;
 }
@@ -33,8 +30,6 @@ export function ViewShell({
   where,
   error,
   onDismissError,
-  epics,
-  above,
   className,
   children,
 }: Props) {
@@ -71,8 +66,7 @@ export function ViewShell({
           Every repository with items {where} is switched off in the bar above.
         </p>
       )}
-      {above}
-      <FilterBar filters={filters} facets={facets} epics={epics} onChange={updateFilters} />
+      <FilterBar filters={filters} facets={facets} onChange={updateFilters} />
 
       {children}
     </div>

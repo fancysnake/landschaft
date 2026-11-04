@@ -79,13 +79,12 @@ export function CardView({ card, showRepo }: { card: Card; showRepo: boolean }) 
   );
 }
 
-/** The card's classes: closed over blocked over epic, PR or issue. */
+/** The card's classes: closed over blocked over PR or issue. */
 function toneOf(card: IssueItemCard): string {
   if (card.state === "CLOSED") {
     return cardClass("border-l-neutral-400", "border-neutral-200 bg-neutral-50 opacity-70");
   }
   if (card.blocked) return cardClass("border-l-red-500", "border-red-200 bg-red-50/60");
-  if (card.isEpic) return cardClass("border-l-violet-500");
   return cardClass(card.kind === "pr" ? "border-l-sky-500" : "border-l-emerald-500");
 }
 
@@ -99,7 +98,6 @@ function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean 
         </span>
         {card.kind === "pr" && <span className={`pill ${TONE.sky}`}>PR</span>}
         {card.issueType && <span className={`pill ${TONE.neutral}`}>{card.issueType}</span>}
-        {card.isEpic && <span className={`pill ${TONE.violet}`}>epic</span>}
         {card.state === "CLOSED" && <span className={`pill ${TONE.neutral}`}>closed</span>}
         {card.blocked && <span className={`pill ${TONE.red}`}>blocked</span>}
         {card.statuses.map((status) => (

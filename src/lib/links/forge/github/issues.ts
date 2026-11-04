@@ -19,7 +19,7 @@ fragment IssueFields on Issue {
   author { login }
   labels(first: 50) { nodes { name color } }
   assignees(first: 10) { nodes { login avatarUrl } }
-  parent { number repository { nameWithOwner } }
+  parent { number state repository { nameWithOwner } }
   subIssuesSummary { total completed percentCompleted }
   issueDependenciesSummary { totalBlockedBy }
   # 50 is GitHub's cap per relationship type; isBlocked's blockedByTotal guard covers any it omits
@@ -87,7 +87,7 @@ export interface IssueNode {
   author: { login: string } | null;
   labels: { nodes: { name: string; color: string }[] };
   assignees: { nodes: { login: string; avatarUrl: string }[] };
-  parent: { number: number; repository: { nameWithOwner: string } } | null;
+  parent: { number: number; state: IssueState; repository: { nameWithOwner: string } } | null;
   subIssuesSummary: { total: number; completed: number; percentCompleted: number };
   issueDependenciesSummary: { totalBlockedBy: number };
   blockedBy: {
@@ -155,7 +155,11 @@ export function toIssue(repo: string, node: IssueNode): FetchedIssue {
     state: node.state,
     issueType: node.issueType?.name ?? null,
     parent: node.parent
-      ? { repo: node.parent.repository.nameWithOwner, number: node.parent.number }
+      ? {
+          repo: node.parent.repository.nameWithOwner,
+          number: node.parent.number,
+          state: node.parent.state,
+        }
       : null,
     subIssues: {
       total: node.subIssuesSummary.total,

@@ -63,7 +63,12 @@ describe("Db", () => {
   });
 
   it("upserts issues idempotently and updates changed fields", () => {
-    const issue = makeIssue({ number: 1, labels: [label("bug")], author: "ann" });
+    const issue = makeIssue({
+      number: 1,
+      labels: [label("bug")],
+      author: "ann",
+      parent: { repo: REPO, number: 9, state: "CLOSED" },
+    });
     db.upsertIssues([issue, issue]);
     expect(db.listIssues([REPO])).toEqual([issue]);
 
@@ -126,16 +131,6 @@ describe("Db", () => {
       { repo: "acme/lib", name: "docs", color: "00ff00", description: "Docs" },
       { repo: REPO, name: "feature", color: "0000ff", description: null },
     ]);
-  });
-
-  it("stars and unstars epics per dashboard", () => {
-    db.setEpicStarred("a", "acme/app#1", true);
-    db.setEpicStarred("a", "acme/app#1", true);
-    db.setEpicStarred("a", "acme/app#2", true);
-    db.setEpicStarred("b", "acme/app#3", true);
-    db.setEpicStarred("a", "acme/app#2", false);
-    expect(db.starredEpics("a")).toEqual(new Set(["acme/app#1"]));
-    expect(db.starredEpics("b")).toEqual(new Set(["acme/app#3"]));
   });
 
   it("stores sync state as a patch", () => {

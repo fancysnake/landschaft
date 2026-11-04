@@ -3,7 +3,6 @@ import { DatabaseSync } from "node:sqlite";
 import type { SyncStore, ViewStore } from "../../pacts/db";
 import type {
   Assignee,
-  Blocker,
   CiJob,
   FetchedIssue,
   Issue,
@@ -14,6 +13,7 @@ import type {
   LabelRef,
   PullStatus,
   Snapshot,
+  StatedRef,
   SyncState,
 } from "../../pacts/types";
 
@@ -64,11 +64,6 @@ CREATE TABLE IF NOT EXISTS sync_state (
   last_error TEXT,
   updated_at TEXT
 );
-CREATE TABLE IF NOT EXISTS starred_epics (
-  dashboard TEXT NOT NULL,
-  epic TEXT NOT NULL,
-  PRIMARY KEY (dashboard, epic)
-);
 CREATE TABLE IF NOT EXISTS ci_jobs (
   repo TEXT NOT NULL,
   branch TEXT NOT NULL,
@@ -98,6 +93,7 @@ interface IssueRow {
   assignees_json: string;
   parent_repo: string | null;
   parent_number: number | null;
+  parent_state: string | null;
   sub_total: number;
   sub_completed: number;
   sub_percent: number;
@@ -153,7 +149,7 @@ function placeholders(count: number): string {
   return Array.from({ length: count }, () => "?").join(", ");
 }
 
-function rowToIssue(row: IssueRow, blockedBy: Blocker[]): Issue {
+function rowToIssue(row: IssueRow, blockedBy: StatedRef[]): Issue {
   return {
     kind: row.kind as IssueKind,
     repo: row.repo,
@@ -171,7 +167,13 @@ function rowToIssue(row: IssueRow, blockedBy: Blocker[]): Issue {
     assignees: JSON.parse(row.assignees_json) as Assignee[],
     parent:
       row.parent_repo && row.parent_number !== null
-        ? { repo: row.parent_repo, number: row.parent_number }
+        ? {
+            repo: row.parent_repo,
+            number: row.parent_number,
+            // shortcut: a row synced before parent_state existed reads its parent as OPEN until the
+            // full resync migrate() forces; remove once no database predates the column.
+            state: (row.parent_state ?? "OPEN") as IssueState,
+          }
         : null,
     subIssues: { total: row.sub_total, completed: row.sub_completed, percent: row.sub_percent },
     blockedBy,
@@ -190,6 +192,7 @@ const ADDED_COLUMNS = [
   ["kind", "TEXT NOT NULL DEFAULT 'issue'"],
   ["linked_json", "TEXT NOT NULL DEFAULT '[]'"],
   ["status_json", "TEXT NOT NULL DEFAULT '[]'"],
+  ["parent_state", "TEXT"],
 ] as const;
 
 export function dbPath(): string {
@@ -209,6 +212,8 @@ export class Db implements SyncStore, ViewStore {
 
   /** Adds missing columns; a new column forces a full resync to fill it. */
   private migrate(): void {
+    // shortcut: drops the old starred-epics table; remove once no database predates plain epics.
+    this.db.exec("DROP TABLE IF EXISTS starred_epics");
     const columns = new Set(
       (this.db.prepare("PRAGMA table_info(issues)").all() as unknown as { name: string }[]).map(
         (column) => column.name,
@@ -246,8 +251,8 @@ export class Db implements SyncStore, ViewStore {
     const upsert = this.db.prepare(`
       INSERT INTO issues (repo, number, node_id, title, state, url, issue_type, author, created_at,
         updated_at, closed_at, labels_json, assignees_json, parent_repo, parent_number, sub_total,
-        sub_completed, sub_percent, blocked_by_total, kind, linked_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        sub_completed, sub_percent, blocked_by_total, kind, linked_json, parent_state)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (repo, number) DO UPDATE SET
         node_id = excluded.node_id, title = excluded.title, state = excluded.state, url = excluded.url,
         issue_type = excluded.issue_type, author = excluded.author, created_at = excluded.created_at,
@@ -256,7 +261,8 @@ export class Db implements SyncStore, ViewStore {
         parent_repo = excluded.parent_repo, parent_number = excluded.parent_number,
         sub_total = excluded.sub_total, sub_completed = excluded.sub_completed,
         sub_percent = excluded.sub_percent, blocked_by_total = excluded.blocked_by_total,
-        kind = excluded.kind, linked_json = excluded.linked_json
+        kind = excluded.kind, linked_json = excluded.linked_json,
+        parent_state = excluded.parent_state
     `);
     const clearBlockers = this.db.prepare("DELETE FROM blocked_by WHERE repo = ? AND number = ?");
     const insertBlocker = this.db.prepare(
@@ -286,6 +292,7 @@ export class Db implements SyncStore, ViewStore {
           issue.blockedByTotal,
           issue.kind,
           JSON.stringify(issue.linked),
+          issue.parent?.state ?? null,
         );
         clearBlockers.run(issue.repo, issue.number);
         for (const blocker of issue.blockedBy) {
@@ -304,7 +311,7 @@ export class Db implements SyncStore, ViewStore {
     const blockerRows = this.db
       .prepare(`SELECT * FROM blocked_by WHERE repo IN (${placeholders(repos.length)})`)
       .all(...repos) as unknown as BlockerRow[];
-    const blockers = new Map<string, Blocker[]>();
+    const blockers = new Map<string, StatedRef[]>();
     for (const b of blockerRows) {
       const key = `${b.repo}#${b.number}`;
       const list = blockers.get(key) ?? [];
@@ -415,24 +422,6 @@ export class Db implements SyncStore, ViewStore {
       color: row.color,
       description: row.description,
     }));
-  }
-
-  /** Keys (`owner/repo#number`) of the dashboard's epics in active development. */
-  starredEpics(dashboard: string): Set<string> {
-    const rows = this.db
-      .prepare("SELECT epic FROM starred_epics WHERE dashboard = ?")
-      .all(dashboard) as unknown as { epic: string }[];
-    return new Set(rows.map((row) => row.epic));
-  }
-
-  setEpicStarred(dashboard: string, epic: string, starred: boolean): void {
-    this.db
-      .prepare(
-        starred
-          ? "INSERT OR IGNORE INTO starred_epics (dashboard, epic) VALUES (?, ?)"
-          : "DELETE FROM starred_epics WHERE dashboard = ? AND epic = ?",
-      )
-      .run(dashboard, epic);
   }
 
   getSyncState(repo: string): SyncState | null {
