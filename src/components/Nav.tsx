@@ -123,7 +123,7 @@ export default function Nav({ path, nav }: Props) {
           </a>
         </div>
       </div>
-      {repos.length > 1 && (
+      {(repos.length > 1 || hidden.length > 0) && (
         <div className="border-t border-neutral-100 px-4 py-2">
           <RepoChips
             repos={repos}

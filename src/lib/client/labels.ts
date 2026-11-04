@@ -1,7 +1,5 @@
 import type { CSSProperties } from "react";
 
-import { type SyncStatus, syncIntervals } from "../pacts/types";
-
 /** GitHub label colours are hex without '#'; pick black or white text by luminance. */
 export function labelStyle(color: string): CSSProperties {
   const hex = /^[0-9a-f]{6}$/i.test(color) ? color : "cccccc";
@@ -21,56 +19,6 @@ export function relativeTime(iso: string | null, now = Date.now()): string {
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `${hours} h ago`;
   return `${Math.round(hours / 24)} d ago`;
-}
-
-export type SyncAge = "fresh" | "late" | "stale";
-
-/**
- * Fresh within two refresh intervals (the scheduler and a sequential run add delay), late within
- * six, stale after that or never synced.
- */
-export function syncAge(iso: string | null, refreshMinutes: number, now = Date.now()): SyncAge {
-  if (!iso) return "stale";
-  const intervals = syncIntervals(iso, refreshMinutes, now);
-  return intervals <= 2 ? "fresh" : intervals <= 6 ? "late" : "stale";
-}
-
-export type SyncPhase = "idle" | "syncing" | "queued";
-
-/** What a repo's dot shows: its phase while it has one, else a failed last sync, else its age. */
-export type SyncTone = Exclude<SyncPhase, "idle"> | "failed" | SyncAge;
-
-export interface RepoSyncView {
-  phase: SyncPhase;
-  tone: SyncTone;
-  failed: boolean;
-  /** The sync button's label: the phase, then the last sync's time or error. */
-  label: string;
-}
-
-const SYNC_LABEL: Record<SyncPhase, (repo: string) => string> = {
-  idle: (repo) => `Sync ${repo}`,
-  syncing: (repo) => `Syncing ${repo}`,
-  queued: (repo) => `${repo} is queued`,
-};
-
-export function repoSyncView(
-  repo: string,
-  status: SyncStatus | null,
-  refreshMinutes: number,
-  now = Date.now(),
-): RepoSyncView {
-  const lastSyncAt = status?.repos[repo]?.lastSyncAt ?? null;
-  const error = status?.repos[repo]?.lastError;
-  const phase: SyncPhase = status?.inFlight.includes(repo)
-    ? "syncing"
-    : status?.queued.includes(repo)
-      ? "queued"
-      : "idle";
-  const tone: SyncTone =
-    phase !== "idle" ? phase : error ? "failed" : syncAge(lastSyncAt, refreshMinutes, now);
-  const synced = error ? `last sync failed: ${error}` : `synced ${relativeTime(lastSyncAt, now)}`;
-  return { phase, tone, failed: Boolean(error), label: `${SYNC_LABEL[phase](repo)} (${synced})` };
 }
 
 export function repoShortName(repo: string): string {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SyncStatus } from "../pacts/types";
 
-import { repoSyncView, syncAge } from "./labels";
+import { repoSyncView, syncAge } from "./syncView";
 
 describe("syncAge", () => {
   const now = Date.parse("2026-01-01T12:00:00Z");
@@ -37,11 +37,10 @@ describe("repoSyncView", () => {
   });
   const failing = { [repo]: { lastSyncAt: null, lastError: "boom" } };
 
-  it("takes the tone from the age when idle and not failed", () => {
+  it("grades the health by age when the last sync did not fail", () => {
     expect(repoSyncView(repo, status(), 5, now)).toEqual({
       phase: "idle",
-      tone: "fresh",
-      failed: false,
+      health: "fresh",
       label: "Sync o/a (synced 1 min ago)",
     });
   });
@@ -49,20 +48,18 @@ describe("repoSyncView", () => {
   it("puts a failed last sync over the age", () => {
     expect(repoSyncView(repo, status({ repos: failing }), 5, now)).toEqual({
       phase: "idle",
-      tone: "failed",
-      failed: true,
+      health: "failed",
       label: "Sync o/a (last sync failed: boom)",
     });
   });
 
-  it("puts syncing over queued, and both over a failure", () => {
+  it("puts syncing over queued, and keeps a failure through both", () => {
     const both = status({ inFlight: [repo], queued: [repo], repos: failing });
-    expect(repoSyncView(repo, both, 5, now)).toMatchObject({ phase: "syncing", tone: "syncing" });
+    expect(repoSyncView(repo, both, 5, now)).toMatchObject({ phase: "syncing", health: "failed" });
     const queued = status({ queued: [repo], repos: failing });
     expect(repoSyncView(repo, queued, 5, now)).toMatchObject({
       phase: "queued",
-      tone: "queued",
-      failed: true,
+      health: "failed",
       label: "o/a is queued (last sync failed: boom)",
     });
   });
@@ -70,8 +67,7 @@ describe("repoSyncView", () => {
   it("counts a repo without status as never synced", () => {
     expect(repoSyncView(repo, null, 5, now)).toEqual({
       phase: "idle",
-      tone: "stale",
-      failed: false,
+      health: "stale",
       label: "Sync o/a (synced never)",
     });
   });

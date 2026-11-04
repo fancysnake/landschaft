@@ -93,7 +93,7 @@ sets how a group starts on every page load.
 
 ## Filters
 
-With more than one global repository, chips in the top bar switch each on or off; `all` turns
+With more than one global repository, or the only one switched off, chips in the top bar switch each on or off; `all` turns
 every chip on and, once all are on, `none` turns them off. The choice is saved in the config as
 `hiddenRepos`, so it holds on every board and in every browser. A dashboard with no items in the repositories switched on is
 dimmed in the top bar.
@@ -104,8 +104,9 @@ that or never synced, red when the last sync failed (the error is in the arrow's
 a sky-blue ring while the repository waits its turn and pulses sky blue while it syncs. Hovering or focusing a chip shows three buttons over its name: the eye
 switches the repository on or off, the arrow syncs it alone (its tooltip says how long ago it
 last synced), and the frame switches every other repository off. On the one repository left the
-frame is pressed; pressing it again switches back on the repositories that were on before, or
-all of them once the page has been reloaded.
+frame is pressed; pressing it again switches back on the repositories that were on before the frame took them
+off, and all of them when the frame has nothing to bring back: it brought them back already, or
+the page was reloaded.
 
 Text, assignee, label, type and sort live in the query string, so a filtered view is a
 link you can bookmark or send. Empty values count as unset. Type is GitHub's issue type, shown

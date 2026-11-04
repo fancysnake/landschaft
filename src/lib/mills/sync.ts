@@ -286,11 +286,8 @@ export function startScheduler(
     }
     const due = config.repos.filter((repo) => {
       if (syncer.inFlight.has(repo)) return false;
-      const state = syncer.db.getSyncState(repo);
-      return (
-        !state?.lastSyncAt ||
-        syncIntervals(state.lastSyncAt, config.refreshMinutes, Date.now()) >= 1
-      );
+      const lastSyncAt = syncer.db.getSyncState(repo)?.lastSyncAt ?? null;
+      return syncIntervals(lastSyncAt, config.refreshMinutes, Date.now()) >= 1;
     });
     if (due.length > 0) await syncer.syncAll(due);
   };

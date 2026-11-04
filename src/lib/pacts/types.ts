@@ -190,8 +190,13 @@ export interface SyncState {
   updatedAt: string | null;
 }
 
-/** Refresh intervals elapsed since `lastSyncAt`. */
-export function syncIntervals(lastSyncAt: string, refreshMinutes: number, now: number): number {
+/** Refresh intervals elapsed since `lastSyncAt`; infinitely many when it never synced. */
+export function syncIntervals(
+  lastSyncAt: string | null,
+  refreshMinutes: number,
+  now: number,
+): number {
+  if (!lastSyncAt) return Infinity;
   return (now - Date.parse(lastSyncAt)) / (refreshMinutes * 60_000);
 }
 
