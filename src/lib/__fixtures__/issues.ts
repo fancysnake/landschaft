@@ -43,9 +43,9 @@ export const DASHBOARD: BoardDashboard = {
   sort: { by: "updated", dir: "desc" },
   closedDays: 0,
   swimlanes: [
-    { id: "high", name: "High", filter: "label:prio:high", hideBlocked: false },
-    { id: "low", name: "Low", filter: "label:prio:low", hideBlocked: true },
-    { id: "rest", name: "Rest", filter: "other", hideBlocked: false },
+    { id: "high", name: "High", filter: "label:prio:high", hideBlocked: false, collapsed: false },
+    { id: "low", name: "Low", filter: "label:prio:low", hideBlocked: true, collapsed: false },
+    { id: "rest", name: "Rest", filter: "other", hideBlocked: false, collapsed: false },
   ],
   columns: [
     { id: "todo", name: "Todo", filter: "other" },

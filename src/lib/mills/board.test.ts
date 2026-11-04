@@ -156,7 +156,7 @@ describe("unmatchedItems", () => {
   it("drops hidden repos after placement, so their items still count", () => {
     const dashboard = {
       ...DASHBOARD,
-      swimlanes: [{ id: "all", name: "All", filter: "", hideBlocked: false }],
+      swimlanes: [{ id: "all", name: "All", filter: "", hideBlocked: false, collapsed: false }],
       columns: [
         { id: "review", name: "Review", filter: "has:pr" },
         { id: "blocking", name: "Blocking", filter: "is:blocking" },
@@ -428,9 +428,9 @@ describe("buildBoard", () => {
     const dashboard = {
       ...DASHBOARD,
       swimlanes: [
-        { id: "a", name: "A", filter: "label:a", hideBlocked: false },
-        { id: "b", name: "B", filter: "other label:b", hideBlocked: false },
-        { id: "rest", name: "Rest", filter: "other", hideBlocked: false },
+        { id: "a", name: "A", filter: "label:a", hideBlocked: false, collapsed: false },
+        { id: "b", name: "B", filter: "other label:b", hideBlocked: false, collapsed: false },
+        { id: "rest", name: "Rest", filter: "other", hideBlocked: false, collapsed: false },
       ],
     };
     const issues = [
@@ -470,7 +470,7 @@ describe("buildBoard", () => {
     const dashboard = {
       ...DASHBOARD,
       swimlanes: [
-        { id: "prs", name: "PRs", filter: "is:pr", hideBlocked: false },
+        { id: "prs", name: "PRs", filter: "is:pr", hideBlocked: false, collapsed: false },
         ...DASHBOARD.swimlanes,
       ],
     };
@@ -509,6 +509,7 @@ describe("buildBoard", () => {
           name: "To fix",
           filter: "is:pr is:conflicting|ci:failed|unanswered",
           hideBlocked: false,
+          collapsed: false,
         },
         ...DASHBOARD.swimlanes,
       ],
@@ -534,7 +535,13 @@ describe("buildBoard", () => {
     const dashboard = {
       ...DASHBOARD,
       swimlanes: [
-        { id: "review", name: "In review", filter: "is:issue has:pr", hideBlocked: false },
+        {
+          id: "review",
+          name: "In review",
+          filter: "is:issue has:pr",
+          hideBlocked: false,
+          collapsed: false,
+        },
         ...DASHBOARD.swimlanes,
       ],
     };
@@ -735,8 +742,14 @@ describe("buildBoard", () => {
     const dashboard = {
       ...DASHBOARD,
       swimlanes: [
-        { id: "blocking", name: "Blocking", filter: "is:blocking", hideBlocked: false },
-        { id: "mine", name: "Mine", filter: "user:@me", hideBlocked: false },
+        {
+          id: "blocking",
+          name: "Blocking",
+          filter: "is:blocking",
+          hideBlocked: false,
+          collapsed: false,
+        },
+        { id: "mine", name: "Mine", filter: "user:@me", hideBlocked: false, collapsed: false },
         ...DASHBOARD.swimlanes,
       ],
     };
@@ -757,7 +770,13 @@ describe("buildBoard", () => {
     const dashboard = {
       ...DASHBOARD,
       swimlanes: [
-        { id: "blocking", name: "Blocking", filter: "is:blocking", hideBlocked: false },
+        {
+          id: "blocking",
+          name: "Blocking",
+          filter: "is:blocking",
+          hideBlocked: false,
+          collapsed: false,
+        },
         ...DASHBOARD.swimlanes,
       ],
     };
@@ -924,8 +943,8 @@ describe("CI jobs", () => {
 
   it("follows the dashboard filter and the swimlanes", () => {
     const lanes = [
-      { id: "ci", name: "CI", filter: "is:ci-job job:lint", hideBlocked: false },
-      { id: "rest", name: "Rest", filter: "other", hideBlocked: false },
+      { id: "ci", name: "CI", filter: "is:ci-job job:lint", hideBlocked: false, collapsed: false },
+      { id: "rest", name: "Rest", filter: "other", hideBlocked: false, collapsed: false },
     ];
     const board = buildBoard(snapshot([], jobs), { ...DASHBOARD, swimlanes: lanes }, EVERYONE);
     expect(board.cells[cell("ci", "todo")]?.map(numberOf)).toEqual(["lint"]);
@@ -954,8 +973,8 @@ describe("CI jobs", () => {
     const pr = makeIssue({ number: 7, kind: "pr", labels: [label("team-a"), label("bug")] });
     const withPr = [makeJob({ name: "lint", pr: { number: 7, url: pr.url } }), ...jobs];
     const lanes = [
-      { id: "a", name: "A", filter: "label:team-a", hideBlocked: false },
-      { id: "rest", name: "Rest", filter: "other", hideBlocked: false },
+      { id: "a", name: "A", filter: "label:team-a", hideBlocked: false, collapsed: false },
+      { id: "rest", name: "Rest", filter: "other", hideBlocked: false, collapsed: false },
     ];
     const dashboard = { ...DASHBOARD, swimlanes: lanes, filter: "is:ci-job" };
     const board = buildBoard(snapshot([pr], withPr), dashboard, EVERYONE);

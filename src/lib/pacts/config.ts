@@ -116,6 +116,7 @@ export const SwimlaneSchema = z.object({
   filter: filterText.optional(),
   ...LegacyGroupSchema.shape,
   hideBlocked: z.boolean().default(false),
+  collapsed: z.boolean().default(false),
 });
 
 export const ColumnSchema = z.object({
@@ -415,7 +416,9 @@ export function withType(type: DashboardType, from: DashboardBase): Dashboard {
     ? {
         type,
         ...base,
-        swimlanes: [{ id: "all", name: "Everything", filter: "", hideBlocked: false }],
+        swimlanes: [
+          { id: "all", name: "Everything", filter: "", hideBlocked: false, collapsed: false },
+        ],
         columns: [{ id: "todo", name: "Todo", filter: "" }],
       }
     : { type, ...base, groups: [] };

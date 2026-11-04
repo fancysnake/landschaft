@@ -134,11 +134,20 @@ function BoardFields({
         title="Swimlanes"
         items={dashboard.swimlanes}
         onChange={(swimlanes) => onChange({ ...dashboard, swimlanes })}
-        create={(id) => ({ id, name: "New lane", filter: "", hideBlocked: false })}
+        create={(id) => ({
+          id,
+          name: "New lane",
+          filter: "",
+          hideBlocked: false,
+          collapsed: false,
+        })}
         offer={offer}
         hint={gridHint("lane above")}
         minItems={1}
-        flag={{ key: "hideBlocked", label: "hide blocked" }}
+        flags={[
+          { key: "hideBlocked", label: "hide blocked" },
+          { key: "collapsed", label: "start collapsed" },
+        ]}
       />
       <LaneColumnEditor
         title="Columns"
@@ -170,7 +179,7 @@ function InboxFields({
       offer={offer}
       hint="the first matching group takes the item · GitHub search syntax · empty = all"
       minItems={0}
-      flag={{ key: "collapsed", label: "start collapsed" }}
+      flags={[{ key: "collapsed", label: "start collapsed" }]}
     />
   );
 }
