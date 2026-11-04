@@ -5,7 +5,6 @@ import {
   filterError,
   type FilterKey,
   type FilterNode,
-  ISSUE_REF,
   LOGIN,
   parseFilter,
   printFilter,
@@ -20,7 +19,6 @@ const id = z
   .max(32)
   .regex(/^[a-z0-9_-]+$/i, "letters, digits, - and _ only");
 export const repoName = z.string().regex(REPO, "expected owner/repo");
-const issueRef = z.string().regex(ISSUE_REF, "expected owner/repo#number");
 
 /** A filter expression (see `filter.ts`); empty matches everything. */
 const filterText = z.string().superRefine((text, ctx) => {
@@ -182,7 +180,6 @@ const BoardDashboardSchema = z
   .object({
     type: z.literal("board"),
     ...shared,
-    epicLabel: z.string().min(1).optional(),
     swimlanes: z.array(SwimlaneSchema).min(1).transform(migrateAxis("swimlanes")),
     columns: z.array(ColumnSchema).min(1).transform(migrateAxis("columns")),
   })
@@ -451,9 +448,6 @@ export function reposToResync(
   return next.repos.filter((repo) => !before.has(repo));
 }
 
-export const StarEpicRequestSchema = z.object({ epic: issueRef, starred: z.boolean() });
-export type StarEpicRequest = z.infer<typeof StarEpicRequestSchema>;
-
 export const HiddenReposRequestSchema = z.object({
   repos: z.array(repoName),
   hidden: z.boolean(),
@@ -468,7 +462,7 @@ export const SyncRequestSchema = z.object({
 export type SyncRequest = z.infer<typeof SyncRequestSchema>;
 
 /** Free-text filters: set from the filter bar, cleared together by "Clear filters". */
-export const TEXT_FILTER_KEYS = ["q", "assignee", "label", "type", "epic", "job"] as const;
+export const TEXT_FILTER_KEYS = ["q", "assignee", "label", "type", "job"] as const;
 export type TextFilterKey = (typeof TEXT_FILTER_KEYS)[number];
 
 export type Filters = { [K in TextFilterKey]?: string } & {

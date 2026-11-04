@@ -16,12 +16,18 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Changed
 
+- An open sub-issue counts as blocked while its parent is open, so `is:blocked` and
+  `hideBlocked` take it and the parent is the card to pick up.
 - Repo chips save which repos are off in the config as `hiddenRepos`, shared by every browser;
   the choice a browser kept before is dropped. `POST /api/hidden-repos` sets it, and
   `PUT /api/config` leaves it as it is.
 
 ### Removed
 
+- Epics: the epic strip, starring, the epic filter (`epic` in the query string),
+  `POST /api/dashboards/:id/starred-epics` and the dashboard's `epicLabel`, which a config
+  may still carry but no longer uses. An `epic` label is a label like any other. Stars kept in
+  the database are dropped.
 - The `hide` query parameter of the board, inbox and unmatched endpoints.
 - `repo` in the `POST /api/sync` body; send `repos: ["owner/repo"]` instead.
 

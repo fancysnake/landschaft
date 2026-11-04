@@ -213,7 +213,6 @@ export default function Settings() {
                     key={current.id}
                     dashboard={current}
                     onChange={updateDashboard}
-                    catalog={catalog}
                     offer={offer}
                   />
                 </>

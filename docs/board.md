@@ -20,21 +20,19 @@ The top bar shows the sync status on every page, with the remaining rate-limit b
 Refresh and full resync buttons. Both sync only the repositories switched on, and are disabled
 when none is. It polls `/api/version`, and an open board reloads itself when a sync has landed.
 
-## Epics
+## Sub-issues
 
-Open issues carrying the dashboard's `epicLabel` (in any case) are lifted out of the grid into a strip above it,
-each with its sub-issue progress from GitHub. Clicking an epic filters the board to its
-sub-issues and to issues it blocks or is blocked by; clicking again clears the filter. The ↗ on a tile opens the epic on GitHub.
-Pull requests that close the epic or any of those issues (GitHub's "linked pull requests")
-are kept as well. A sky `PR` badge on the tile counts the open ones, drafts included.
+An issue with sub-issues is a card like any other, with its sub-issue progress from GitHub. Each
+open sub-issue counts as blocked while its parent is open: it gets the red `blocked` tint,
+`is:blocked` matches it, and a swimlane with `hideBlocked` drops it. The parent is the card to
+pick up, and `is:blocking` matches it. An `epic` label is a label like any other.
 
-The ☆ on a tile marks the epic as in active development: it moves to the front of the strip
-with an amber accent and an `active` badge; ★ clears it. The mark is kept per dashboard in
-the local database, never on GitHub, so a closed epic that is reopened keeps its star.
+A parent or blocker in a repository outside `repos` is only seen through the state saved with
+the issue it blocks. Once it closes, that issue stays blocked until its next full sync.
 
 ## Pull requests
 
-Open pull requests are synced alongside issues and placed by the same filters. They carry a `PR` badge and a sky-blue tint (issues green, epics violet, blocked red). Put `is:pr` (or `is:issue`) in a swimlane's or column's filter to split them.
+Open pull requests are synced alongside issues and placed by the same filters. They carry a `PR` badge and a sky-blue tint (issues green, blocked red). Put `is:pr` (or `is:issue`) in a swimlane's or column's filter to split them.
 
 `is:conflicting`, `is:ci:failed`, `is:ci:running`, `is:unanswered` and `is:draft` pick PRs by
 merge conflicts, a failed check (GitHub's red ✗ on the last commit), any check still running,
@@ -52,7 +50,7 @@ opened the PR, as long as the PR is in one of the global repos; such an issue ca
 A dashboard with `closedDays` above 0 keeps the issues and PRs closed (or merged) within that
 many days, placed by the same filters. `is:closed` picks them, so a `Done` column with
 `is:closed` gathers them and `-is:closed` keeps them out of a lane. Their cards are greyed
-with a `closed` pill, without PR status pills. Epics follow the same window. A closed item
+with a `closed` pill, without PR status pills. A closed item
 never counts for `has:pr`, `is:blocked` or `is:blocking`, and the unmatched view lists open
 items only.
 
@@ -74,7 +72,7 @@ top of main stays off. `author:` and `user:` match those commit authors.
 that PR's labels: the card shows them, and `label:` and the label filter match them. A catch-all
 swimlane, column or inbox group takes jobs like any other item; `-is:ci-job` in a dashboard's
 filter keeps them off it. The search box matches job and branch names, and the CI job filter
-picks jobs by name and hides issues; the assignee, type and epic filters hide jobs.
+picks jobs by name and hides issues; the assignee and type filters hide jobs.
 
 Each sync first reads the head commit status of every branch, then fetches jobs and commit
 authors for the failing ones and the default branch alone. That status leaves out scheduled
@@ -91,7 +89,7 @@ on the Unmatched page. PRs, issues and failed CI jobs render as on a board, in t
 sort.
 
 Each group header shows its count and folds the group away on click; `collapsed` in the config
-sets how a group starts on every page load. An inbox has no epic strip.
+sets how a group starts on every page load.
 
 ## Filters
 
@@ -109,6 +107,6 @@ last synced), and the frame switches every other repository off. On the one repo
 frame is pressed; pressing it again switches back on the repositories that were on before, or
 all of them once the page has been reloaded.
 
-Text, assignee, label, type, epic and sort live in the query string, so a filtered view is a
+Text, assignee, label, type and sort live in the query string, so a filtered view is a
 link you can bookmark or send. Empty values count as unset. Type is GitHub's issue type, shown
 on each typed card; the type filter hides PRs and jobs.

@@ -18,8 +18,8 @@ localhost only. Errors are `{ "error": "message" }` with a matching status.
 
 ## Board
 
-`GET /api/dashboards/:id/board?q=&assignee=&label=&type=&epic=&sort=updated&dir=desc`
-returns the grid as cells keyed by swimlane and column id, the epic strip, the repositories
+`GET /api/dashboards/:id/board?q=&assignee=&label=&type=&sort=updated&dir=desc`
+returns the grid as cells keyed by swimlane and column id, the repositories
 among the dashboard's items with the `hidden` ones among them, whose items it leaves out, and the
 label catalogue used for colouring. The React island renders it as-is; all placement logic is
 server-side and unit-tested.
@@ -32,10 +32,6 @@ a dashboard of the other type.
 the global users that no dashboard places in a cell or inbox group, most recently updated first,
 as cards shaped like the board's with every label, leaving out hidden repositories; `filter` takes a
 dashboard filter expression; `offer` holds the repos, labels and users the filter box suggests.
-
-`POST /api/dashboards/:id/starred-epics` with `{ "epic": "owner/repo#12", "starred": true }`
-marks the epic as in active development (`false` clears the mark) and returns the dashboard's
-`starredEpics`. Starring rejects an epic outside the global repositories with `400`.
 
 `POST /api/hidden-repos` with `{ "repos": ["owner/repo"], "hidden": true }` switches those
 repositories off on every view (`false` switches them back on) and returns the config's

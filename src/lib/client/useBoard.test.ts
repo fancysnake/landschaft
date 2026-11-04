@@ -10,7 +10,7 @@ import { SYNCED } from "./useSyncStatus";
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
-  return { ...actual, api: { board: vi.fn(), setEpicStarred: vi.fn() } };
+  return { ...actual, api: { board: vi.fn() } };
 });
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -56,16 +56,6 @@ test("a landed sync reloads the board with the current query", async () => {
   await synced(2);
   expect(vi.mocked(api.board)).toHaveBeenCalledTimes(calls + 1);
   expect(vi.mocked(api.board).mock.lastCall?.[1]).toEqual({ q: "a" });
-});
-
-test("a failed star stays reported after the reload", async () => {
-  vi.mocked(api.board).mockImplementation(() => Promise.resolve(response()));
-  vi.mocked(api.setEpicStarred).mockRejectedValue(new Error("boom"));
-  const { result } = await renderBoard({});
-
-  await act(() => result.current!.setEpicStarred("o/r#1", true));
-
-  expect(result.current!.error).toBe("Starring epic failed: boom");
 });
 
 test("a stale board response does not replace a newer one", async () => {

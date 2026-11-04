@@ -3,7 +3,6 @@ import { Fragment } from "react";
 import { useBoard } from "../../lib/client/useBoard";
 import { useViewRequest } from "../../lib/client/useViewRequest";
 import { cellKey } from "../../lib/pacts/types";
-import { EpicStrip } from "./EpicStrip";
 import { CardView } from "./IssueCard";
 import { TONE } from "./tone";
 import { ViewShell } from "./ViewShell";
@@ -14,7 +13,7 @@ interface Props {
 
 export default function Board({ dashboardId }: Props) {
   const view = useViewRequest();
-  const { data, error, setEpicStarred, dismissError } = useBoard(dashboardId, view.filters);
+  const { data, error, dismissError } = useBoard(dashboardId, view.filters);
 
   if (!data) {
     return <p className="p-6 text-sm text-neutral-500">{error ?? "Loading board…"}</p>;
@@ -31,17 +30,6 @@ export default function Board({ dashboardId }: Props) {
       where="on this board"
       error={error}
       onDismissError={dismissError}
-      epics={board.epics}
-      above={
-        dashboard.epicLabel && (
-          <EpicStrip
-            epics={board.epics}
-            active={view.filters.epic}
-            onSelect={(key) => view.updateFilters({ epic: key })}
-            onSetStarred={(key, starred) => void setEpicStarred(key, starred)}
-          />
-        )
-      }
       className="h-full"
     >
       <div className="min-h-0 flex-1 overflow-auto">
