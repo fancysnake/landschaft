@@ -48,7 +48,7 @@ export function LaneColumnEditor<T extends Group>({
   offer,
   hint,
   minItems,
-  flags = [],
+  flags,
 }: Props<T>) {
   const replace = (index: number, item: T) =>
     onChange(items.map((current, i) => (i === index ? item : current)));
@@ -69,7 +69,7 @@ export function LaneColumnEditor<T extends Group>({
                 className="field w-full"
               />
               <div className="mt-0.5 font-mono text-[0.625rem] text-neutral-400">{item.id}</div>
-              {flags.map((flag) => (
+              {flags?.map((flag) => (
                 <label
                   key={flag.label}
                   className="mt-1 flex items-center gap-1 text-xs text-neutral-700"
