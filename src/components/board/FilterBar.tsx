@@ -1,7 +1,7 @@
-import type { Facets } from "../../lib/pacts/types";
+import type { Facets } from "../../lib/pacts/views";
 
 import { useDebouncedText } from "../../lib/client/useDebouncedText";
-import { type Filters, TEXT_FILTER_KEYS } from "../../lib/pacts/schema";
+import { type Filters, TEXT_FILTER_KEYS } from "../../lib/pacts/views";
 
 interface Props {
   filters: Filters;

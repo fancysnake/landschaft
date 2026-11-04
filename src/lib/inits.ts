@@ -1,14 +1,16 @@
+import { resolve } from "node:path";
+
 import type { ConfigStore } from "./pacts/config";
 import type { Services } from "./pacts/services";
 
+import { startTimer } from "./gates/timer/node";
 import { loadConfig, saveConfig } from "./links/config/file";
 import { Db } from "./links/db/sqlite";
 import { createGithubClient, getToken } from "./links/forge/github/client";
 import { GithubForge } from "./links/forge/github/forge";
 import { ConfigKeeper } from "./mills/config";
-import { startScheduler, Syncer } from "./mills/sync";
+import { Syncer } from "./mills/sync";
 import { Views } from "./mills/views";
-import { closedDays } from "./pacts/schema";
 
 export interface App {
   services: Services;
@@ -20,11 +22,15 @@ const registry = globalThis as { landschaftApp?: App };
 /** One DB handle, GitHub client and sync scheduler per process, surviving Vite HMR re-evaluation. */
 export function getApp(): App {
   if (!registry.landschaftApp) {
-    const db = new Db();
+    const configFile = resolve(process.env.LANDSCHAFT_CONFIG ?? "landschaft.config.json");
+    const db = new Db(process.env.LANDSCHAFT_DB ?? "landschaft.db");
     const forge = new GithubForge(createGithubClient(getToken));
-    const config: ConfigStore = { load: () => loadConfig(), save: (raw) => saveConfig(raw) };
-    const syncer = new Syncer({ db, forge, closedDays: () => closedDays(config.load()) });
-    const stopScheduler = startScheduler(syncer, config.load);
+    const config: ConfigStore = {
+      load: () => loadConfig(configFile),
+      save: (raw) => saveConfig(raw, configFile),
+    };
+    const syncer = new Syncer({ db, forge, config: config.load });
+    const stopTimer = startTimer(syncer);
     registry.landschaftApp = {
       services: {
         config: new ConfigKeeper(config, syncer),
@@ -37,7 +43,7 @@ export function getApp(): App {
         }),
       },
       stop() {
-        stopScheduler();
+        stopTimer();
         db.close();
         registry.landschaftApp = undefined;
       },

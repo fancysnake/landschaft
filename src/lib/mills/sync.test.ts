@@ -4,12 +4,12 @@ import type { CiBranchNode } from "../links/forge/github/ci";
 import type { GithubClient, GqlOptions } from "../links/forge/github/client";
 import type { IssueNode, PullNode } from "../links/forge/github/issues";
 
-import { cachedIssue, makeIssue, REPO } from "../__fixtures__/issues";
+import { cachedIssue, DASHBOARD, makeIssue, REPO } from "../__fixtures__/issues";
 import { Db } from "../links/db/sqlite";
 import { GithubForge } from "../links/forge/github/forge";
-import { CONFIG_VERSION, type Config } from "../pacts/schema";
-import { SyncBusyError } from "../pacts/services";
-import { type SyncDeps, startScheduler, Syncer } from "./sync";
+import { ConfigSchema } from "../pacts/config";
+import { InvalidError, SyncBusyError } from "../pacts/services";
+import { closedSince, type SyncDeps, Syncer } from "./sync";
 
 function toNode(number: number, state: "OPEN" | "CLOSED" = "OPEN"): IssueNode {
   const issue = makeIssue({ number, state });
@@ -173,9 +173,15 @@ const deferred = () => Promise.withResolvers<unknown>();
 
 const now = new Date("2026-05-01T12:00:00Z");
 
-/** A Syncer over `gh` whose clock stands at `now`. */
+/** A Syncer over `gh` whose clock stands at `now`, configured with `REPO` alone. */
 const syncerWith = (db: Db, gh: GithubClient, deps: Partial<SyncDeps> = {}) =>
-  new Syncer({ db, forge: new GithubForge(gh), now: () => now, ...deps });
+  new Syncer({
+    db,
+    forge: new GithubForge(gh),
+    config: () => ConfigSchema.parse({ repos: [REPO] }),
+    now: () => now,
+    ...deps,
+  });
 
 describe("Syncer", () => {
   let db: Db;
@@ -216,7 +222,10 @@ describe("Syncer", () => {
 
   it("also fetches the items closed within the window on a full sync", async () => {
     const { gh, calls } = fakeGithub([[toNode(1)]]);
-    const syncer = syncerWith(db, gh, { closedDays: () => 7 });
+    const syncer = syncerWith(db, gh, {
+      config: () =>
+        ConfigSchema.parse({ repos: [REPO], dashboards: [{ ...DASHBOARD, closedDays: 7 }] }),
+    });
 
     await syncer.syncRepo(REPO);
 
@@ -327,7 +336,7 @@ describe("Syncer", () => {
     expect(statusCalls(calls)).toHaveLength(1);
     const flagged = db.listIssues([REPO]).filter((issue) => issue.statuses.length > 0);
     expect(flagged).toHaveLength(50);
-    expect(syncer.rateRemaining).toBe(50);
+    expect(syncer.status().rateRemaining).toBe(50);
   });
 
   it("reads jobs of the red and default branches alone and replaces the cached ones", async () => {
@@ -452,7 +461,7 @@ describe("Syncer", () => {
       repository: { issues: empty, pullRequests: empty, refs: empty },
     });
     await expect(running).resolves.toMatchObject({ upserted: 0 });
-    expect(syncer.inFlight.size).toBe(0);
+    expect(syncer.status().inFlight).toEqual([]);
   });
 
   it("keeps a sync-all's early failure past a later success and counts the run", async () => {
@@ -482,16 +491,17 @@ describe("Syncer", () => {
       lastSyncAt: "2026-05-01T11:00:00.000Z",
       lastFullSyncAt: "2026-05-01T11:00:00.000Z",
     });
-    const syncer = syncerWith(db, gh);
+    const syncer = syncerWith(db, gh, {
+      config: () => ConfigSchema.parse({ repos: [REPO, "acme/other"] }),
+    });
     const first = syncer.syncAll([REPO]);
-    await vi.waitFor(() => expect(syncer.inFlight.has(REPO)).toBe(true));
-    const second = syncer.syncAll(["acme/other"], { full: true });
-    expect(second).toBe(first);
-    expect(syncer.currentRun).toBe(1);
+    await vi.waitFor(() => expect(syncer.status().inFlight).toContain(REPO));
+    expect(syncer.start(["acme/other"], { full: true })).toBe(1);
     gate.resolve(undefined);
-    await second;
+    await first;
     expect(syncer.status().runs).toBe(1);
-    expect(syncer.currentRun).toBe(2);
+    expect(syncer.start([])).toBe(2);
+    await syncer.syncAll([]);
     expect(
       pageCalls(calls)
         .filter((c) => c.variables.name === "other")
@@ -529,48 +539,94 @@ describe("Syncer", () => {
   });
 });
 
-describe("startScheduler", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-05-01T12:00:00Z"));
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("syncs due repos on each tick and skips fresh ones", async () => {
+describe("Syncer.syncDue", () => {
+  it("syncs the repos whose last sync is older than the refresh interval", async () => {
     const db = new Db(":memory:");
     db.setSyncState("acme/fresh", {
       lastSyncAt: "2026-05-01T11:59:30.000Z",
       lastFullSyncAt: "2026-05-01T11:59:30.000Z",
     });
-    const { gh, calls } = fakeGithub([[]]);
-    const syncer = syncerWith(db, gh, { now: () => new Date() });
-    const config: Config = {
-      version: CONFIG_VERSION,
-      repos: ["acme/due", "acme/fresh"],
-      users: [],
-      hiddenRepos: [],
-      refreshMinutes: 5,
-      dashboards: [],
-    };
-    const stop = startScheduler(syncer, () => config, { tickMs: 60_000, firstDelayMs: 0 });
+    db.setSyncState("acme/stale", {
+      lastSyncAt: "2026-05-01T11:50:00.000Z",
+      lastFullSyncAt: "2026-05-01T11:50:00.000Z",
+    });
+    const { gh } = fakeGithub([]);
+    const syncer = syncerWith(db, gh, {
+      config: () =>
+        ConfigSchema.parse({ repos: ["acme/new", "acme/fresh", "acme/stale"], refreshMinutes: 5 }),
+    });
+    const syncAll = vi.spyOn(syncer, "syncAll").mockResolvedValue();
 
-    await vi.advanceTimersByTimeAsync(0);
-    expect(pageCalls(calls).length).toBe(1);
-    expect(db.getSyncState("acme/due")?.lastSyncAt).not.toBeNull();
+    await syncer.syncDue();
 
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(pageCalls(calls).length).toBe(1);
+    expect(syncAll).toHaveBeenCalledWith(["acme/new", "acme/stale"]);
+    db.close();
+  });
 
-    await vi.advanceTimersByTimeAsync(5 * 60_000);
-    expect(pageCalls(calls).length).toBeGreaterThanOrEqual(3);
+  it("records a config that fails to load and syncs nothing", async () => {
+    const db = new Db(":memory:");
+    const { gh } = fakeGithub([]);
+    const syncer = syncerWith(db, gh, {
+      config: () => {
+        throw new Error("bad json");
+      },
+    });
+    const syncAll = vi.spyOn(syncer, "syncAll");
 
-    stop();
-    const before = calls.length;
-    await vi.advanceTimersByTimeAsync(10 * 60_000);
-    expect(calls.length).toBe(before);
+    await syncer.syncDue();
+
+    expect(syncAll).not.toHaveBeenCalled();
+    expect(syncer.status().lastError).toBe("config: bad json");
+    db.close();
+  });
+
+  it("records a sync state that fails to load and syncs nothing", async () => {
+    const db = new Db(":memory:");
+    const syncer = syncerWith(db, fakeGithub([]).gh);
+    vi.spyOn(db, "getSyncState").mockImplementation(() => {
+      throw new Error("disk I/O error");
+    });
+    const syncAll = vi.spyOn(syncer, "syncAll");
+
+    await syncer.syncDue();
+
+    expect(syncAll).not.toHaveBeenCalled();
+    expect(syncer.status().lastError).toBe("due repos: disk I/O error");
+    db.close();
+  });
+});
+
+describe("closedSince", () => {
+  const at = new Date("2026-05-10T00:00:00Z");
+
+  it("goes back the window's days from now", () => {
+    expect(closedSince(7, at)).toBe(Date.parse("2026-05-03T00:00:00Z"));
+  });
+
+  it("keeps nothing closed for an empty window", () => {
+    expect(closedSince(0, at)).toBe(Number.POSITIVE_INFINITY);
+  });
+});
+
+describe("Syncer.start", () => {
+  it("queues every configured repo when none are named", () => {
+    const db = new Db(":memory:");
+    const syncer = syncerWith(db, fakeGithub([]).gh);
+    const syncAll = vi.spyOn(syncer, "syncAll").mockResolvedValue();
+
+    syncer.start(undefined, { full: true });
+
+    expect(syncAll).toHaveBeenCalledWith([REPO], { full: true });
+    db.close();
+  });
+
+  it("rejects a repo outside the config before queuing anything", () => {
+    const db = new Db(":memory:");
+    const syncer = syncerWith(db, fakeGithub([]).gh);
+    const syncAll = vi.spyOn(syncer, "syncAll");
+
+    expect(() => syncer.start([REPO, "acme/other"])).toThrow(InvalidError);
+    expect(syncAll).not.toHaveBeenCalled();
     db.close();
   });
 });

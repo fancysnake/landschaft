@@ -1,4 +1,4 @@
-import { ConfigSchema } from "../../lib/pacts/schema";
+import { ConfigSchema } from "../../lib/pacts/config";
 import { json, parseBody, route } from "./_route";
 
 export const GET = route(({ locals }) => json(locals.services.config.load()));

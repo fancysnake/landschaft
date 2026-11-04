@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { type Config, ConfigSchema } from "../pacts/schema";
+import { type Config, ConfigSchema } from "../pacts/config";
 import { InvalidError } from "../pacts/services";
-import { ConfigKeeper } from "./config";
+import { ConfigKeeper, reposToResync } from "./config";
 
 function setup(repos: string[]) {
   let stored = ConfigSchema.parse({ repos });
@@ -47,5 +47,24 @@ describe("ConfigKeeper.setHidden", () => {
     const stale = keeper.load();
     keeper.setHidden(["acme/a"], true);
     expect(keeper.save({ ...stale, hiddenRepos: ["acme/b"] }).hiddenRepos).toEqual(["acme/a"]);
+  });
+});
+
+const scope = (repos: string[], ...windows: number[]) => ({
+  repos,
+  dashboards: windows.map((closedDays) => ({ closedDays })),
+});
+
+describe("reposToResync", () => {
+  it("resyncs every repo when the closed window grew", () => {
+    expect(reposToResync(scope(["acme/a"], 0, 3), scope(["acme/a", "acme/b"], 7))).toEqual([
+      "acme/a",
+      "acme/b",
+    ]);
+  });
+
+  it("resyncs only the added repos otherwise", () => {
+    expect(reposToResync(scope(["acme/a"], 7), scope(["acme/a", "acme/b"], 3))).toEqual(["acme/b"]);
+    expect(reposToResync(scope(["acme/a"], 7), scope(["acme/a"], 7))).toEqual([]);
   });
 });

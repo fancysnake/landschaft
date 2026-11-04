@@ -1,4 +1,4 @@
-import type { CiJob, FetchedIssue, LabelDef, PullStatus } from "./types";
+import type { CiJob, FetchedIssue, LabelDef, PullStatus } from "./issues";
 
 export interface IssuesPage {
   issues: FetchedIssue[];

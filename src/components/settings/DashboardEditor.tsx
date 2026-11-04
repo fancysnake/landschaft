@@ -10,7 +10,7 @@ import {
   type SortBy,
   type SortDir,
   withType,
-} from "../../lib/pacts/schema";
+} from "../../lib/pacts/config";
 import { Field } from "./Field";
 import { FilterInput } from "./FilterInput";
 import { LaneColumnEditor } from "./LaneColumnEditor";

@@ -2,7 +2,7 @@
 import Board from "../../components/board/Board";
 import Inbox from "../../components/board/Inbox";
 import Base from "../../layouts/Base.astro";
-import { findDashboard } from "../../lib/pacts/schema";
+import { findDashboard } from "../../lib/pacts/config";
 
 const id = Astro.params.id ?? "";
 const dashboard = findDashboard(Astro.locals.services.config.load(), id);

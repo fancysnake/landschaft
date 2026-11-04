@@ -1,4 +1,5 @@
-import type { CiJob, FetchedIssue, LabelDef, PullStatus, Snapshot, SyncState } from "./types";
+import type { CiJob, FetchedIssue, LabelDef, PullStatus, Snapshot } from "./issues";
+import type { SyncState } from "./sync";
 
 /** The cache the sync writes. */
 export interface SyncStore {

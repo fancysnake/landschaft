@@ -1,15 +1,11 @@
 import type { ViewStore } from "../pacts/db";
-import type { Audience, NavData, Snapshot, SyncStatus } from "../pacts/types";
+import type { Snapshot } from "../pacts/issues";
+import type { SyncStatus } from "../pacts/sync";
+import type { Audience, NavData } from "../pacts/views";
 
-import {
-  type Config,
-  type Dashboard,
-  type DashboardType,
-  type Filters,
-  findDashboard,
-  type UnmatchedQuery,
-} from "../pacts/schema";
+import { type Config, type Dashboard, type DashboardType, findDashboard } from "../pacts/config";
 import { NotFoundError, type SyncService, type ViewService } from "../pacts/services";
+import { type Filters, type UnmatchedQuery } from "../pacts/views";
 import { buildBoard, buildInbox, scopedRepos, unmatchedItems } from "./board";
 
 export interface ViewDeps {

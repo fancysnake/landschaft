@@ -1,4 +1,4 @@
-import type { SyncStatus as Status } from "../../lib/pacts/types";
+import type { SyncStatus as Status } from "../../lib/pacts/sync";
 
 import { relativeTime } from "../../lib/client/labels";
 import { useNow } from "../../lib/client/useNow";
