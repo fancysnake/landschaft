@@ -33,7 +33,7 @@
           {
             "patterns": [
               {
-                "regex": "^\\.\\./",
+                "regex": "^(\\./)*\\.\\./",
                 "message": "pacts import nothing first-party outside pacts."
               },
               {
@@ -69,7 +69,7 @@
           {
             "patterns": [
               {
-                "regex": "^(\\.\\./)+(.*/)?(links|gates|inits|client|components|layouts|pages)(\\.ts)?(/|$)",
+                "regex": "^(\\./)*(\\.\\./)+(.*/)?(links|gates|inits|client|components|layouts|pages)(\\.ts)?(/|$)",
                 "message": "mills import pacts only."
               },
               {
@@ -89,7 +89,7 @@
           {
             "patterns": [
               {
-                "regex": "^(\\.\\./)+(.*/)?(mills|specs|gates|inits|client|components|layouts|pages)(\\.ts)?(/|$)",
+                "regex": "^(\\./)*(\\.\\./)+(.*/)?(mills|specs|gates|inits|client|components|layouts|pages)(\\.ts)?(/|$)",
                 "message": "links import pacts only."
               }
             ]
