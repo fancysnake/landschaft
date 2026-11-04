@@ -40,7 +40,6 @@ export const DASHBOARD: BoardDashboard = {
   id: "main",
   name: "Main",
   filter: "",
-  epicLabel: "epic",
   sort: { by: "updated", dir: "desc" },
   closedDays: 0,
   swimlanes: [

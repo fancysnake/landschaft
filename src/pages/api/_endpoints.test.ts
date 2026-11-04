@@ -12,7 +12,6 @@ import { Syncer } from "../../lib/mills/sync";
 import { Views } from "../../lib/mills/views";
 import { type Config, ConfigSchema } from "../../lib/pacts/config";
 import { GET as board } from "./dashboards/[id]/board";
-import { POST as starredEpics } from "./dashboards/[id]/starred-epics";
 import { POST as hiddenRepos } from "./hidden-repos";
 import { POST as sync } from "./sync";
 
@@ -95,24 +94,6 @@ describe("GET /api/dashboards/[id]/board", () => {
       status: 404,
       body: { error: "board not found" },
     });
-  });
-});
-
-describe("POST /api/dashboards/[id]/starred-epics", () => {
-  it("answers 404 for an unknown dashboard", async () => {
-    const response = await call(starredEpics, "/api/dashboards/nope/starred-epics", {
-      body: { epic: `${REPO}#1`, starred: true },
-      params: { id: "nope" },
-    });
-    expect(response.status).toBe(404);
-  });
-
-  it("answers 400 for an epic outside the configured repos", async () => {
-    const response = await call(starredEpics, "/api/dashboards/main/starred-epics", {
-      body: { epic: "acme/other#1", starred: true },
-      params: { id: "main" },
-    });
-    expect(response.status).toBe(400);
   });
 });
 

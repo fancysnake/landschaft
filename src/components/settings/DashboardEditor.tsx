@@ -1,5 +1,4 @@
 import type { Offer } from "../../lib/pacts/filter";
-import type { LabelDef } from "../../lib/pacts/issues";
 
 import {
   type BoardDashboard,
@@ -14,19 +13,16 @@ import {
 } from "../../lib/pacts/config";
 import { Field } from "./Field";
 import { FilterInput } from "./FilterInput";
-import { LabelPicker } from "./LabelPicker";
 import { LaneColumnEditor } from "./LaneColumnEditor";
 
 interface Props {
   dashboard: Dashboard;
   onChange(dashboard: Dashboard): void;
-  /** Labels of the global repos, for the epic label picker. */
-  catalog: LabelDef[];
   /** Completed in filters. */
   offer: Offer;
 }
 
-export function DashboardEditor({ dashboard, onChange, catalog, offer }: Props) {
+export function DashboardEditor({ dashboard, onChange, offer }: Props) {
   const patch = (changes: Partial<Omit<DashboardBase, "id">>) =>
     onChange({ ...dashboard, ...changes });
 
@@ -108,7 +104,7 @@ export function DashboardEditor({ dashboard, onChange, catalog, offer }: Props) 
       </Field>
 
       {dashboard.type === "board" ? (
-        <BoardFields dashboard={dashboard} onChange={onChange} catalog={catalog} offer={offer} />
+        <BoardFields dashboard={dashboard} onChange={onChange} offer={offer} />
       ) : (
         <InboxFields dashboard={dashboard} onChange={onChange} offer={offer} />
       )}
@@ -127,7 +123,6 @@ const gridHint = (others: string) => (
 function BoardFields({
   dashboard,
   onChange,
-  catalog,
   offer,
 }: Omit<Props, "dashboard" | "onChange"> & {
   dashboard: BoardDashboard;
@@ -135,19 +130,6 @@ function BoardFields({
 }) {
   return (
     <>
-      <Field
-        group
-        label="Epic label"
-        hint="Issues with this label appear in the epic strip with sub-issue progress."
-      >
-        <LabelPicker
-          single
-          value={dashboard.epicLabel ? [dashboard.epicLabel] : []}
-          onChange={([epicLabel]) => onChange({ ...dashboard, epicLabel })}
-          options={catalog}
-          placeholder="none"
-        />
-      </Field>
       <LaneColumnEditor
         title="Swimlanes"
         items={dashboard.swimlanes}

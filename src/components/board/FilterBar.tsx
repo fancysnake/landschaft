@@ -1,4 +1,4 @@
-import type { Epic, Facets } from "../../lib/pacts/views";
+import type { Facets } from "../../lib/pacts/views";
 
 import { useDebouncedText } from "../../lib/client/useDebouncedText";
 import { type Filters, TEXT_FILTER_KEYS } from "../../lib/pacts/views";
@@ -7,12 +7,10 @@ interface Props {
   filters: Filters;
   /** Of the view it filters. */
   facets: Facets;
-  /** The board's epics; none on an inbox. */
-  epics?: Epic[];
   onChange(patch: Partial<Filters>): void;
 }
 
-export function FilterBar({ filters, facets, epics, onChange }: Props) {
+export function FilterBar({ filters, facets, onChange }: Props) {
   const [text, setText] = useDebouncedText(filters.q ?? "", (q) => onChange({ q: q || undefined }));
 
   const active = TEXT_FILTER_KEYS.some((key) => filters[key]);
@@ -64,21 +62,6 @@ export function FilterBar({ filters, facets, epics, onChange }: Props) {
           {facets.types.map((name) => (
             <option key={name} value={name}>
               {name}
-            </option>
-          ))}
-        </select>
-      )}
-      {epics && epics.length > 0 && (
-        <select
-          aria-label="Epic"
-          value={filters.epic ?? ""}
-          onChange={(event) => onChange({ epic: event.target.value || undefined })}
-          className="field max-w-72 truncate"
-        >
-          <option value="">Any epic</option>
-          {epics.map((epic) => (
-            <option key={epic.key} value={epic.key}>
-              {epic.title}
             </option>
           ))}
         </select>

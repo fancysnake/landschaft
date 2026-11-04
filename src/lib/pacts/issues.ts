@@ -25,9 +25,8 @@ export interface Assignee {
   avatarUrl: string;
 }
 
-export interface Blocker {
-  repo: string;
-  number: number;
+/** An issue ref with the state it had when it was synced. */
+export interface StatedRef extends IssueRef {
   state: IssueState;
 }
 
@@ -54,9 +53,9 @@ export interface Issue {
   closedAt: string | null;
   labels: LabelRef[];
   assignees: Assignee[];
-  parent: { repo: string; number: number } | null;
+  parent: StatedRef | null;
   subIssues: Progress;
-  blockedBy: Blocker[];
+  blockedBy: StatedRef[];
   /** Total from GitHub; larger than blockedBy.length when the list was truncated. */
   blockedByTotal: number;
   /** Issues a PR closes when merged; empty for issues. */
@@ -75,12 +74,6 @@ export interface PullStatus {
 
 export function issueKey(repo: string, number: number): string {
   return `${repo}#${number}`;
-}
-
-export function parseIssueKey(key: string): { repo: string; number: number } | null {
-  const match = /^([^#]+)#(\d+)$/.exec(key);
-  if (!match) return null;
-  return { repo: match[1]!, number: Number(match[2]) };
 }
 
 /**

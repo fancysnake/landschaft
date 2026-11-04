@@ -35,25 +35,11 @@ export interface IssueItemCard {
   labels: LabelRef[];
   progress: Progress | null;
   blocked: boolean;
-  isEpic: boolean;
   statuses: PullStatusLabel[];
   /** An open PR closes it. */
   hasPr: boolean;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface Epic {
-  key: string;
-  repo: string;
-  number: number;
-  title: string;
-  url: string;
-  progress: Progress | null;
-  /** Marked as in active development on this dashboard. */
-  starred: boolean;
-  /** Open PRs that close the epic or an issue related to it. */
-  openPrs: number;
 }
 
 /** What the filter bar and repo chips need from any dashboard view. */
@@ -84,7 +70,6 @@ export interface Board extends Facets {
   /** Issues shown in each column; one in several lanes counts once. */
   columnTotals: Record<string, number>;
   hiddenBlocked: Record<string, number>;
-  epics: Epic[];
   /** Issues shown in at least one cell; one in several cells counts once. */
   total: number;
 }
@@ -104,7 +89,7 @@ export interface NavData {
 }
 
 /** Free-text filters: set from the filter bar, cleared together by "Clear filters". */
-export const TEXT_FILTER_KEYS = ["q", "assignee", "label", "type", "epic", "job"] as const;
+export const TEXT_FILTER_KEYS = ["q", "assignee", "label", "type", "job"] as const;
 export type TextFilterKey = (typeof TEXT_FILTER_KEYS)[number];
 
 export type Filters = { [K in TextFilterKey]?: string } & {

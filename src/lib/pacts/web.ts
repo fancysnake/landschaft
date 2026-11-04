@@ -1,10 +1,7 @@
 import { z } from "zod";
 
-import { filterText, issueRef, repoName, SortBySchema, SortDirSchema } from "./config";
+import { filterText, repoName, SortBySchema, SortDirSchema } from "./config";
 import { type Filters, TEXT_FILTER_KEYS, type TextFilterKey, type UnmatchedQuery } from "./views";
-
-export const StarEpicRequestSchema = z.object({ epic: issueRef, starred: z.boolean() });
-export type StarEpicRequest = z.infer<typeof StarEpicRequestSchema>;
 
 export const HiddenReposRequestSchema = z.object({
   repos: z.array(repoName),

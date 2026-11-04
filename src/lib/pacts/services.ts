@@ -78,11 +78,6 @@ export interface ViewService {
   ): Promise<{ dashboard: InboxDashboard; inbox: Inbox; status: SyncStatus }>;
   unmatched(query: UnmatchedQuery): Promise<{ items: Card[]; offer: Offer; status: SyncStatus }>;
   labels(repos: string[]): LabelDef[];
-  /**
-   * Stars or unstars `epic` on dashboard `id`; returns its starred epics. Throws `NotFoundError`
-   * for an unknown dashboard and `InvalidError` for an epic outside the configured repos.
-   */
-  starEpic(id: string, epic: string, starred: boolean): string[];
 }
 
 /** What every request reaches the app through, as `locals.services`. */

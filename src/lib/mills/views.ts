@@ -4,8 +4,7 @@ import type { SyncStatus } from "../pacts/sync";
 import type { Audience, NavData } from "../pacts/views";
 
 import { type Config, type Dashboard, type DashboardType, findDashboard } from "../pacts/config";
-import { parseIssueKey } from "../pacts/issues";
-import { InvalidError, NotFoundError, type SyncService, type ViewService } from "../pacts/services";
+import { NotFoundError, type SyncService, type ViewService } from "../pacts/services";
 import { type Filters, type UnmatchedQuery } from "../pacts/views";
 import { buildBoard, buildInbox, scopedRepos, unmatchedItems } from "./board";
 
@@ -63,8 +62,7 @@ export class Views implements ViewService {
   async board(id: string, filters: Filters) {
     const { config, snapshot, audience, status } = await this.context();
     const dashboard = dashboardOf(config, id, "board");
-    const starred = this.deps.store.starredEpics(dashboard.id);
-    const board = buildBoard(snapshot, dashboard, { ...audience, query: filters, starred });
+    const board = buildBoard(snapshot, dashboard, { ...audience, query: filters });
     return { dashboard, board, status };
   }
 
@@ -83,17 +81,5 @@ export class Views implements ViewService {
 
   labels(repos: string[]) {
     return this.deps.store.listLabels(repos);
-  }
-
-  starEpic(id: string, epic: string, starred: boolean): string[] {
-    const config = this.deps.config();
-    const dashboard = findDashboard(config, id);
-    if (!dashboard) throw new NotFoundError("dashboard not found");
-    if (starred && !config.repos.includes(parseIssueKey(epic)?.repo ?? "")) {
-      throw new InvalidError("epic is not in a configured repository");
-    }
-    const { store } = this.deps;
-    store.setEpicStarred(dashboard.id, epic, starred);
-    return [...store.starredEpics(dashboard.id)];
   }
 }

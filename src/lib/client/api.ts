@@ -3,7 +3,7 @@ import type { Offer } from "../pacts/filter";
 import type { LabelDef } from "../pacts/issues";
 import type { SyncStatus } from "../pacts/sync";
 import type { Board, Card, Filters, Inbox, NavData } from "../pacts/views";
-import type { HiddenReposRequest, StarEpicRequest, SyncRequest } from "../pacts/web";
+import type { HiddenReposRequest, SyncRequest } from "../pacts/web";
 
 /** Tells the islands on this page that the config was saved. */
 export const CONFIG_SAVED = "landschaft:config-saved";
@@ -98,11 +98,6 @@ export const api = {
   version: () => request<SyncStatus>("/api/version"),
   sync: (body: Partial<Pick<SyncRequest, "full" | "repos">>) =>
     request<SyncResponse>("/api/sync", { method: "POST", body: JSON.stringify(body) }),
-  setEpicStarred: (dashboardId: string, body: StarEpicRequest) =>
-    request<{ starredEpics: string[] }>(
-      `/api/dashboards/${encodeURIComponent(dashboardId)}/starred-epics`,
-      { method: "POST", body: JSON.stringify(body) },
-    ),
   config: () => request<Config>("/api/config"),
   saveConfig: (config: unknown) => saveTo<Config>("/api/config", "PUT", config),
   setHidden: async (body: HiddenReposRequest) => {

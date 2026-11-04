@@ -16,10 +16,8 @@ export interface SyncStore {
   upsertLabels(repo: string, labels: Omit<LabelDef, "repo">[]): void;
 }
 
-/** The cache the views read, plus the starred epics they keep. */
+/** The cache the views read. */
 export interface ViewStore {
   snapshot(repos: string[]): Snapshot;
   listLabels(repos: string[]): LabelDef[];
-  starredEpics(dashboard: string): Set<string>;
-  setEpicStarred(dashboard: string, epic: string, starred: boolean): void;
 }

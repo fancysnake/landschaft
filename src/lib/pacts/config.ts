@@ -5,7 +5,6 @@ import {
   filterError,
   type FilterKey,
   type FilterNode,
-  ISSUE_REF,
   LOGIN,
   parseFilter,
   printFilter,
@@ -20,7 +19,6 @@ const id = z
   .max(32)
   .regex(/^[a-z0-9_-]+$/i, "letters, digits, - and _ only");
 export const repoName = z.string().regex(REPO, "expected owner/repo");
-export const issueRef = z.string().regex(ISSUE_REF, "expected owner/repo#number");
 
 /** A filter expression (see `filter.ts`); empty matches everything. */
 export const filterText = z.string().superRefine((text, ctx) => {
@@ -182,7 +180,6 @@ const BoardDashboardSchema = z
   .object({
     type: z.literal("board"),
     ...shared,
-    epicLabel: z.string().min(1).optional(),
     swimlanes: z.array(SwimlaneSchema).min(1).transform(migrateAxis("swimlanes")),
     columns: z.array(ColumnSchema).min(1).transform(migrateAxis("columns")),
   })
