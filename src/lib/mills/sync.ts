@@ -1,7 +1,6 @@
 import type { Config, Dashboard } from "../pacts/config";
 import type { SyncStore } from "../pacts/db";
 import type { CiJob } from "../pacts/issues";
-import type { SyncStatus } from "../pacts/sync";
 
 import {
   CI_BATCH,
@@ -17,6 +16,7 @@ import {
   type SyncResult,
   type SyncService,
 } from "../pacts/services";
+import { type SyncStatus, syncIntervals } from "../pacts/sync";
 import { FULL_SYNC_MAX_AGE_MS, RATE_FLOOR, SINCE_OVERLAP_MS } from "../specs";
 
 export interface SyncDeps {
@@ -75,6 +75,7 @@ export class Syncer implements SyncService {
       lastError: this.lastError,
       rateRemaining: this.rateRemaining,
       inFlight: [...this.inFlight],
+      queued: [...this.queue.keys()],
       repos: Object.fromEntries(
         this.db
           .listSyncStates()
@@ -135,8 +136,8 @@ export class Syncer implements SyncService {
       const now = this.now().getTime();
       due = config.repos.filter((repo) => {
         if (this.inFlight.has(repo)) return false;
-        const lastSyncAt = this.db.getSyncState(repo)?.lastSyncAt;
-        return !lastSyncAt || now - Date.parse(lastSyncAt) >= config.refreshMinutes * 60_000;
+        const lastSyncAt = this.db.getSyncState(repo)?.lastSyncAt ?? null;
+        return syncIntervals(lastSyncAt, config.refreshMinutes, now) >= 1;
       });
     } catch (error) {
       this.lastError = `due repos: ${errorMessage(error)}`;

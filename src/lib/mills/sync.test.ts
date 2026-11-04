@@ -497,9 +497,10 @@ describe("Syncer", () => {
     const first = syncer.syncAll([REPO]);
     await vi.waitFor(() => expect(syncer.status().inFlight).toContain(REPO));
     expect(syncer.start(["acme/other"], { full: true })).toBe(1);
+    expect(syncer.status()).toMatchObject({ inFlight: [REPO], queued: ["acme/other"] });
     gate.resolve(undefined);
     await first;
-    expect(syncer.status().runs).toBe(1);
+    expect(syncer.status()).toMatchObject({ runs: 1, inFlight: [], queued: [] });
     expect(syncer.start([])).toBe(2);
     await syncer.syncAll([]);
     expect(

@@ -86,6 +86,7 @@ export interface NavData {
   repos: string[];
   /** Those of `repos` switched off. */
   hidden: string[];
+  refreshMinutes: number;
 }
 
 /** Free-text filters: set from the filter bar, cleared together by "Clear filters". */

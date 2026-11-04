@@ -24,7 +24,7 @@ const current = (active: boolean) => (active ? "page" : undefined);
  * dashboard with no items in the repos switched on is dimmed.
  */
 export default function Nav({ path, nav }: Props) {
-  const [{ dashboards, repos, hidden }, setNav] = useState(nav);
+  const [{ dashboards, repos, hidden, refreshMinutes }, setNav] = useState(nav);
   const [toggleError, setToggleError] = useState<string | null>(null);
   const { status, error, syncing, sync, dismissError } = useSyncStatus();
 
@@ -112,8 +112,9 @@ export default function Nav({ path, nav }: Props) {
             <SyncStatus
               status={status}
               syncing={syncing}
+              allOff={shown.length === 0}
               error={error}
-              onSync={(full) => void sync({ full })}
+              onSync={(full) => void sync({ full, repos: shown })}
               onDismissError={dismissError}
             />
           )}
@@ -122,12 +123,13 @@ export default function Nav({ path, nav }: Props) {
           </a>
         </div>
       </div>
-      {repos.length > 1 && (
+      {(repos.length > 1 || hidden.length > 0) && (
         <div className="border-t border-neutral-100 px-4 py-2">
           <RepoChips
             repos={repos}
             shown={shown}
             status={status}
+            refreshMinutes={refreshMinutes}
             onChange={setShown}
             onSync={(repo) => void sync({ repos: [repo] })}
           />

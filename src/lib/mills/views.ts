@@ -56,6 +56,7 @@ export class Views implements ViewService {
       })),
       repos: config.repos,
       hidden: config.hiddenRepos,
+      refreshMinutes: config.refreshMinutes,
     };
   }
 
