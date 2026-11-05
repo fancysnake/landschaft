@@ -7,10 +7,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [5.1.0] - 2026-11-05
+
 ### Added
 
 - A swimlane can be `fluid`: adjacent fluid lanes share one row, a single list per column in lane
-  order. Each item shows once there, and the column header counts the blocked issues they hide.
+  order, each item once, and the column header counts the blocked issues they hide.
 - A folded lane marks the columns with the lowest count, and `unranked` leaves a column out.
 
 ### Changed
@@ -327,7 +329,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v5.0.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v5.1.0...HEAD
+[5.1.0]: https://github.com/fancysnake/landschaft/compare/v5.0.0...v5.1.0
 [5.0.0]: https://github.com/fancysnake/landschaft/compare/v4.4.0...v5.0.0
 [4.4.0]: https://github.com/fancysnake/landschaft/compare/v4.3.0...v4.4.0
 [4.3.0]: https://github.com/fancysnake/landschaft/compare/v4.2.0...v4.3.0
