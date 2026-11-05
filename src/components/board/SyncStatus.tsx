@@ -1,10 +1,13 @@
 import type { SyncStatus as Status } from "../../lib/pacts/sync";
 
 import { relativeTime } from "../../lib/client/labels";
+import { syncErrors } from "../../lib/client/syncView";
 import { useNow } from "../../lib/client/useNow";
 
 interface Props {
   status: Status;
+  /** The configured repos, whose failures the dot reports. */
+  repos: string[];
   syncing: boolean;
   /** No repo is on, so Refresh has nothing to sync. */
   allOff: boolean;
@@ -14,8 +17,17 @@ interface Props {
   onDismissError(): void;
 }
 
-export function SyncStatus({ status, syncing, allOff, error, onSync, onDismissError }: Props) {
+export function SyncStatus({
+  status,
+  repos,
+  syncing,
+  allOff,
+  error,
+  onSync,
+  onDismissError,
+}: Props) {
   const now = useNow();
+  const errors = syncErrors(status, repos);
 
   const busy = syncing || status.inFlight.length > 0;
   return (
@@ -24,12 +36,12 @@ export function SyncStatus({ status, syncing, allOff, error, onSync, onDismissEr
         className={`inline-block h-2 w-2 rounded-full ${
           busy
             ? "bg-sky-500 motion-safe:animate-pulse"
-            : status.lastError
+            : errors.length > 0
               ? "bg-red-500"
               : "bg-emerald-500"
         }`}
       />
-      <span title={status.lastError ?? undefined}>
+      <span title={errors.join("\n") || undefined}>
         {busy
           ? `Syncing ${status.inFlight.join(", ")}…`
           : `Synced ${relativeTime(status.lastSyncAt, now)}`}

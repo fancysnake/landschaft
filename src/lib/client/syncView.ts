@@ -12,6 +12,18 @@ export function syncAge(iso: string | null, refreshMinutes: number, now: number)
   return intervals <= 2 ? "fresh" : intervals <= 6 ? "late" : "stale";
 }
 
+/** The failures to show for `repos`: the status's own, then each repo's it does not carry. */
+export function syncErrors(status: SyncStatus, repos: string[]): string[] {
+  const { lastError } = status;
+  const failed = repos.flatMap((repo) => {
+    const error = status.repos[repo]?.lastError;
+    return error ? [`${repo}: ${error}`] : [];
+  });
+  return lastError
+    ? [lastError, ...failed.filter((failure) => !lastError.includes(failure))]
+    : failed;
+}
+
 export type SyncPhase = "idle" | "syncing" | "queued";
 
 /** How the last sync went: its failure, else its age. */

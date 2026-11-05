@@ -37,6 +37,28 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const closedSince = (days: number, now: Date): number =>
   days > 0 ? now.getTime() - days * DAY_MS : Number.POSITIVE_INFINITY;
 
+type Schedule = Pick<Config, "repos" | "hiddenRepos" | "refreshMinutes">;
+
+/**
+ * The repo to sync next: none within a slot of the newest attempt, a slot being the refresh
+ * interval split by the repos, else the stalest due repo, those that are on first. Takes attempts
+ * rather than successes, so a failing repo waits its turn instead of staying the stalest.
+ */
+export function nextDue(
+  { repos, hiddenRepos, refreshMinutes }: Schedule,
+  attempts: Record<string, string | null>,
+  now: number,
+): string | undefined {
+  const ages = repos.map((repo) => ({
+    repo,
+    age: syncIntervals(attempts[repo] ?? null, refreshMinutes, now),
+  }));
+  if (Math.min(...ages.map(({ age }) => age)) < 1 / repos.length) return undefined;
+  // Two repos that never synced give Infinity - Infinity, NaN, which keeps config order.
+  const due = ages.filter(({ age }) => age >= 1).toSorted((a, b) => b.age - a.age);
+  return (due.find(({ repo }) => !hiddenRepos.includes(repo)) ?? due[0])?.repo;
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -46,8 +68,10 @@ export class Syncer implements SyncService {
   /** Sync-all runs finished. */
   private runs = 0;
   private lastSyncAt: string | null = null;
-  /** Written by sync-all runs alone; a repo's own error stays in its sync state. */
+  /** Written by runs a user asked for; a repo's own error stays in its sync state. */
   private lastError: string | null = null;
+  /** Why `syncDue` last failed to pick a repo, until it next picks one. */
+  private dueError: string | null = null;
   private rateRemaining: number | null = null;
   private viewerLogin: string | null = null;
   private readonly inFlight = new Set<string>();
@@ -59,8 +83,8 @@ export class Syncer implements SyncService {
   /** Repos the running sync-all has yet to reach, each with its `full` flag. */
   private readonly queue = new Map<string, boolean>();
   private running: Promise<void> | null = null;
-  /** When `syncDue` last started a sync, in ms. */
-  private lastTickAt = Number.NEGATIVE_INFINITY;
+  /** The running sync-all holds a user's repos, so it reports to `lastError`. */
+  private userRun = false;
 
   constructor(deps: SyncDeps) {
     this.db = deps.db;
@@ -74,7 +98,7 @@ export class Syncer implements SyncService {
       version: this.version,
       runs: this.runs,
       lastSyncAt: this.lastSyncAt,
-      lastError: this.lastError,
+      lastError: [this.lastError, this.dueError].filter(Boolean).join("; ") || null,
       rateRemaining: this.rateRemaining,
       inFlight: [...this.inFlight],
       queued: [...this.queue.keys()],
@@ -105,12 +129,13 @@ export class Syncer implements SyncService {
   /**
    * Adds `repos` to the running sync-all, or starts one; resolves when that run ends. A run
    * syncs one repo at a time, skips those already in flight, and ends with every failure it met
-   * in `lastError`. Never rejects.
+   * in `lastError`, unless only `background` calls fed it. Never rejects.
    */
-  syncAll(repos: string[], options: SyncOptions = {}): Promise<void> {
+  syncAll(repos: string[], options: SyncOptions & { background?: boolean } = {}): Promise<void> {
     for (const repo of repos) {
       this.queue.set(repo, Boolean(options.full) || Boolean(this.queue.get(repo)));
     }
+    this.userRun ||= !options.background;
     // Deferred a tick, so a run that finds the queue empty ends after `running` is set.
     this.running ??= Promise.resolve().then(() => this.drainQueue());
     return this.running;
@@ -131,35 +156,21 @@ export class Syncer implements SyncService {
     try {
       config = this.config();
     } catch (error) {
-      this.lastError = `config: ${errorMessage(error)}`;
+      this.dueError = `config: ${errorMessage(error)}`;
       return;
     }
     let repo: string | undefined;
     try {
-      const now = this.now().getTime();
-      const slotMs = (config.refreshMinutes * 60_000) / config.repos.length;
-      if (now - this.lastTickAt < slotMs) return;
-      repo = this.stalestDue(config, now);
-      if (repo) this.lastTickAt = now;
+      const attempts = Object.fromEntries(
+        this.db.listSyncStates().map((state) => [state.repo, state.lastAttemptAt]),
+      );
+      repo = nextDue(config, attempts, this.now().getTime());
     } catch (error) {
-      this.lastError = `due repos: ${errorMessage(error)}`;
+      this.dueError = `due repos: ${errorMessage(error)}`;
       return;
     }
-    if (repo) await this.syncAll([repo]);
-  }
-
-  /**
-   * The due repo with the oldest sync attempt, repos that are on first. Attempts rather than
-   * successes, so a failing repo waits its turn instead of staying the stalest.
-   */
-  private stalestDue(config: Config, now: number): string | undefined {
-    const off = (repo: string) => Number(config.hiddenRepos.includes(repo));
-    return config.repos
-      .map((repo) => ({ repo, attempt: this.db.getSyncState(repo)?.updatedAt ?? null }))
-      .filter(({ attempt }) => syncIntervals(attempt, config.refreshMinutes, now) >= 1)
-      .toSorted(
-        (a, b) => off(a.repo) - off(b.repo) || (a.attempt ?? "").localeCompare(b.attempt ?? ""),
-      )[0]?.repo;
+    this.dueError = null;
+    if (repo) await this.syncAll([repo], { background: true });
   }
 
   private async drainQueue(): Promise<void> {
@@ -176,7 +187,8 @@ export class Syncer implements SyncService {
         }
       }
     } finally {
-      this.lastError = errors.length > 0 ? errors.join("; ") : null;
+      if (this.userRun) this.lastError = errors.length > 0 ? errors.join("; ") : null;
+      this.userRun = false;
       this.runs += 1;
       this.running = null;
     }
@@ -186,6 +198,7 @@ export class Syncer implements SyncService {
     if (this.inFlight.has(repo)) throw new SyncBusyError(repo);
     this.inFlight.add(repo);
     const startedAt = this.now();
+    const stamp = startedAt.toISOString();
     try {
       const state = this.db.getSyncState(repo);
       const fullAge = state?.lastFullSyncAt
@@ -224,19 +237,18 @@ export class Syncer implements SyncService {
       await this.refreshCiJobs(repo);
       this.db.upsertLabels(repo, await this.forge.repoLabels(repo));
 
-      const stamp = startedAt.toISOString();
       this.db.setSyncState(repo, {
         lastSyncAt: stamp,
         lastFullSyncAt: full ? stamp : (state?.lastFullSyncAt ?? null),
         lastError: null,
-        updatedAt: this.now().toISOString(),
+        lastAttemptAt: stamp,
       });
       this.lastSyncAt = stamp;
       return { repo, full, upserted, closed };
     } catch (error) {
       this.db.setSyncState(repo, {
         lastError: errorMessage(error),
-        updatedAt: this.now().toISOString(),
+        lastAttemptAt: stamp,
       });
       throw error;
     } finally {

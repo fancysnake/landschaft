@@ -145,7 +145,7 @@ describe("Db", () => {
       lastSyncAt: "2026-01-01T00:00:00Z",
       lastFullSyncAt: "2026-01-01T00:00:00Z",
       lastError: "boom",
-      updatedAt: null,
+      lastAttemptAt: null,
     });
   });
 });

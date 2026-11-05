@@ -3,17 +3,14 @@ export interface SyncState {
   lastSyncAt: string | null;
   lastFullSyncAt: string | null;
   lastError: string | null;
-  updatedAt: string | null;
+  /** When the last sync started, whether it succeeded or not. */
+  lastAttemptAt: string | null;
 }
 
-/** Refresh intervals elapsed since `lastSyncAt`; infinitely many when it never synced. */
-export function syncIntervals(
-  lastSyncAt: string | null,
-  refreshMinutes: number,
-  now: number,
-): number {
-  if (!lastSyncAt) return Infinity;
-  return (now - Date.parse(lastSyncAt)) / (refreshMinutes * 60_000);
+/** Refresh intervals elapsed since `since`; infinitely many when null. */
+export function syncIntervals(since: string | null, refreshMinutes: number, now: number): number {
+  if (!since) return Infinity;
+  return (now - Date.parse(since)) / (refreshMinutes * 60_000);
 }
 
 export interface SyncStatus {
@@ -21,7 +18,7 @@ export interface SyncStatus {
   /** Sync-all runs finished since the server started. */
   runs: number;
   lastSyncAt: string | null;
-  /** Every failure of the last finished sync-all run. */
+  /** Every failure of the last run a user asked for, then why the scheduler cannot pick a repo. */
   lastError: string | null;
   rateRemaining: number | null;
   inFlight: string[];

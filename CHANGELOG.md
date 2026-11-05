@@ -18,7 +18,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 - Background syncs arrive one repo at a time, spread over `refreshMinutes` by the number of
   repos: the stalest repo that is on, then the stalest that is off. A failed repo is retried
-  after `refreshMinutes` instead of every minute.
+  after `refreshMinutes` instead of every minute. The top-bar dot stays red while any configured
+  repo's last sync failed.
 - An open sub-issue counts as blocked while its parent is open, so `is:blocked` and
   `hideBlocked` take it and the parent is the card to pick up.
 - Repo chips save which repos are off in the config as `hiddenRepos`, shared by every browser;

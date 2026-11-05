@@ -9,7 +9,7 @@ import { Db } from "../links/db/sqlite";
 import { GithubForge } from "../links/forge/github/forge";
 import { ConfigSchema } from "../pacts/config";
 import { InvalidError, SyncBusyError } from "../pacts/services";
-import { closedSince, type SyncDeps, Syncer } from "./sync";
+import { closedSince, nextDue, type SyncDeps, Syncer } from "./sync";
 
 function toNode(number: number, state: "OPEN" | "CLOSED" = "OPEN"): IssueNode {
   const issue = makeIssue({ number, state });
@@ -540,84 +540,60 @@ describe("Syncer", () => {
   });
 });
 
-const FRESH = "2026-05-01T11:59:30.000Z";
+const FRESH = "2026-05-01T11:56:00.000Z";
 const STALE = "2026-05-01T11:50:00.000Z";
 const STALER = "2026-05-01T11:40:00.000Z";
 
-/** A Syncer over a db whose repos last attempted a sync at the given times. */
-function dueSyncer(attempts: Record<string, string | null>, hiddenRepos: string[] = []) {
-  const db = new Db(":memory:");
-  for (const [repo, updatedAt] of Object.entries(attempts)) {
-    if (updatedAt) db.setSyncState(repo, { updatedAt });
-  }
-  const syncer = syncerWith(db, fakeGithub([]).gh, {
-    config: () =>
-      ConfigSchema.parse({ repos: Object.keys(attempts), hiddenRepos, refreshMinutes: 5 }),
+const due = (attempts: Record<string, string | null>, hiddenRepos: string[] = []) =>
+  nextDue(
+    { repos: Object.keys(attempts), hiddenRepos, refreshMinutes: 5 },
+    attempts,
+    now.getTime(),
+  );
+
+describe("nextDue", () => {
+  it("picks the repo with the oldest attempt", () => {
+    expect(due({ "acme/fresh": FRESH, "acme/stale": STALE, "acme/staler": STALER })).toBe(
+      "acme/staler",
+    );
   });
-  return { db, syncer, syncAll: vi.spyOn(syncer, "syncAll").mockResolvedValue() };
-}
+
+  it("picks a repo that never synced before any other", () => {
+    expect(due({ "acme/stale": STALE, "acme/new": null })).toBe("acme/new");
+  });
+
+  it("keeps config order among repos that never synced", () => {
+    expect(due({ "acme/b": null, "acme/a": null })).toBe("acme/b");
+  });
+
+  it("prefers a due repo that is on over a staler one that is off", () => {
+    expect(due({ "acme/off": STALER, "acme/on": STALE }, ["acme/off"])).toBe("acme/on");
+  });
+
+  it("picks a repo that is off once every repo that is on is fresh", () => {
+    expect(due({ "acme/off": STALE, "acme/on": FRESH }, ["acme/off"])).toBe("acme/off");
+  });
+
+  it("picks nothing when no repo is older than the interval", () => {
+    expect(due({ "acme/on": FRESH, "acme/off": FRESH }, ["acme/off"])).toBeUndefined();
+  });
+
+  it("picks nothing within a slot of the newest attempt", () => {
+    const justNow = "2026-05-01T11:59:30.000Z";
+    expect(due({ "acme/stale": STALE, "acme/recent": justNow })).toBeUndefined();
+  });
+
+  it("picks nothing without repos", () => {
+    expect(due({})).toBeUndefined();
+  });
+});
 
 describe("Syncer.syncDue", () => {
-  it("syncs only the repo with the oldest attempt", async () => {
-    const { db, syncer, syncAll } = dueSyncer({
-      "acme/fresh": FRESH,
-      "acme/stale": STALE,
-      "acme/staler": STALER,
-    });
-
-    await syncer.syncDue();
-
-    expect(syncAll.mock.calls).toEqual([[["acme/staler"]]]);
-    db.close();
-  });
-
-  it("syncs a repo that never synced before any other", async () => {
-    const { db, syncer, syncAll } = dueSyncer({ "acme/stale": STALE, "acme/new": null });
-
-    await syncer.syncDue();
-
-    expect(syncAll.mock.calls).toEqual([[["acme/new"]]]);
-    db.close();
-  });
-
-  it("prefers a due repo that is on over a staler one that is off", async () => {
-    const { db, syncer, syncAll } = dueSyncer({ "acme/off": STALER, "acme/on": STALE }, [
-      "acme/off",
-    ]);
-
-    await syncer.syncDue();
-
-    expect(syncAll.mock.calls).toEqual([[["acme/on"]]]);
-    db.close();
-  });
-
-  it("syncs a repo that is off once every repo that is on is fresh", async () => {
-    const { db, syncer, syncAll } = dueSyncer({ "acme/off": STALE, "acme/on": FRESH }, [
-      "acme/off",
-    ]);
-
-    await syncer.syncDue();
-
-    expect(syncAll.mock.calls).toEqual([[["acme/off"]]]);
-    db.close();
-  });
-
-  it("syncs nothing when no repo is older than the interval", async () => {
-    const { db, syncer, syncAll } = dueSyncer({ "acme/on": FRESH, "acme/off": FRESH }, [
-      "acme/off",
-    ]);
-
-    await syncer.syncDue();
-
-    expect(syncAll).not.toHaveBeenCalled();
-    db.close();
-  });
-
   it("puts a repo that just failed behind the others, though its last success is older", async () => {
     const db = new Db(":memory:");
     const repos = ["acme/bad", "acme/good"];
-    db.setSyncState("acme/bad", { lastSyncAt: STALER, lastError: "boom", updatedAt: STALE });
-    db.setSyncState("acme/good", { lastSyncAt: STALER, updatedAt: STALER });
+    db.setSyncState("acme/bad", { lastSyncAt: STALER, lastError: "boom", lastAttemptAt: STALE });
+    db.setSyncState("acme/good", { lastSyncAt: STALER, lastAttemptAt: STALER });
     const syncer = syncerWith(db, fakeGithub([]).gh, {
       config: () => ConfigSchema.parse({ repos, refreshMinutes: 5 }),
     });
@@ -625,7 +601,7 @@ describe("Syncer.syncDue", () => {
 
     await syncer.syncDue();
 
-    expect(syncAll.mock.calls).toEqual([[["acme/good"]]]);
+    expect(syncAll.mock.calls).toEqual([[["acme/good"], { background: true }]]);
     db.close();
   });
 
@@ -666,7 +642,7 @@ describe("Syncer.syncDue", () => {
     const synced: { repo: string; at: number }[] = [];
     vi.spyOn(syncer, "syncAll").mockImplementation(async ([repo = ""]) => {
       synced.push({ repo, at: clock });
-      db.setSyncState(repo, { updatedAt: new Date(clock).toISOString() });
+      db.setSyncState(repo, { lastAttemptAt: new Date(clock).toISOString() });
     });
 
     for (; clock < now.getTime() + 2 * 300_000; clock += 5000) await syncer.syncDue();
@@ -674,6 +650,47 @@ describe("Syncer.syncDue", () => {
     const gaps = synced.slice(1).map(({ at }, index) => at - (synced[index]?.at ?? 0));
     expect(new Set(gaps)).toEqual(new Set([25_000]));
     expect(synced.map(({ repo }) => repo)).toEqual([...repos, ...repos]);
+    db.close();
+  });
+
+  it("leaves a user run's failure in place when a background run ends", async () => {
+    const db = new Db(":memory:");
+    const { gh: good } = fakeGithub([[]]);
+    const gh: GithubClient = {
+      gql: <T>(query: string, variables: Record<string, unknown>): Promise<T> =>
+        variables.name === "bad"
+          ? Promise.reject(new Error("boom"))
+          : good.gql<T>(query, variables),
+    };
+    const syncer = syncerWith(db, gh, {
+      config: () => ConfigSchema.parse({ repos: ["acme/bad", REPO], refreshMinutes: 5 }),
+      now: () => new Date(now.getTime() + (db.getSyncState("acme/bad") ? 200_000 : 0)),
+    });
+    await syncer.syncAll(["acme/bad"]);
+
+    await syncer.syncDue();
+
+    expect(db.getSyncState(REPO)?.lastSyncAt).not.toBeNull();
+    expect(syncer.status()).toMatchObject({ runs: 2, lastError: "acme/bad: boom" });
+    db.close();
+  });
+
+  it("clears its own error once it picks a repo again", async () => {
+    const db = new Db(":memory:");
+    let broken = true;
+    const syncer = syncerWith(db, fakeGithub([]).gh, {
+      config: () => {
+        if (broken) throw new Error("bad json");
+        return ConfigSchema.parse({ repos: [REPO] });
+      },
+    });
+    await syncer.syncDue();
+    expect(syncer.status().lastError).toBe("config: bad json");
+    broken = false;
+
+    await syncer.syncDue();
+
+    expect(syncer.status().lastError).toBeNull();
     db.close();
   });
 
@@ -697,7 +714,7 @@ describe("Syncer.syncDue", () => {
   it("records a sync state that fails to load and syncs nothing", async () => {
     const db = new Db(":memory:");
     const syncer = syncerWith(db, fakeGithub([]).gh);
-    vi.spyOn(db, "getSyncState").mockImplementation(() => {
+    vi.spyOn(db, "listSyncStates").mockImplementationOnce(() => {
       throw new Error("disk I/O error");
     });
     const syncAll = vi.spyOn(syncer, "syncAll");

@@ -63,7 +63,7 @@ export interface SyncService {
   /**
    * Syncs the stalest repo due, those that are on first, at most once per refresh interval split
    * by the configured repos; skips while a sync runs. Due: last attempt older than the interval.
-   * Never rejects.
+   * The repo's failure stays in its sync state, out of `lastError`. Never rejects.
    */
   syncDue(): Promise<void>;
 }
