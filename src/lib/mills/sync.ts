@@ -68,8 +68,11 @@ export class Syncer implements SyncService {
   /** Sync-all runs finished. */
   private runs = 0;
   private lastSyncAt: string | null = null;
-  /** Written by runs a user asked for; a repo's own error stays in its sync state. */
-  private lastError: string | null = null;
+  /**
+   * Failures of runs a user asked for, by repo, until that repo syncs or leaves the config. A
+   * repo's own error stays in its sync state.
+   */
+  private readonly userErrors = new Map<string, string>();
   /** Why `syncDue` last failed to pick a repo, until it next picks one. */
   private dueError: string | null = null;
   private rateRemaining: number | null = null;
@@ -83,7 +86,7 @@ export class Syncer implements SyncService {
   /** Repos the running sync-all has yet to reach, each with its `full` flag. */
   private readonly queue = new Map<string, boolean>();
   private running: Promise<void> | null = null;
-  /** The running sync-all holds a user's repos, so it reports to `lastError`. */
+  /** The running sync-all holds a user's repos, so it reports to `userErrors`. */
   private userRun = false;
 
   constructor(deps: SyncDeps) {
@@ -98,7 +101,7 @@ export class Syncer implements SyncService {
       version: this.version,
       runs: this.runs,
       lastSyncAt: this.lastSyncAt,
-      lastError: [this.lastError, this.dueError].filter(Boolean).join("; ") || null,
+      lastError: [...this.userErrors.values(), this.dueError].filter(Boolean).join("; ") || null,
       rateRemaining: this.rateRemaining,
       inFlight: [...this.inFlight],
       queued: [...this.queue.keys()],
@@ -129,7 +132,8 @@ export class Syncer implements SyncService {
   /**
    * Adds `repos` to the running sync-all, or starts one; resolves when that run ends. A run
    * syncs one repo at a time, skips those already in flight, and ends with every failure it met
-   * in `lastError`, unless only `background` calls fed it. Never rejects.
+   * in `lastError`, unless only `background` calls fed it; each stays until its repo syncs. Never
+   * rejects.
    */
   syncAll(repos: string[], options: SyncOptions & { background?: boolean } = {}): Promise<void> {
     for (const repo of repos) {
@@ -170,11 +174,15 @@ export class Syncer implements SyncService {
       return;
     }
     this.dueError = null;
+    // No sync will clear a repo gone from the config.
+    for (const failed of this.userErrors.keys()) {
+      if (!config.repos.includes(failed)) this.userErrors.delete(failed);
+    }
     if (repo) await this.syncAll([repo], { background: true });
   }
 
   private async drainQueue(): Promise<void> {
-    const errors: string[] = [];
+    const errors = new Map<string, string>();
     try {
       // A Map iterator also visits the repos added while the run goes.
       for (const [repo, full] of this.queue) {
@@ -182,12 +190,13 @@ export class Syncer implements SyncService {
         if (this.inFlight.has(repo)) continue;
         try {
           await this.syncRepo(repo, { full });
+          errors.delete(repo);
         } catch (error) {
-          errors.push(`${repo}: ${errorMessage(error)}`);
+          errors.set(repo, `${repo}: ${errorMessage(error)}`);
         }
       }
     } finally {
-      if (this.userRun) this.lastError = errors.length > 0 ? errors.join("; ") : null;
+      if (this.userRun) for (const [repo, error] of errors) this.userErrors.set(repo, error);
       this.userRun = false;
       this.runs += 1;
       this.running = null;
@@ -244,6 +253,7 @@ export class Syncer implements SyncService {
         lastAttemptAt: stamp,
       });
       this.lastSyncAt = stamp;
+      this.userErrors.delete(repo);
       return { repo, full, upserted, closed };
     } catch (error) {
       this.db.setSyncState(repo, {

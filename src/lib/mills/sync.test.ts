@@ -588,6 +588,17 @@ describe("nextDue", () => {
   });
 });
 
+/** A GitHub that fails every query on the repo names in `broken`, read per query. */
+const failingOn = (broken: Set<string>): GithubClient => {
+  const { gh: good } = fakeGithub([[]]);
+  return {
+    gql: <T>(query: string, variables: Record<string, unknown>): Promise<T> =>
+      broken.has(String(variables.name))
+        ? Promise.reject(new Error("boom"))
+        : good.gql<T>(query, variables),
+  };
+};
+
 describe("Syncer.syncDue", () => {
   it("puts a repo that just failed behind the others, though its last success is older", async () => {
     const db = new Db(":memory:");
@@ -672,6 +683,62 @@ describe("Syncer.syncDue", () => {
 
     expect(db.getSyncState(REPO)?.lastSyncAt).not.toBeNull();
     expect(syncer.status()).toMatchObject({ runs: 2, lastError: "acme/bad: boom" });
+    db.close();
+  });
+
+  it("drops a user run's failure once a background sync recovers that repo", async () => {
+    const db = new Db(":memory:");
+    const broken = new Set(["bad", "worse"]);
+    let clock = now.getTime();
+    const syncer = syncerWith(db, failingOn(broken), {
+      config: () => ConfigSchema.parse({ repos: ["acme/bad", "acme/worse"], refreshMinutes: 5 }),
+      now: () => new Date(clock),
+    });
+    await syncer.syncAll(["acme/bad", "acme/worse"]);
+    expect(syncer.status().lastError).toBe("acme/bad: boom; acme/worse: boom");
+    broken.clear();
+
+    clock += 300_000;
+    await syncer.syncDue();
+    expect(syncer.status().lastError).toBe("acme/worse: boom");
+
+    clock += 300_000;
+    await syncer.syncDue();
+    expect(syncer.status().lastError).toBeNull();
+    db.close();
+  });
+
+  it("reports no failure for a repo a later pass of the same run recovers", async () => {
+    const db = new Db(":memory:");
+    const { gh: good } = fakeGithub([[]]);
+    let failed = false;
+    const syncer: Syncer = syncerWith(db, {
+      gql: <T>(query: string, variables: Record<string, unknown>): Promise<T> => {
+        if (failed) return good.gql<T>(query, variables);
+        failed = true;
+        void syncer.syncAll([REPO]);
+        return Promise.reject(new Error("boom"));
+      },
+    });
+
+    await syncer.syncAll([REPO]);
+
+    expect(syncer.status()).toMatchObject({ runs: 1, lastError: null });
+    db.close();
+  });
+
+  it("drops a user run's failure once its repo leaves the config", async () => {
+    const db = new Db(":memory:");
+    let repos = ["acme/bad"];
+    const syncer = syncerWith(db, failingOn(new Set(["bad"])), {
+      config: () => ConfigSchema.parse({ repos, refreshMinutes: 5 }),
+    });
+    await syncer.syncAll(repos);
+    repos = [REPO];
+
+    await syncer.syncDue();
+
+    expect(syncer.status().lastError).toBeNull();
     db.close();
   });
 

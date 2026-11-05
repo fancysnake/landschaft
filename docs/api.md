@@ -46,5 +46,5 @@ every open issue instead of only those changed since the last sync. A call durin
 sync-all joins that run and adds its repositories to it. Follow progress by polling
 `GET /api/version`: a repository is waiting while it is in `queued` and busy while it is in
 `inFlight`, the run is done once `runs`
-reaches `run`, and its failures land in `lastError`. A background sync's failure stays in that
-repository's entry under `repos`.
+reaches `run`, and its failures land in `lastError`, each until its repository next syncs. A
+background sync's failure stays in that repository's entry under `repos`.
