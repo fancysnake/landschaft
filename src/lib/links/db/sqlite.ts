@@ -142,7 +142,7 @@ const toSyncState = (row: SyncStateRow): SyncState => ({
   lastSyncAt: row.last_sync_at,
   lastFullSyncAt: row.last_full_sync_at,
   lastError: row.last_error,
-  updatedAt: row.updated_at,
+  lastAttemptAt: row.updated_at,
 });
 
 function placeholders(count: number): string {
@@ -438,7 +438,7 @@ export class Db implements SyncStore, ViewStore {
       lastSyncAt: null,
       lastFullSyncAt: null,
       lastError: null,
-      updatedAt: null,
+      lastAttemptAt: null,
     };
     const next = { ...current, ...patch };
     this.db
@@ -449,6 +449,6 @@ export class Db implements SyncStore, ViewStore {
            last_full_sync_at = excluded.last_full_sync_at, last_error = excluded.last_error,
            updated_at = excluded.updated_at`,
       )
-      .run(repo, next.lastSyncAt, next.lastFullSyncAt, next.lastError, next.updatedAt);
+      .run(repo, next.lastSyncAt, next.lastFullSyncAt, next.lastError, next.lastAttemptAt);
   }
 }

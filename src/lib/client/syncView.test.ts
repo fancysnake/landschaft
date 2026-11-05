@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SyncStatus } from "../pacts/sync";
 
-import { repoSyncView, syncAge } from "./syncView";
+import { repoSyncView, syncAge, syncErrors } from "./syncView";
 
 describe("syncAge", () => {
   const now = Date.parse("2026-01-01T12:00:00Z");
@@ -17,6 +17,32 @@ describe("syncAge", () => {
 
   it("counts a repo never synced as stale", () => {
     expect(syncAge(null, 5, now)).toBe("stale");
+  });
+});
+
+const errorStatus = (over: Partial<SyncStatus>) =>
+  ({ lastError: null, repos: {}, ...over }) as SyncStatus;
+
+describe("syncErrors", () => {
+  const failing = { "o/a": { lastSyncAt: null, lastError: "boom" } };
+
+  it("reports a failing repo though the status has no error", () => {
+    expect(syncErrors(errorStatus({ repos: failing }), ["o/a"])).toEqual(["o/a: boom"]);
+  });
+
+  it("ignores a repo outside the config", () => {
+    expect(syncErrors(errorStatus({ repos: failing }), ["o/b"])).toEqual([]);
+  });
+
+  it("reports an error no repo holds", () => {
+    expect(syncErrors(errorStatus({ lastError: "config: bad json" }), ["o/a"])).toEqual([
+      "config: bad json",
+    ]);
+  });
+
+  it("repeats no failure the status already carries", () => {
+    const lastError = "o/a: boom; o/b: nope";
+    expect(syncErrors(errorStatus({ lastError, repos: failing }), ["o/a"])).toEqual([lastError]);
   });
 });
 

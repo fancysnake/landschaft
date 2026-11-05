@@ -111,6 +111,7 @@ export default function Nav({ path, nav }: Props) {
           {status && (
             <SyncStatus
               status={status}
+              repos={repos}
               syncing={syncing}
               allOff={shown.length === 0}
               error={error}
