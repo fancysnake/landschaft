@@ -9,7 +9,7 @@ export const HiddenReposRequestSchema = z.object({
 });
 export type HiddenReposRequest = z.infer<typeof HiddenReposRequestSchema>;
 
-export const SyncRequestSchema = z.object({
+export const SyncRequestSchema = z.strictObject({
   /** What a sync-all queues instead of every configured repo. */
   repos: z.array(repoName).optional(),
   full: z.boolean().default(false),

@@ -41,7 +41,8 @@ repositories off on every view (`false` switches them back on) and returns the c
 
 `POST /api/sync` syncs every configured repository in the background, or with
 `{ "repos": ["owner/repo"] }` just those, and answers `202` with `{ "status", "run" }` at once,
-never `409`; a repository that is not configured is refused with `400`. `"full": true` refetches
+never `409`; a repository that is not configured, or an unknown key, is refused with
+`400`. `"full": true` refetches
 every open issue instead of only those changed since the last sync. A call during a running
 sync-all joins that run and adds its repositories to it. Follow progress by polling
 `GET /api/version`: a repository is waiting while it is in `queued` and busy while it is in
