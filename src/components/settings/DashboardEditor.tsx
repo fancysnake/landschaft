@@ -7,6 +7,7 @@ import {
   dashboardFilterError,
   type DashboardType,
   type InboxDashboard,
+  newSwimlane,
   type SortBy,
   type SortDir,
   withType,
@@ -134,13 +135,7 @@ function BoardFields({
         title="Swimlanes"
         items={dashboard.swimlanes}
         onChange={(swimlanes) => onChange({ ...dashboard, swimlanes })}
-        create={(id) => ({
-          id,
-          name: "New lane",
-          filter: "",
-          hideBlocked: false,
-          collapsed: false,
-        })}
+        create={(id) => newSwimlane(id, "New lane")}
         offer={offer}
         hint={gridHint("lane above")}
         minItems={1}
