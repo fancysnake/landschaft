@@ -49,15 +49,8 @@ function LaneRow({
       {columns.map((column) => {
         const cards = board.cells[cellKey(lane.id, column.id)] ?? [];
         return collapsed ? (
-          <div
-            key={column.id}
-            className={`${CELL} flex items-center justify-center [container-type:size]`}
-          >
-            {/* A digit is about 0.6em wide, so 150cqw over the digit count fits the width. */}
-            <span
-              className="leading-none font-semibold text-neutral-500 tabular-nums"
-              style={{ fontSize: `min(100cqh, ${150 / String(cards.length).length}cqw)` }}
-            >
+          <div key={column.id} className={`${CELL} flex items-center justify-center`}>
+            <span className="text-5xl font-semibold text-neutral-500 tabular-nums">
               {cards.length}
             </span>
           </div>
