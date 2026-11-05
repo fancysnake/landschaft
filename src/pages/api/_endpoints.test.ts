@@ -75,6 +75,12 @@ describe("POST /api/sync", () => {
     });
   });
 
+  it("answers 400 for the repo key, which queues nothing", async () => {
+    const response = await call(sync, "/api/sync", { body: { repo: REPO } });
+    expect(response).toMatchObject({ status: 400, body: { error: "validation failed" } });
+    expect(services.sync.status().queued).toEqual([]);
+  });
+
   it("answers 400 for a body that is not JSON", async () => {
     expect(await call(sync, "/api/sync", { body: "{" })).toEqual({
       status: 400,
