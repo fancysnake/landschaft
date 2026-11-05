@@ -1,5 +1,6 @@
 import {
   type BoardDashboard,
+  type Column,
   type Dashboard,
   type InboxDashboard,
   OTHER_LOOKS_AT,
@@ -448,6 +449,7 @@ export function buildBoard(
     laneTotals: {},
     columnTotals: {},
     hiddenBlocked: {},
+    lowest: {},
     fluidHiddenBlocked: {},
     total: 0,
   };
@@ -494,7 +496,18 @@ export function buildBoard(
     board.cells[key] = cards.toSorted(compare);
   for (const row of laneRows(dashboard.swimlanes))
     for (const column of dashboard.columns) keepFirstInRow(board, row, column.id);
+  for (const lane of dashboard.swimlanes)
+    board.lowest[lane.id] = lowestColumns(board, lane.id, dashboard.columns);
   return board;
+}
+
+/** The ids of the ranked `columns` with the fewest cards in the lane; none when all of them tie. */
+function lowestColumns(board: Board, laneId: string, columns: Column[]): string[] {
+  const countOf = (column: Column) => board.cells[cellKey(laneId, column.id)]!.length;
+  const ranked = columns.filter((column) => !column.unranked);
+  const lowest = Math.min(...ranked.map(countOf));
+  const low = ranked.filter((column) => countOf(column) === lowest);
+  return low.length === ranked.length ? [] : low.map((column) => column.id);
 }
 
 /** Leaves each card in `column` only in the first of the row's `lanes` that has it. */

@@ -20,7 +20,8 @@ localhost only. Errors are `{ "error": "message" }` with a matching status.
 
 `GET /api/dashboards/:id/board?q=&assignee=&label=&type=&sort=updated&dir=desc`
 returns the grid as cells keyed by swimlane and column id (adjacent fluid lanes hold each item in
-one of their cells per column, `fluidHiddenBlocked` counts what they hide), the repositories
+one of their cells per column, `fluidHiddenBlocked` counts what they hide), `lowest`, the ranked columns with the fewest cards
+in each lane, the repositories
 among the dashboard's items with the `hidden` ones among them, whose items it leaves out, and the
 label catalogue used for colouring. The React island renders it as-is; all placement logic is
 server-side and unit-tested.

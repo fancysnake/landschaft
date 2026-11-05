@@ -412,6 +412,11 @@ export function newSwimlane(laneId: string, name: string): Swimlane {
   return { id: laneId, name, filter: "", hideBlocked: false, collapsed: false, fluid: false };
 }
 
+/** A column taking every item, counted in the lowest mark. */
+export function newColumn(columnId: string, name: string): Column {
+  return { id: columnId, name, filter: "", unranked: false };
+}
+
 /** A fresh dashboard of `type` keeping `base`, the fields every type has. */
 export function withType(type: DashboardType, from: DashboardBase): Dashboard {
   const base: DashboardBase = {
@@ -426,7 +431,7 @@ export function withType(type: DashboardType, from: DashboardBase): Dashboard {
         type,
         ...base,
         swimlanes: [newSwimlane("all", "Everything")],
-        columns: [{ id: "todo", name: "Todo", filter: "", unranked: false }],
+        columns: [newColumn("todo", "Todo")],
       }
     : { type, ...base, groups: [] };
 }

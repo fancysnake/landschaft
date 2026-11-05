@@ -14,9 +14,6 @@ const STATUS_PILLS: Record<PullStatusLabel, { text: string; title: string; tone:
   "is:draft": { text: "draft", title: "Draft pull request", tone: "neutral" },
 };
 
-/** Stacks cards into one list, split by hairlines. */
-export const CARD_LIST = "flex flex-col divide-y divide-neutral-200";
-
 /** Inbox row with a coloured bar on the left for its kind; white unless `surface` tints it. */
 const cardClass = (accent: string, surface = "bg-white") =>
   `border-l-[3px] px-3 py-2 text-sm ${surface} ${accent}`;
@@ -74,6 +71,27 @@ export function CardView({ card, showRepo }: { card: Card; showRepo: boolean }) 
     <CiJobItem card={card} showRepo={showRepo} />
   ) : (
     <IssueCard card={card} showRepo={showRepo} />
+  );
+}
+
+/** `cards` stacked into one list, split by hairlines. */
+export function CardList({
+  cards,
+  showRepo,
+  className = "",
+}: {
+  cards: Card[];
+  showRepo: boolean;
+  className?: string;
+}) {
+  return (
+    <ul className={`flex flex-col divide-y divide-neutral-200 ${className}`}>
+      {cards.map((card) => (
+        <li key={card.key}>
+          <CardView card={card} showRepo={showRepo} />
+        </li>
+      ))}
+    </ul>
   );
 }
 

@@ -137,7 +137,7 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
   lane. An item in several of them shows once, in the first lane that shows it. The column header
   counts the blocked issues they hide.
 - **Fold** a swimlane from its header to see one count per column instead of its cards. **Start
-  collapsed** (per swimlane) folds it on every page load. A folded lane marks the columns with the
+  collapsed** (per solid swimlane) folds it on every page load. A folded lane marks the columns with the
   lowest count; **leave out of lowest count** (per column) skips a column.
 - Open **pull requests** are cards like issues.
 - Repo chips in the top bar switch each global repository on or off for every board, saved in

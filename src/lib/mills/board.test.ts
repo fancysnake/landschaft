@@ -16,7 +16,7 @@ import {
 } from "../__fixtures__/issues";
 import { askedLabels, type FilterNode } from "../pacts/filter";
 import { type Issue } from "../pacts/issues";
-import { type Card, cellKey, laneRows, lowestColumns } from "../pacts/views";
+import { type Card, cellKey, laneRows } from "../pacts/views";
 import {
   buildBoard,
   buildInbox,
@@ -46,22 +46,34 @@ const hitting =
 
 const ids = (groups: { id: string }[]) => groups.map((group) => group.id);
 
-describe("lowestColumns", () => {
-  const counts = { a: 5, b: 3, c: 3, d: 1 };
+describe("buildBoard lowest", () => {
+  // Three cards in a, two in b and c, one in d; the `only` lane holds one of each.
+  const issues = [
+    makeIssue({ number: 1, labels: ["a", "b", "c", "d"].map(label) }),
+    makeIssue({ number: 2, labels: ["a", "b", "c"].map(label) }),
+    makeIssue({ number: 3, labels: [label("a")] }),
+  ];
   const lowest = (unranked: string[]) =>
-    lowestColumns(
-      Object.keys(counts).map((id) => ({ id, unranked: unranked.includes(id) })),
-      (column) => counts[column.id as keyof typeof counts],
-    ).map((column) => column.id);
+    buildBoard(
+      snapshot(issues),
+      {
+        ...DASHBOARD,
+        swimlanes: [makeLane({ id: "all" }), makeLane({ id: "only", filter: "label:d" })],
+        columns: ["a", "b", "c", "d"].map((id) =>
+          makeColumn({ id, filter: `label:${id}`, unranked: unranked.includes(id) }),
+        ),
+      },
+      EVERYONE,
+    ).lowest;
 
-  it("picks the lowest ranked columns, ties included", () => {
-    expect(lowest([])).toEqual(["d"]);
-    expect(lowest(["d"])).toEqual(["b", "c"]);
+  it("names each lane's lowest ranked columns, ties included", () => {
+    expect(lowest([])).toEqual({ all: ["d"], only: [] });
+    expect(lowest(["d"]).all).toEqual(["b", "c"]);
   });
 
-  it("picks none when every ranked column ties or none ranks", () => {
-    expect(lowest(["a", "d"])).toEqual([]);
-    expect(lowest(["a", "b", "c", "d"])).toEqual([]);
+  it("names none when every ranked column ties or none ranks", () => {
+    expect(lowest(["a", "d"]).all).toEqual([]);
+    expect(lowest(["a", "b", "c", "d"]).all).toEqual([]);
   });
 });
 

@@ -7,6 +7,7 @@ import {
   dashboardFilterError,
   type DashboardType,
   type InboxDashboard,
+  newColumn,
   newSwimlane,
   type SortBy,
   type SortDir,
@@ -116,8 +117,8 @@ export function DashboardEditor({ dashboard, onChange, offer }: Props) {
 /** How a swimlane's or column's filter combines, `other` looking at `others`. */
 const gridHint = (others: string) => (
   <>
-    every matching entry shows the item · adjacent fluid lanes share one row of lists · GitHub
-    search syntax · empty = all · <code>other</code> = matched by no {others}
+    every matching entry shows the item · GitHub search syntax · empty = all · <code>other</code> =
+    matched by no {others}
   </>
 );
 
@@ -141,15 +142,15 @@ function BoardFields({
         minItems={1}
         flags={[
           { key: "hideBlocked", label: "hide blocked" },
-          { key: "collapsed", label: "start collapsed" },
-          { key: "fluid", label: "fluid" },
+          { key: "collapsed", label: "start collapsed", applies: (lane) => !lane.fluid },
+          { key: "fluid", label: "fluid: share one row of lists with adjacent fluid lanes" },
         ]}
       />
       <LaneColumnEditor
         title="Columns"
         items={dashboard.columns}
         onChange={(columns) => onChange({ ...dashboard, columns })}
-        create={(id) => ({ id, name: "New column", filter: "", unranked: false })}
+        create={(id) => newColumn(id, "New column")}
         offer={offer}
         hint={gridHint("column to the right")}
         minItems={1}

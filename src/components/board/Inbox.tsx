@@ -8,7 +8,7 @@ import { useFold } from "../../lib/client/useFold";
 import { useSynced } from "../../lib/client/useSynced";
 import { useViewRequest } from "../../lib/client/useViewRequest";
 import { FoldButton } from "./FoldButton";
-import { CARD_LIST, CardView } from "./IssueCard";
+import { CardList } from "./IssueCard";
 import { ViewShell } from "./ViewShell";
 
 interface Props {
@@ -37,13 +37,7 @@ function GroupRow({
         <span className="font-normal text-neutral-500 tabular-nums">{cards.length}</span>
       </FoldButton>
       {!collapsed && cards.length > 0 && (
-        <ul className={`border-t border-neutral-200 ${CARD_LIST}`}>
-          {cards.map((card) => (
-            <li key={card.key}>
-              <CardView card={card} showRepo={showRepo} />
-            </li>
-          ))}
-        </ul>
+        <CardList cards={cards} showRepo={showRepo} className="border-t border-neutral-200" />
       )}
     </section>
   );

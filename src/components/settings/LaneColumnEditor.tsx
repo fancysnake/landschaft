@@ -25,8 +25,8 @@ interface Props<T extends Group> {
   hint: ReactNode;
   /** Below which "remove" is off. */
   minItems: number;
-  /** Per-entry checkboxes and their labels. */
-  flags?: { key: FlagKey<T>; label: string }[];
+  /** Per-entry checkboxes and their labels; `applies` limits one to the entries it holds for. */
+  flags?: { key: FlagKey<T>; label: string; applies?(item: T): boolean }[];
 }
 
 function slug(name: string, taken: Set<string>): string {
@@ -69,21 +69,23 @@ export function LaneColumnEditor<T extends Group>({
                 className="field w-full"
               />
               <div className="mt-0.5 font-mono text-[0.625rem] text-neutral-400">{item.id}</div>
-              {flags?.map((flag) => (
-                <label
-                  key={flag.label}
-                  className="mt-1 flex items-center gap-1 text-xs text-neutral-700"
-                >
-                  <input
-                    type="checkbox"
-                    checked={Boolean(item[flag.key])}
-                    onChange={(event) =>
-                      replace(index, { ...item, [flag.key]: event.target.checked })
-                    }
-                  />
-                  {flag.label}
-                </label>
-              ))}
+              {flags
+                ?.filter((flag) => flag.applies?.(item) ?? true)
+                .map((flag) => (
+                  <label
+                    key={flag.label}
+                    className="mt-1 flex items-center gap-1 text-xs text-neutral-700"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={Boolean(item[flag.key])}
+                      onChange={(event) =>
+                        replace(index, { ...item, [flag.key]: event.target.checked })
+                      }
+                    />
+                    {flag.label}
+                  </label>
+                ))}
             </div>
             <FilterInput
               value={item.filter}

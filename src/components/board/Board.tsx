@@ -3,9 +3,9 @@ import type { Column, Swimlane } from "../../lib/pacts/config";
 import { useBoard } from "../../lib/client/useBoard";
 import { useFold } from "../../lib/client/useFold";
 import { useViewRequest } from "../../lib/client/useViewRequest";
-import { type Board as BoardData, cellKey, laneRows, lowestColumns } from "../../lib/pacts/views";
+import { type Board as BoardData, cellKey, laneRows } from "../../lib/pacts/views";
 import { FoldButton } from "./FoldButton";
-import { CARD_LIST, CardView } from "./IssueCard";
+import { CardList } from "./IssueCard";
 import { ViewShell } from "./ViewShell";
 
 interface Props {
@@ -22,10 +22,8 @@ const cardsIn = (board: BoardData, lane: Swimlane, column: Column) =>
 
 /** One count per column; the lowest stand out. */
 function FoldedCounts({ lane, columns, board }: RowProps & { lane: Swimlane }) {
-  const countOf = (column: Column) => cardsIn(board, lane, column).length;
-  const lowest = lowestColumns(columns, countOf);
   return columns.map((column) => {
-    const low = lowest.includes(column);
+    const low = board.lowest[lane.id]?.includes(column.id);
     return (
       <div
         key={column.id}
@@ -34,16 +32,20 @@ function FoldedCounts({ lane, columns, board }: RowProps & { lane: Swimlane }) {
           low ? "bg-emerald-800 text-white" : "bg-neutral-200/60 text-neutral-500"
         }`}
       >
-        {countOf(column)}
+        {cardsIn(board, lane, column).length}
         {low && <span className="sr-only"> fewest</span>}
       </div>
     );
   });
 }
 
-function SolidLane({ lane, columns, board }: RowProps & { lane: Swimlane }) {
+function SolidLane({
+  lane,
+  columns,
+  board,
+  showRepo,
+}: RowProps & { lane: Swimlane; showRepo: boolean }) {
   const [collapsed, toggle] = useFold(lane.collapsed);
-  const showRepo = board.repos.length > 1;
   const hidden = board.hiddenBlocked[lane.id] ?? 0;
 
   return (
@@ -67,11 +69,12 @@ function SolidLane({ lane, columns, board }: RowProps & { lane: Swimlane }) {
         <FoldedCounts lane={lane} columns={columns} board={board} />
       ) : (
         columns.map((column) => (
-          <div key={column.id} className={`min-h-8 ${CARD_LIST}`}>
-            {cardsIn(board, lane, column).map((card) => (
-              <CardView key={card.key} card={card} showRepo={showRepo} />
-            ))}
-          </div>
+          <CardList
+            key={column.id}
+            cards={cardsIn(board, lane, column)}
+            showRepo={showRepo}
+            className="min-h-8"
+          />
         ))
       )}
     </>
@@ -79,9 +82,12 @@ function SolidLane({ lane, columns, board }: RowProps & { lane: Swimlane }) {
 }
 
 /** One list per column: the lanes in order, each headed by its name where it has cards. */
-function FluidLanes({ lanes, columns, board }: RowProps & { lanes: Swimlane[] }) {
-  const showRepo = board.repos.length > 1;
-
+function FluidLanes({
+  lanes,
+  columns,
+  board,
+  showRepo,
+}: RowProps & { lanes: Swimlane[]; showRepo: boolean }) {
   return columns.map((column) => (
     <div key={column.id} className="flex min-h-8 flex-col gap-2">
       {lanes.map((lane) => {
@@ -93,11 +99,7 @@ function FluidLanes({ lanes, columns, board }: RowProps & { lanes: Swimlane[] })
                 {lane.name}
                 <span className="tabular-nums">{cards.length}</span>
               </h3>
-              <div className={CARD_LIST}>
-                {cards.map((card) => (
-                  <CardView key={card.key} card={card} showRepo={showRepo} />
-                ))}
-              </div>
+              <CardList cards={cards} showRepo={showRepo} />
             </section>
           )
         );
@@ -115,6 +117,7 @@ export default function Board({ dashboardId }: Props) {
   }
   const { dashboard, board } = data;
   const { columns } = dashboard;
+  const row = { columns, board, showRepo: board.repos.length > 1 };
 
   return (
     <ViewShell
@@ -151,11 +154,11 @@ export default function Board({ dashboardId }: Props) {
               </div>
             );
           })}
-          {laneRows(dashboard.swimlanes).map((row) =>
-            row[0]?.fluid ? (
-              <FluidLanes key={row[0].id} lanes={row} columns={columns} board={board} />
+          {laneRows(dashboard.swimlanes).map((lanes) =>
+            lanes[0].fluid ? (
+              <FluidLanes key={lanes[0].id} lanes={lanes} {...row} />
             ) : (
-              row[0] && <SolidLane key={row[0].id} lane={row[0]} columns={columns} board={board} />
+              <SolidLane key={lanes[0].id} lane={lanes[0]} {...row} />
             ),
           )}
         </div>
