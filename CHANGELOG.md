@@ -7,22 +7,24 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-11-05
+
 ### Added
 
 - Repo chips show each repo's sync age (red, with the error on hover, after a failed sync), sync
-  that repo alone with `↻`, and show it as the only repo with `only`. `POST /api/sync` takes
-  `repos` to queue just those, and `/api/version` reports each repo's last sync and error in
-  `repos`.
+  that repo alone, and show it as the only repo. `POST /api/sync` takes `repos` to queue just
+  those, and `/api/version` lists waiting repos in `queued` and each repo's last sync and error
+  in `repos`.
 - Swimlanes fold from their header to one count per column, and `collapsed` starts a lane folded.
 
 ### Changed
 
 - Background syncs arrive one repo at a time, spread over `refreshMinutes` by the number of
   repos: the stalest repo that is on, then the stalest that is off. A failed repo is retried
-  after `refreshMinutes` instead of every minute. The top-bar dot stays red while any configured
-  repo's last sync failed.
+  after `refreshMinutes`. The top-bar dot stays red while any configured repo's last sync failed.
+- Refresh and full resync sync only the repos that are on, and are disabled when none is.
 - An open sub-issue counts as blocked while its parent is open, so `is:blocked` and
-  `hideBlocked` take it and the parent is the card to pick up.
+  `hideBlocked` take it and `is:blocking` takes the parent.
 - Repo chips save which repos are off in the config as `hiddenRepos`, shared by every browser;
   the choice a browser kept before is dropped. `POST /api/hidden-repos` sets it, and
   `PUT /api/config` leaves it as it is.
@@ -34,7 +36,12 @@ The format is based on [Keep a Changelog], and this project adheres to
   may still carry but no longer uses. An `epic` label is a label like any other. Stars kept in
   the database are dropped.
 - The `hide` query parameter of the board, inbox and unmatched endpoints.
-- `repo` in the `POST /api/sync` body; send `repos: ["owner/repo"]` instead.
+- `repo` in the `POST /api/sync` body, refused with `400` like any unknown key; send
+  `repos: ["owner/repo"]`. The answer is always `202`: follow the run on `/api/version`.
+
+### Fixed
+
+- A config upgrade keeps a quoted filter value holding `is:has-pr` intact, so the config loads.
 
 ## [4.4.0] - 2026-10-29
 
@@ -308,7 +315,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v4.4.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v5.0.0...HEAD
+[5.0.0]: https://github.com/fancysnake/landschaft/compare/v4.4.0...v5.0.0
 [4.4.0]: https://github.com/fancysnake/landschaft/compare/v4.3.0...v4.4.0
 [4.3.0]: https://github.com/fancysnake/landschaft/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/fancysnake/landschaft/compare/v4.1.0...v4.2.0
