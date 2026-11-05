@@ -13,7 +13,7 @@ interface Props {
   dashboardId: string;
 }
 
-const CELL = "flex flex-col gap-2 rounded-lg bg-neutral-200/40 p-2";
+const CELL = "rounded-lg bg-neutral-200/40";
 
 function LaneRow({
   lane,
@@ -49,11 +49,20 @@ function LaneRow({
       {columns.map((column) => {
         const cards = board.cells[cellKey(lane.id, column.id)] ?? [];
         return collapsed ? (
-          <div key={column.id} className={CELL}>
-            <span className={`pill self-start tabular-nums ${TONE.neutral}`}>{cards.length}</span>
+          <div
+            key={column.id}
+            className={`${CELL} flex items-center justify-center [container-type:size]`}
+          >
+            {/* A digit is about 0.6em wide, so 150cqw over the digit count fits the width. */}
+            <span
+              className="leading-none font-semibold text-neutral-500 tabular-nums"
+              style={{ fontSize: `min(100cqh, ${150 / String(cards.length).length}cqw)` }}
+            >
+              {cards.length}
+            </span>
           </div>
         ) : (
-          <div key={column.id} className={`${CELL} min-h-16`}>
+          <div key={column.id} className={`${CELL} flex min-h-16 flex-col gap-2 p-2`}>
             {cards.map((card) => (
               <CardView key={card.key} card={card} showRepo={showRepo} />
             ))}
