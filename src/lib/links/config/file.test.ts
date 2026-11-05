@@ -66,7 +66,7 @@ describe("config file", () => {
     expect(saved.dashboards[0]).toMatchObject({
       sort: { by: "updated", dir: "desc" },
       filter: "",
-      swimlanes: [{ id: "all", filter: "other", hideBlocked: false }],
+      swimlanes: [{ id: "all", filter: "other", hideBlocked: false, collapsed: false }],
       columns: [{ id: "todo", filter: "other" }],
     });
     expect(loadConfig(file)).toEqual(saved);
@@ -143,6 +143,7 @@ describe("config schema rules", () => {
       name: "A",
       filter: 'label:a|"needs review"',
       hideBlocked: false,
+      collapsed: false,
     });
     expect(lane({ labels: ["a", "b"], match: "all" })?.filter).toBe("label:a label:b");
     expect(lane({ labels: ["bug", "is:ci:failed", "is:has-pr"] })?.filter).toBe(
@@ -337,8 +338,14 @@ describe("config upgrades", () => {
     const config = ConfigSchema.parse(unversioned);
     expect(config.version).toBe(CONFIG_VERSION);
     expect(asBoard(config.dashboards[0]).swimlanes).toEqual([
-      { id: "ci-jobs", name: "Failed CI", filter: "is:ci-job", hideBlocked: false },
-      { id: "all", name: "All", filter: "other", hideBlocked: false },
+      {
+        id: "ci-jobs",
+        name: "Failed CI",
+        filter: "is:ci-job",
+        hideBlocked: false,
+        collapsed: false,
+      },
+      { id: "all", name: "All", filter: "other", hideBlocked: false, collapsed: false },
     ]);
     const taken = [{ id: "ci-jobs", name: "Mine", filter: "label:ci" }];
     expect(laneIds({ dashboards: [dashboard("a", { swimlanes: taken })] })).toEqual([

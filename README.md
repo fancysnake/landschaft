@@ -132,6 +132,8 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
   them.
 - **Hide blocked** (per swimlane) drops issues that have at least one open blocker
   (GitHub "blocked by" relationships) or an open parent issue.
+- **Fold** a swimlane from its header to see one count per column instead of its cards. **Start
+  collapsed** (per swimlane) folds it on every page load.
 - Open **pull requests** are cards like issues.
 - Repo chips in the top bar switch each global repository on or off for every board, saved in
   the config; a dashboard with no items in the repos switched on is dimmed. Each chip shows its

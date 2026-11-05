@@ -116,6 +116,7 @@ export const SwimlaneSchema = z.object({
   filter: filterText.optional(),
   ...LegacyGroupSchema.shape,
   hideBlocked: z.boolean().default(false),
+  collapsed: z.boolean().default(false),
 });
 
 export const ColumnSchema = z.object({
@@ -402,6 +403,11 @@ export type Dashboard = Config["dashboards"][number];
 /** The fields every dashboard type has. */
 export type DashboardBase = Pick<Dashboard, keyof typeof shared>;
 
+/** A lane taking every item, open and showing blocked ones. */
+export function newSwimlane(laneId: string, name: string): Swimlane {
+  return { id: laneId, name, filter: "", hideBlocked: false, collapsed: false };
+}
+
 /** A fresh dashboard of `type` keeping `base`, the fields every type has. */
 export function withType(type: DashboardType, from: DashboardBase): Dashboard {
   const base: DashboardBase = {
@@ -415,7 +421,7 @@ export function withType(type: DashboardType, from: DashboardBase): Dashboard {
     ? {
         type,
         ...base,
-        swimlanes: [{ id: "all", name: "Everything", filter: "", hideBlocked: false }],
+        swimlanes: [newSwimlane("all", "Everything")],
         columns: [{ id: "todo", name: "Todo", filter: "" }],
       }
     : { type, ...base, groups: [] };

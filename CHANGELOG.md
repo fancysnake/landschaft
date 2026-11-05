@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog], and this project adheres to
   that repo alone with `↻`, and show it as the only repo with `only`. `POST /api/sync` takes
   `repos` to queue just those, and `/api/version` reports each repo's last sync and error in
   `repos`.
+- Swimlanes fold from their header to one count per column, and `collapsed` starts a lane folded.
 
 ### Changed
 

@@ -9,6 +9,7 @@ import {
   label,
   makeIssue,
   makeJob,
+  makeLane,
   REPO,
   snapshot,
 } from "../__fixtures__/issues";
@@ -156,7 +157,7 @@ describe("unmatchedItems", () => {
   it("drops hidden repos after placement, so their items still count", () => {
     const dashboard = {
       ...DASHBOARD,
-      swimlanes: [{ id: "all", name: "All", filter: "", hideBlocked: false }],
+      swimlanes: [makeLane({ id: "all" })],
       columns: [
         { id: "review", name: "Review", filter: "has:pr" },
         { id: "blocking", name: "Blocking", filter: "is:blocking" },
@@ -428,9 +429,9 @@ describe("buildBoard", () => {
     const dashboard = {
       ...DASHBOARD,
       swimlanes: [
-        { id: "a", name: "A", filter: "label:a", hideBlocked: false },
-        { id: "b", name: "B", filter: "other label:b", hideBlocked: false },
-        { id: "rest", name: "Rest", filter: "other", hideBlocked: false },
+        makeLane({ id: "a", filter: "label:a" }),
+        makeLane({ id: "b", filter: "other label:b" }),
+        makeLane({ id: "rest", filter: "other" }),
       ],
     };
     const issues = [
@@ -469,10 +470,7 @@ describe("buildBoard", () => {
   it("puts pull requests in a PR swimlane and in every other lane they match", () => {
     const dashboard = {
       ...DASHBOARD,
-      swimlanes: [
-        { id: "prs", name: "PRs", filter: "is:pr", hideBlocked: false },
-        ...DASHBOARD.swimlanes,
-      ],
+      swimlanes: [makeLane({ id: "prs", filter: "is:pr" }), ...DASHBOARD.swimlanes],
     };
     const issues = [
       makeIssue({ number: 1, kind: "pr", labels: [label("prio:high")] }),
@@ -504,12 +502,7 @@ describe("buildBoard", () => {
     const dashboard = {
       ...DASHBOARD,
       swimlanes: [
-        {
-          id: "fix",
-          name: "To fix",
-          filter: "is:pr is:conflicting|ci:failed|unanswered",
-          hideBlocked: false,
-        },
+        makeLane({ id: "fix", filter: "is:pr is:conflicting|ci:failed|unanswered" }),
         ...DASHBOARD.swimlanes,
       ],
     };
@@ -533,10 +526,7 @@ describe("buildBoard", () => {
   it("matches has:pr on issues an open PR closes, whoever's the PR", () => {
     const dashboard = {
       ...DASHBOARD,
-      swimlanes: [
-        { id: "review", name: "In review", filter: "is:issue has:pr", hideBlocked: false },
-        ...DASHBOARD.swimlanes,
-      ],
+      swimlanes: [makeLane({ id: "review", filter: "is:issue has:pr" }), ...DASHBOARD.swimlanes],
     };
     const alice = { author: "alice" };
     const issues = [
@@ -735,8 +725,8 @@ describe("buildBoard", () => {
     const dashboard = {
       ...DASHBOARD,
       swimlanes: [
-        { id: "blocking", name: "Blocking", filter: "is:blocking", hideBlocked: false },
-        { id: "mine", name: "Mine", filter: "user:@me", hideBlocked: false },
+        makeLane({ id: "blocking", filter: "is:blocking" }),
+        makeLane({ id: "mine", filter: "user:@me" }),
         ...DASHBOARD.swimlanes,
       ],
     };
@@ -756,10 +746,7 @@ describe("buildBoard", () => {
   it("matches is:blocking on an open parent of an open sub-issue", () => {
     const dashboard = {
       ...DASHBOARD,
-      swimlanes: [
-        { id: "blocking", name: "Blocking", filter: "is:blocking", hideBlocked: false },
-        ...DASHBOARD.swimlanes,
-      ],
+      swimlanes: [makeLane({ id: "blocking", filter: "is:blocking" }), ...DASHBOARD.swimlanes],
     };
     const issues = [
       makeIssue({ number: 1 }),
@@ -924,8 +911,8 @@ describe("CI jobs", () => {
 
   it("follows the dashboard filter and the swimlanes", () => {
     const lanes = [
-      { id: "ci", name: "CI", filter: "is:ci-job job:lint", hideBlocked: false },
-      { id: "rest", name: "Rest", filter: "other", hideBlocked: false },
+      makeLane({ id: "ci", filter: "is:ci-job job:lint" }),
+      makeLane({ id: "rest", filter: "other" }),
     ];
     const board = buildBoard(snapshot([], jobs), { ...DASHBOARD, swimlanes: lanes }, EVERYONE);
     expect(board.cells[cell("ci", "todo")]?.map(numberOf)).toEqual(["lint"]);
@@ -954,8 +941,8 @@ describe("CI jobs", () => {
     const pr = makeIssue({ number: 7, kind: "pr", labels: [label("team-a"), label("bug")] });
     const withPr = [makeJob({ name: "lint", pr: { number: 7, url: pr.url } }), ...jobs];
     const lanes = [
-      { id: "a", name: "A", filter: "label:team-a", hideBlocked: false },
-      { id: "rest", name: "Rest", filter: "other", hideBlocked: false },
+      makeLane({ id: "a", filter: "label:team-a" }),
+      makeLane({ id: "rest", filter: "other" }),
     ];
     const dashboard = { ...DASHBOARD, swimlanes: lanes, filter: "is:ci-job" };
     const board = buildBoard(snapshot([pr], withPr), dashboard, EVERYONE);
