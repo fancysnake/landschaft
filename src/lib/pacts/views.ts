@@ -70,12 +70,36 @@ export interface Board extends Facets {
   /** Issues shown in each column; one in several lanes counts once. */
   columnTotals: Record<string, number>;
   hiddenBlocked: Record<string, number>;
+  /** Issues fluid lanes alone hide as blocked, by column; shown in no lane. */
+  fluidHiddenBlocked: Record<string, number>;
   /** Issues shown in at least one cell; one in several cells counts once. */
   total: number;
 }
 
 export function cellKey(laneId: string, colId: string): string {
   return `${laneId}:${colId}`;
+}
+
+/** The grid's rows, top to bottom: a solid lane alone, adjacent fluid lanes together. */
+export function laneRows<T extends { fluid: boolean }>(lanes: T[]): T[][] {
+  const rows: T[][] = [];
+  for (const lane of lanes) {
+    const last = rows.at(-1);
+    if (lane.fluid && last?.[0]?.fluid) last.push(lane);
+    else rows.push([lane]);
+  }
+  return rows;
+}
+
+/** The ranked `columns` holding the lowest count; none when all of them tie. */
+export function lowestColumns<T extends { unranked: boolean }>(
+  columns: T[],
+  countOf: (column: T) => number,
+): T[] {
+  const ranked = columns.filter((column) => !column.unranked);
+  const lowest = Math.min(...ranked.map(countOf));
+  const low = ranked.filter((column) => countOf(column) === lowest);
+  return low.length === ranked.length ? [] : low;
 }
 
 /** What the nav shows. */

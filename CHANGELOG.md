@@ -7,6 +7,17 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- A swimlane can be `fluid`: adjacent fluid lanes share one row, a single list per column in lane
+  order. Each item shows once there, and the column header counts the blocked issues they hide.
+- A folded lane marks the columns with the lowest count, and `unranked` leaves a column out.
+
+### Changed
+
+- Board and inbox cards are rows of one list with the title first, and swimlane names sit above
+  their row instead of in a column of their own.
+
 ## [5.0.0] - 2026-11-05
 
 ### Added

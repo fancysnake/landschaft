@@ -33,6 +33,7 @@ import {
   type Facets,
   type Filters,
   type Inbox,
+  laneRows,
   type UnmatchedQuery,
 } from "../pacts/views";
 import { closedSince } from "./sync";
@@ -447,6 +448,7 @@ export function buildBoard(
     laneTotals: {},
     columnTotals: {},
     hiddenBlocked: {},
+    fluidHiddenBlocked: {},
     total: 0,
   };
   for (const lane of dashboard.swimlanes) {
@@ -454,7 +456,10 @@ export function buildBoard(
     board.hiddenBlocked[lane.id] = 0;
     for (const column of dashboard.columns) board.cells[cellKey(lane.id, column.id)] = [];
   }
-  for (const column of dashboard.columns) board.columnTotals[column.id] = 0;
+  for (const column of dashboard.columns) {
+    board.columnTotals[column.id] = 0;
+    board.fluidHiddenBlocked[column.id] = 0;
+  }
 
   /** Puts `card` in every cell `item` lands in, and counts it once if it shows in any. */
   const put = (item: FilterItem, card: Card) => {
@@ -471,7 +476,12 @@ export function buildBoard(
       board.laneTotals[lane.id] = (board.laneTotals[lane.id] ?? 0) + 1;
       shownInAny = true;
     }
-    if (!shownInAny) return;
+    if (!shownInAny) {
+      if (!lanes.some((lane) => lane.fluid && lane.hideBlocked && item.blocked)) return;
+      for (const column of columns)
+        board.fluidHiddenBlocked[column.id] = (board.fluidHiddenBlocked[column.id] ?? 0) + 1;
+      return;
+    }
     board.total += 1;
     for (const column of columns)
       board.columnTotals[column.id] = (board.columnTotals[column.id] ?? 0) + 1;
@@ -482,7 +492,20 @@ export function buildBoard(
   const compare = compareBy(sort.by, sort.dir);
   for (const [key, cards] of Object.entries(board.cells))
     board.cells[key] = cards.toSorted(compare);
+  for (const row of laneRows(dashboard.swimlanes))
+    for (const column of dashboard.columns) keepFirstInRow(board, row, column.id);
   return board;
+}
+
+/** Leaves each card in `column` only in the first of the row's `lanes` that has it. */
+function keepFirstInRow(board: Board, lanes: { id: string }[], column: string) {
+  const seen = new Set<string>();
+  for (const lane of lanes) {
+    const key = cellKey(lane.id, column);
+    const fresh = board.cells[key]!.filter((card) => !seen.has(card.key));
+    for (const card of fresh) seen.add(card.key);
+    board.cells[key] = fresh;
+  }
 }
 
 /**

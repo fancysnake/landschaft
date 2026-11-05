@@ -1,5 +1,5 @@
 import type { Db } from "../links/db/sqlite";
-import type { BoardDashboard, Swimlane } from "../pacts/config";
+import type { BoardDashboard, Column, Swimlane } from "../pacts/config";
 import type { CiJob, Issue, Snapshot } from "../pacts/issues";
 import type { Audience } from "../pacts/views";
 
@@ -41,6 +41,10 @@ export function makeLane(overrides: Partial<Swimlane> & { id: string }): Swimlan
   return { ...newSwimlane(overrides.id, overrides.id), ...overrides };
 }
 
+export function makeColumn(overrides: Partial<Column> & { id: string; filter: string }): Column {
+  return { name: overrides.id, unranked: false, ...overrides };
+}
+
 export const DASHBOARD: BoardDashboard = {
   type: "board",
   id: "main",
@@ -54,9 +58,9 @@ export const DASHBOARD: BoardDashboard = {
     makeLane({ id: "rest", filter: "other" }),
   ],
   columns: [
-    { id: "todo", name: "Todo", filter: "other" },
-    { id: "doing", name: "Doing", filter: "label:phase:doing" },
-    { id: "done", name: "Done", filter: "label:phase:done|phase:shipped" },
+    makeColumn({ id: "todo", name: "Todo", filter: "other" }),
+    makeColumn({ id: "doing", name: "Doing", filter: "label:phase:doing" }),
+    makeColumn({ id: "done", name: "Done", filter: "label:phase:done|phase:shipped" }),
   ],
 };
 

@@ -116,8 +116,8 @@ export function DashboardEditor({ dashboard, onChange, offer }: Props) {
 /** How a swimlane's or column's filter combines, `other` looking at `others`. */
 const gridHint = (others: string) => (
   <>
-    every matching entry shows the item · GitHub search syntax · empty = all · <code>other</code> =
-    matched by no {others}
+    every matching entry shows the item · adjacent fluid lanes share one row of lists · GitHub
+    search syntax · empty = all · <code>other</code> = matched by no {others}
   </>
 );
 
@@ -142,16 +142,18 @@ function BoardFields({
         flags={[
           { key: "hideBlocked", label: "hide blocked" },
           { key: "collapsed", label: "start collapsed" },
+          { key: "fluid", label: "fluid" },
         ]}
       />
       <LaneColumnEditor
         title="Columns"
         items={dashboard.columns}
         onChange={(columns) => onChange({ ...dashboard, columns })}
-        create={(id) => ({ id, name: "New column", filter: "" })}
+        create={(id) => ({ id, name: "New column", filter: "", unranked: false })}
         offer={offer}
         hint={gridHint("column to the right")}
         minItems={1}
+        flags={[{ key: "unranked", label: "leave out of lowest count" }]}
       />
     </>
   );
