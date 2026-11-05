@@ -48,7 +48,9 @@ to both. Switching the type in Settings keeps the shared fields and starts the r
 | `name`        | string              | required | Header text                                                                                                                                                                                           |
 | `filter`      | string              | `other`  | Items this entry takes, in GitHub search syntax; `""` = everything, `other` = what no lane above / column to the right took; omitted = `other` minus a `-(…)` for each entry `other` does not look at |
 | `hideBlocked` | boolean (swimlanes) | `false`  | Drop issues with an open blocker or parent issue, and show how many it dropped                                                                                                                        |
-| `collapsed`   | boolean (swimlanes) | `false`  | Start folded to one count per column; the header toggles it on the board until the next page load                                                                                                     |
+| `collapsed`   | boolean (swimlanes) | `false`  | Start folded to one count per column; the header toggles it on the board until the next page load; a fluid lane has no header and ignores it                                                          |
+| `unranked`    | boolean (columns)   | `false`  | Stay out of the lowest count a folded lane marks                                                                                                                                                      |
+| `fluid`       | boolean (swimlanes) | `false`  | Share a row with the fluid lanes next to it: one list per column, in lane order, each item once at the first lane that shows it; a `false` lane is solid and keeps its own row                        |
 
 ## Inbox group
 

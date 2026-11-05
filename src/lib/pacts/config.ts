@@ -117,12 +117,16 @@ export const SwimlaneSchema = z.object({
   ...LegacyGroupSchema.shape,
   hideBlocked: z.boolean().default(false),
   collapsed: z.boolean().default(false),
+  /** Shares a row with the fluid lanes next to it, which ranks its cards in each column. */
+  fluid: z.boolean().default(false),
 });
 
 export const ColumnSchema = z.object({
   id,
   name: z.string().min(1),
   filter: filterText.optional(),
+  /** Stays out of the lowest count a folded lane marks. */
+  unranked: z.boolean().default(false),
   ...LegacyGroupSchema.shape,
 });
 
@@ -405,7 +409,12 @@ export type DashboardBase = Pick<Dashboard, keyof typeof shared>;
 
 /** A lane taking every item, open and showing blocked ones. */
 export function newSwimlane(laneId: string, name: string): Swimlane {
-  return { id: laneId, name, filter: "", hideBlocked: false, collapsed: false };
+  return { id: laneId, name, filter: "", hideBlocked: false, collapsed: false, fluid: false };
+}
+
+/** A column taking every item, counted in the lowest mark. */
+export function newColumn(columnId: string, name: string): Column {
+  return { id: columnId, name, filter: "", unranked: false };
 }
 
 /** A fresh dashboard of `type` keeping `base`, the fields every type has. */
@@ -422,7 +431,7 @@ export function withType(type: DashboardType, from: DashboardBase): Dashboard {
         type,
         ...base,
         swimlanes: [newSwimlane("all", "Everything")],
-        columns: [{ id: "todo", name: "Todo", filter: "" }],
+        columns: [newColumn("todo", "Todo")],
       }
     : { type, ...base, groups: [] };
 }

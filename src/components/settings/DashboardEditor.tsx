@@ -7,6 +7,7 @@ import {
   dashboardFilterError,
   type DashboardType,
   type InboxDashboard,
+  newColumn,
   newSwimlane,
   type SortBy,
   type SortDir,
@@ -141,17 +142,19 @@ function BoardFields({
         minItems={1}
         flags={[
           { key: "hideBlocked", label: "hide blocked" },
-          { key: "collapsed", label: "start collapsed" },
+          { key: "collapsed", label: "start collapsed", applies: (lane) => !lane.fluid },
+          { key: "fluid", label: "fluid: share one row of lists with adjacent fluid lanes" },
         ]}
       />
       <LaneColumnEditor
         title="Columns"
         items={dashboard.columns}
         onChange={(columns) => onChange({ ...dashboard, columns })}
-        create={(id) => ({ id, name: "New column", filter: "" })}
+        create={(id) => newColumn(id, "New column")}
         offer={offer}
         hint={gridHint("column to the right")}
         minItems={1}
+        flags={[{ key: "unranked", label: "leave out of lowest count" }]}
       />
     </>
   );

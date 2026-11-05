@@ -14,35 +14,32 @@ const STATUS_PILLS: Record<PullStatusLabel, { text: string; title: string; tone:
   "is:draft": { text: "draft", title: "Draft pull request", tone: "neutral" },
 };
 
-/** Card with a coloured bar on the left for its kind; white unless `surface` tints it. */
-const cardClass = (accent: string, surface = "border-neutral-200 bg-white") =>
-  `rounded-lg border border-l-[3px] px-3 py-2 text-sm shadow-xs ${surface} ${accent}`;
+/** Inbox row with a coloured bar on the left for its kind; white unless `surface` tints it. */
+const cardClass = (accent: string, surface = "bg-white") =>
+  `border-l-[3px] px-3 py-2 text-sm ${surface} ${accent}`;
 
-const metaRow = "mb-1 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500";
+const metaRow = "mt-1 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500";
 
 const titleLink = "leading-snug font-medium text-neutral-900 hover:underline";
 
 function Labels({ labels }: { labels: LabelRef[] }) {
-  return (
-    labels.length > 0 && (
-      <div className="mt-1.5 flex flex-wrap gap-1">
-        {labels.map((label) => (
-          <span
-            key={label.name}
-            style={labelStyle(label.color)}
-            className="rounded-full px-1.5 text-[0.6875rem] leading-4"
-          >
-            {label.name}
-          </span>
-        ))}
-      </div>
-    )
-  );
+  return labels.map((label) => (
+    <span
+      key={label.name}
+      style={labelStyle(label.color)}
+      className="rounded-full px-1.5 text-[0.6875rem] leading-4"
+    >
+      {label.name}
+    </span>
+  ));
 }
 
 function CiJobItem({ card, showRepo }: { card: CiJobCard; showRepo: boolean }) {
   return (
     <article className={cardClass("border-l-orange-500")}>
+      <a href={card.url} target="_blank" rel="noreferrer" className={titleLink}>
+        {card.workflow ? `${card.workflow} / ${card.name}` : card.name}
+      </a>
       <div className={metaRow}>
         <span className={`pill ${TONE.red}`}>CI ✗</span>
         <span className="font-mono text-[0.6875rem]">
@@ -59,14 +56,11 @@ function CiJobItem({ card, showRepo }: { card: CiJobCard; showRepo: boolean }) {
             PR #{card.pr.number}
           </a>
         )}
+        <Labels labels={card.labels} />
         <span className="ml-auto tabular-nums" title={card.failedAt}>
           failed {relativeTime(card.failedAt)}
         </span>
       </div>
-      <a href={card.url} target="_blank" rel="noreferrer" className={titleLink}>
-        {card.workflow ? `${card.workflow} / ${card.name}` : card.name}
-      </a>
-      <Labels labels={card.labels} />
     </article>
   );
 }
@@ -80,18 +74,42 @@ export function CardView({ card, showRepo }: { card: Card; showRepo: boolean }) 
   );
 }
 
+/** `cards` stacked into one list, split by hairlines. */
+export function CardList({
+  cards,
+  showRepo,
+  className = "",
+}: {
+  cards: Card[];
+  showRepo: boolean;
+  className?: string;
+}) {
+  return (
+    <ul className={`flex flex-col divide-y divide-neutral-200 ${className}`}>
+      {cards.map((card) => (
+        <li key={card.key}>
+          <CardView card={card} showRepo={showRepo} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** The card's classes: closed over blocked over PR or issue. */
 function toneOf(card: IssueItemCard): string {
   if (card.state === "CLOSED") {
-    return cardClass("border-l-neutral-400", "border-neutral-200 bg-neutral-50 opacity-70");
+    return cardClass("border-l-neutral-400", "bg-neutral-50 opacity-70");
   }
-  if (card.blocked) return cardClass("border-l-red-500", "border-red-200 bg-red-50/60");
+  if (card.blocked) return cardClass("border-l-red-500", "bg-red-50");
   return cardClass(card.kind === "pr" ? "border-l-sky-500" : "border-l-emerald-500");
 }
 
 function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean }) {
   return (
     <article className={toneOf(card)}>
+      <a href={card.url} target="_blank" rel="noreferrer" className={titleLink}>
+        {card.title}
+      </a>
       <div className={metaRow}>
         <span className="font-mono text-[0.6875rem]">
           {showRepo ? `${repoShortName(card.repo)}#` : "#"}
@@ -115,6 +133,7 @@ function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean 
             PR open
           </span>
         )}
+        <Labels labels={card.labels} />
         {card.assignees.length > 0 && (
           <span className="ml-auto flex -space-x-1.5">
             {card.assignees.map((assignee) => (
@@ -129,10 +148,6 @@ function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean 
           </span>
         )}
       </div>
-      <a href={card.url} target="_blank" rel="noreferrer" className={titleLink}>
-        {card.title}
-      </a>
-      <Labels labels={card.labels} />
       {card.progress && (
         <div
           className="mt-2 flex items-center gap-2"

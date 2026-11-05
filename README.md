@@ -132,8 +132,13 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
   them.
 - **Hide blocked** (per swimlane) drops issues that have at least one open blocker
   (GitHub "blocked by" relationships) or an open parent issue.
+- A swimlane is **solid** or **fluid**. A solid lane is a row of its own. Adjacent fluid lanes
+  share one row: each column is a single list in lane order, with the sort applied inside each
+  lane. An item in several of them shows once, in the first lane that shows it. The column header
+  counts the blocked issues they hide.
 - **Fold** a swimlane from its header to see one count per column instead of its cards. **Start
-  collapsed** (per swimlane) folds it on every page load.
+  collapsed** (per solid swimlane) folds it on every page load. A folded lane marks the columns with the
+  lowest count; **leave out of lowest count** (per column) skips a column.
 - Open **pull requests** are cards like issues.
 - Repo chips in the top bar switch each global repository on or off for every board, saved in
   the config; a dashboard with no items in the repos switched on is dimmed. Each chip shows its

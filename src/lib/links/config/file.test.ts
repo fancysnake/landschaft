@@ -144,6 +144,7 @@ describe("config schema rules", () => {
       filter: 'label:a|"needs review"',
       hideBlocked: false,
       collapsed: false,
+      fluid: false,
     });
     expect(lane({ labels: ["a", "b"], match: "all" })?.filter).toBe("label:a label:b");
     expect(lane({ labels: ["bug", "is:ci:failed", "is:has-pr"] })?.filter).toBe(
@@ -344,8 +345,16 @@ describe("config upgrades", () => {
         filter: "is:ci-job",
         hideBlocked: false,
         collapsed: false,
+        fluid: false,
       },
-      { id: "all", name: "All", filter: "other", hideBlocked: false, collapsed: false },
+      {
+        id: "all",
+        name: "All",
+        filter: "other",
+        hideBlocked: false,
+        collapsed: false,
+        fluid: false,
+      },
     ]);
     const taken = [{ id: "ci-jobs", name: "Mine", filter: "label:ci" }];
     expect(laneIds({ dashboards: [dashboard("a", { swimlanes: taken })] })).toEqual([

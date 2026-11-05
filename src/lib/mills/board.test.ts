@@ -9,13 +9,14 @@ import {
   label,
   makeIssue,
   makeJob,
+  makeColumn,
   makeLane,
   REPO,
   snapshot,
 } from "../__fixtures__/issues";
 import { askedLabels, type FilterNode } from "../pacts/filter";
 import { type Issue } from "../pacts/issues";
-import { type Card, cellKey } from "../pacts/views";
+import { type Card, cellKey, laneRows } from "../pacts/views";
 import {
   buildBoard,
   buildInbox,
@@ -44,6 +45,55 @@ const hitting =
     askedLabels(node).some((name) => hits.includes(name));
 
 const ids = (groups: { id: string }[]) => groups.map((group) => group.id);
+
+describe("buildBoard lowest", () => {
+  // Three cards in a, two in b and c, one in d; the `only` lane holds one of each.
+  const issues = [
+    makeIssue({ number: 1, labels: ["a", "b", "c", "d"].map(label) }),
+    makeIssue({ number: 2, labels: ["a", "b", "c"].map(label) }),
+    makeIssue({ number: 3, labels: [label("a")] }),
+  ];
+  const lowest = (unranked: string[]) =>
+    buildBoard(
+      snapshot(issues),
+      {
+        ...DASHBOARD,
+        swimlanes: [makeLane({ id: "all" }), makeLane({ id: "only", filter: "label:d" })],
+        columns: ["a", "b", "c", "d"].map((id) =>
+          makeColumn({ id, filter: `label:${id}`, unranked: unranked.includes(id) }),
+        ),
+      },
+      EVERYONE,
+    ).lowest;
+
+  it("names each lane's lowest ranked columns, ties included", () => {
+    expect(lowest([])).toEqual({ all: ["d"], only: [] });
+    expect(lowest(["d"]).all).toEqual(["b", "c"]);
+  });
+
+  it("names none when every ranked column ties or none ranks", () => {
+    expect(lowest(["a", "d"]).all).toEqual([]);
+    expect(lowest(["a", "b", "c", "d"]).all).toEqual([]);
+  });
+});
+
+describe("laneRows", () => {
+  it("joins adjacent fluid lanes and keeps a solid lane alone", () => {
+    const lanes = [
+      { id: "a", fluid: false },
+      { id: "b", fluid: true },
+      { id: "c", fluid: true },
+      { id: "d", fluid: false },
+      { id: "e", fluid: true },
+    ];
+    expect(laneRows(lanes).map((row) => row.map((lane) => lane.id))).toEqual([
+      ["a"],
+      ["b", "c"],
+      ["d"],
+      ["e"],
+    ]);
+  });
+});
 
 describe("placeIn", () => {
   it("takes every group that matches, an empty filter matching all", () => {
@@ -119,7 +169,7 @@ describe("unmatchedItems", () => {
       ...DASHBOARD,
       id: "narrow",
       filter: "label:team",
-      columns: [{ id: "doing", name: "Doing", filter: "label:phase:doing" }],
+      columns: [makeColumn({ id: "doing", name: "Doing", filter: "label:phase:doing" })],
     };
     const wide = { ...DASHBOARD, id: "wide", filter: "label:infra" };
     const mine = { author: "me" };
@@ -149,7 +199,10 @@ describe("unmatchedItems", () => {
   });
 
   it("treats an epic like any other issue", () => {
-    const board = { ...DASHBOARD, columns: [{ id: "doing", name: "Doing", filter: "label:x" }] };
+    const board = {
+      ...DASHBOARD,
+      columns: [makeColumn({ id: "doing", name: "Doing", filter: "label:x" })],
+    };
     const issues = [makeIssue({ number: 1, labels: [label("epic")] }), makeIssue({ number: 2 })];
     expect(unmatchedItems(snapshot(issues), [board], EVERYONE).items.map(numberOf)).toEqual([2, 1]);
   });
@@ -159,8 +212,8 @@ describe("unmatchedItems", () => {
       ...DASHBOARD,
       swimlanes: [makeLane({ id: "all" })],
       columns: [
-        { id: "review", name: "Review", filter: "has:pr" },
-        { id: "blocking", name: "Blocking", filter: "is:blocking" },
+        makeColumn({ id: "review", name: "Review", filter: "has:pr" }),
+        makeColumn({ id: "blocking", name: "Blocking", filter: "is:blocking" }),
       ],
     };
     const lib = { repo: "acme/lib" };
@@ -373,9 +426,9 @@ describe("buildBoard", () => {
     const dashboard = {
       ...DASHBOARD,
       columns: [
-        { id: "todo", name: "Todo", filter: "-label:phase:doing" },
-        { id: "doing", name: "Doing", filter: "label:phase:doing" },
-        { id: "waiting", name: "Waiting", filter: "label:phase:doing label:wait" },
+        makeColumn({ id: "todo", name: "Todo", filter: "-label:phase:doing" }),
+        makeColumn({ id: "doing", name: "Doing", filter: "label:phase:doing" }),
+        makeColumn({ id: "waiting", name: "Waiting", filter: "label:phase:doing label:wait" }),
       ],
     };
     const issues = [
@@ -450,9 +503,9 @@ describe("buildBoard", () => {
     const dashboard = {
       ...DASHBOARD,
       columns: [
-        { id: "rest", name: "Rest", filter: "other" },
-        { id: "b", name: "B", filter: "other label:b" },
-        { id: "a", name: "A", filter: "label:a" },
+        makeColumn({ id: "rest", name: "Rest", filter: "other" }),
+        makeColumn({ id: "b", name: "B", filter: "other label:b" }),
+        makeColumn({ id: "a", name: "A", filter: "label:a" }),
       ],
     };
     const issues = [
@@ -495,6 +548,48 @@ describe("buildBoard", () => {
     expect(board.cells[cell("rest", "todo")]).toEqual([]);
     expect(board.laneTotals).toEqual({ high: 1, low: 1, rest: 0 });
     expect(board.columnTotals).toEqual({ todo: 0, doing: 1, done: 1 });
+    expect(board.total).toBe(1);
+  });
+
+  it("shows an item once in a run of fluid lanes, in the first that shows it", () => {
+    const dashboard = {
+      ...DASHBOARD,
+      swimlanes: [
+        makeLane({ id: "a", filter: "label:a", fluid: true, hideBlocked: true }),
+        makeLane({ id: "b", filter: "label:b", fluid: true }),
+        makeLane({ id: "solid", filter: "label:a" }),
+        makeLane({ id: "c", filter: "label:a", fluid: true }),
+      ],
+    };
+    const issues = [
+      makeIssue({ number: 1, labels: [label("a"), label("b")] }),
+      makeIssue({
+        number: 2,
+        labels: [label("a"), label("b")],
+        blockedBy: waitsOn(9),
+        blockedByTotal: 1,
+      }),
+    ];
+    const board = buildBoard(snapshot(issues), dashboard, EVERYONE);
+    expect(board.cells[cell("a", "todo")]?.map(numberOf)).toEqual([1]);
+    expect(board.cells[cell("b", "todo")]?.map(numberOf)).toEqual([2]);
+    // A solid lane or a later run keeps its own copy.
+    expect(board.cells[cell("solid", "todo")]?.map(numberOf)).toEqual([2, 1]);
+    expect(board.cells[cell("c", "todo")]?.map(numberOf)).toEqual([2, 1]);
+    expect(board.columnTotals.todo).toBe(2);
+  });
+
+  it("counts by column what only fluid lanes hide, once per item", () => {
+    const dashboard = {
+      ...DASHBOARD,
+      swimlanes: [
+        makeLane({ id: "a", filter: "", fluid: true, hideBlocked: true }),
+        makeLane({ id: "b", filter: "", fluid: true, hideBlocked: true }),
+      ],
+    };
+    const blocked = makeIssue({ number: 1, blockedBy: waitsOn(9), blockedByTotal: 1 });
+    const board = buildBoard(snapshot([blocked, makeIssue({ number: 2 })]), dashboard, EVERYONE);
+    expect(board.fluidHiddenBlocked).toEqual({ todo: 1, doing: 0, done: 0 });
     expect(board.total).toBe(1);
   });
 
@@ -562,8 +657,8 @@ describe("buildBoard", () => {
       ...DASHBOARD,
       closedDays: 7,
       columns: [
-        { id: "todo", name: "Todo", filter: "other" },
-        { id: "done", name: "Done", filter: "is:closed" },
+        makeColumn({ id: "todo", name: "Todo", filter: "other" }),
+        makeColumn({ id: "done", name: "Done", filter: "is:closed" }),
       ],
     };
     const board = buildBoard(snapshot(issues), dashboard, { ...EVERYONE, now });
@@ -587,7 +682,7 @@ describe("buildBoard", () => {
   it("leaves out issues that fit no group when an axis has no catch-all", () => {
     const dashboard = {
       ...DASHBOARD,
-      columns: [{ id: "doing", name: "Doing", filter: "label:phase:doing" }],
+      columns: [makeColumn({ id: "doing", name: "Doing", filter: "label:phase:doing" })],
     };
     const board = buildBoard(snapshot([makeIssue({ number: 1 })]), dashboard, EVERYONE);
     expect(board.total).toBe(0);
@@ -639,9 +734,9 @@ describe("buildBoard", () => {
       ...DASHBOARD,
       closedDays: 7,
       columns: [
-        { id: "blocking", name: "Blocking", filter: "is:blocking" },
-        { id: "review", name: "Review", filter: "has:pr" },
-        { id: "rest", name: "Rest", filter: "other" },
+        makeColumn({ id: "blocking", name: "Blocking", filter: "is:blocking" }),
+        makeColumn({ id: "review", name: "Review", filter: "has:pr" }),
+        makeColumn({ id: "rest", name: "Rest", filter: "other" }),
       ],
     };
     const board = buildBoard(snapshot(issues), dashboard, { ...EVERYONE, now });
@@ -669,8 +764,8 @@ describe("buildBoard", () => {
       ...DASHBOARD,
       closedDays: 7,
       columns: [
-        { id: "failing", name: "Failing", filter: "is:ci:failed" },
-        { id: "rest", name: "Rest", filter: "other" },
+        makeColumn({ id: "failing", name: "Failing", filter: "is:ci:failed" }),
+        makeColumn({ id: "rest", name: "Rest", filter: "other" }),
       ],
     };
     const board = buildBoard(snapshot(issues), dashboard, { ...EVERYONE, now });
