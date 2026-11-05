@@ -25,8 +25,8 @@ interface Props<T extends Group> {
   hint: ReactNode;
   /** Below which "remove" is off. */
   minItems: number;
-  /** A per-entry checkbox and its label. */
-  flag?: { key: FlagKey<T>; label: string };
+  /** Per-entry checkboxes and their labels. */
+  flags?: { key: FlagKey<T>; label: string }[];
 }
 
 function slug(name: string, taken: Set<string>): string {
@@ -48,7 +48,7 @@ export function LaneColumnEditor<T extends Group>({
   offer,
   hint,
   minItems,
-  flag,
+  flags,
 }: Props<T>) {
   const replace = (index: number, item: T) =>
     onChange(items.map((current, i) => (i === index ? item : current)));
@@ -69,8 +69,11 @@ export function LaneColumnEditor<T extends Group>({
                 className="field w-full"
               />
               <div className="mt-0.5 font-mono text-[0.625rem] text-neutral-400">{item.id}</div>
-              {flag && (
-                <label className="mt-1 flex items-center gap-1 text-xs text-neutral-700">
+              {flags?.map((flag) => (
+                <label
+                  key={flag.label}
+                  className="mt-1 flex items-center gap-1 text-xs text-neutral-700"
+                >
                   <input
                     type="checkbox"
                     checked={Boolean(item[flag.key])}
@@ -80,7 +83,7 @@ export function LaneColumnEditor<T extends Group>({
                   />
                   {flag.label}
                 </label>
-              )}
+              ))}
             </div>
             <FilterInput
               value={item.filter}
