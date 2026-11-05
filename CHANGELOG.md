@@ -37,7 +37,8 @@ The format is based on [Keep a Changelog], and this project adheres to
   the database are dropped.
 - The `hide` query parameter of the board, inbox and unmatched endpoints.
 - `repo` in the `POST /api/sync` body, refused with `400` like any unknown key; send
-  `repos: ["owner/repo"]`. The answer is always `202`: follow the run on `/api/version`.
+  `repos: ["owner/repo"]`, which answers `202` at once rather than a result: follow the run on
+  `/api/version`.
 
 ### Fixed
 
