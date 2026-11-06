@@ -3,6 +3,7 @@ import type { SyncStatus as Status } from "../../lib/pacts/sync";
 import { relativeTime } from "../../lib/client/labels";
 import { syncErrors } from "../../lib/client/syncView";
 import { useNow } from "../../lib/client/useNow";
+import { SYNCING_DOT } from "./tone";
 
 interface Props {
   status: Status;
@@ -34,11 +35,7 @@ export function SyncStatus({
     <div className="flex items-center gap-2 text-sm text-neutral-600">
       <span
         className={`inline-block h-2 w-2 rounded-full ${
-          busy
-            ? "bg-yellow-400 motion-safe:animate-pulse"
-            : errors.length > 0
-              ? "bg-red-500"
-              : "bg-emerald-500"
+          busy ? SYNCING_DOT : errors.length > 0 ? "bg-red-500" : "bg-emerald-500"
         }`}
       />
       <span title={errors.join("\n") || undefined}>

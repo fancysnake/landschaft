@@ -8,3 +8,6 @@ export const TONE = {
 } as const;
 
 export type Tone = keyof typeof TONE;
+
+/** A status dot while its sync runs. */
+export const SYNCING_DOT = "bg-violet-500 motion-safe:animate-pulse";
