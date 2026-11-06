@@ -35,7 +35,7 @@ export function SyncStatus({
       <span
         className={`inline-block h-2 w-2 rounded-full ${
           busy
-            ? "bg-sky-500 motion-safe:animate-pulse"
+            ? "bg-yellow-400 motion-safe:animate-pulse"
             : errors.length > 0
               ? "bg-red-500"
               : "bg-emerald-500"

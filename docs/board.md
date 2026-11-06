@@ -104,9 +104,9 @@ dimmed in the top bar.
 A chip's dot is filled when its repository is on and a ring when off. Its colour says how fresh
 the last sync is, counted in refresh intervals: green within two, amber within six, orange after
 that or never synced, red when the last sync failed (the error is in the arrow's tooltip). It is
-a sky-blue ring while the repository waits its turn and pulses sky blue while it syncs. Hovering or focusing a chip shows three buttons over its name: the eye
-switches the repository on or off, the arrow syncs it alone (its tooltip says how long ago it
-last synced), and the frame switches every other repository off. On the one repository left the
+a yellow ring while the repository waits its turn and pulses yellow while it syncs. Pressing a chip's name
+switches the repository on or off. Hovering or focusing a chip shows a button on each edge: the arrow on the left syncs it alone (its tooltip says how long ago it
+last synced), and the frame on the right switches every other repository off. On the one repository left the
 frame is pressed; pressing it again switches back on the repositories that were on before the frame took them
 off, and all of them when the frame has nothing to bring back: it brought them back already, or
 the page was reloaded.

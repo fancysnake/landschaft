@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- A repo chip's name switches the repo on or off, with sync on its left edge and show-only on its
+  right, revealed on hover or focus.
+- The sync dots are yellow while a repo syncs or waits its turn, so they stand apart from green.
+
 ## [5.1.0] - 2026-11-05
 
 ### Added
