@@ -1,6 +1,6 @@
 site_name: landschaft
 site_url: https://landschaft.fancysnake.dev
-site_description: Local kanban dashboards over GitHub issues — swimlanes × columns from labels.
+site_description: A structured inbox for your GitHub work — issues, PRs and failed CI jobs sorted by your own filters into what to do next.
 repo_url: https://github.com/fancysnake/landschaft
 repo_name: fancysnake/landschaft
 copyright: MIT
@@ -56,7 +56,8 @@ nav:
   - index.md
   - getting-started.md
   - configuration.md
-  - board.md
+  - workflow.md
+  - placement.md
   - api.md
   - architecture.md
   - changelog.md

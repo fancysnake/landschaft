@@ -2,7 +2,7 @@
 
 --8<-- "README.md:what"
 
---8<-- "README.md:grid"
+--8<-- "README.md:dashboards"
 
 --8<-- "README.md:built-with"
 
@@ -11,7 +11,7 @@
 1. **Use it as a package** — your dashboards are one JSON file in a (private) repo of their
    own; the engine is an installed dependency you update by bumping a tag. This is the path
    most people want.
-2. **Develop from source** — clone the repo and change the board, the sync or the settings UI
+2. **Develop from source** — clone the repo and change the views, the sync or the settings UI
    directly. It is simply the repo as you see it.
 
 [Getting started](getting-started.md) covers both.
@@ -20,7 +20,8 @@
 
 - [Getting started](getting-started.md) — install, run, pin the engine
 - [Configuration](configuration.md) — every field of `landschaft.config.json`
-- [How the board works](board.md) — placement, sync, sub-issues, filters
+- [A working setup](workflow.md) — three real dashboards and how they get used
+- [How placement works](placement.md) — inboxes, filters, sync, sub-issues
 - [API](api.md) — the local JSON endpoints the islands talk to
 - [How it works](architecture.md) — the shape of the codebase
 - [Changelog](changelog.md) — what each release changed

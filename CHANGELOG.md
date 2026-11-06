@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- landschaft describes itself as a structured inbox for GitHub work, in the docs, the CLI help
+  and the package metadata. Config, API and code keep `board` and `inbox` as the two layouts.
+- The docs page "How the board works" is now "How placement works", at `/placement/`, and
+  `/board/` is gone. A new page, "A working setup", walks through three real dashboards.
+- The example config is an inbox and a planning board.
+
 ## [5.1.0] - 2026-11-05
 
 ### Added
