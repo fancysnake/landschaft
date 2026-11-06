@@ -27,12 +27,12 @@ dashboard filters.
 
 | Field        | Type                                       | Default                              | Meaning                                                                                 |
 | ------------ | ------------------------------------------ | ------------------------------------ | --------------------------------------------------------------------------------------- |
-| `type`       | `board\|inbox`                             | `board`                              | The view; see [Inbox](placement.md#inbox)                                               |
+| `type`       | `board\|inbox`                             | `board`                              | The view; see [Inbox](reference.md#inbox)                                               |
 | `id`         | `[a-z0-9_-]{1,32}`                         | required                             | In the URL (`/d/:id`); immutable once saved                                             |
 | `name`       | string                                     | required                             | Shown in the header                                                                     |
 | `filter`     | string                                     | `""`                                 | Narrows the base set, e.g. `repo:acme/app\|acme/lib user:@me`; `""` = all of it         |
 | `sort`       | `{ by: created\|updated, dir: asc\|desc }` | `{ "by": "updated", "dir": "desc" }` | Default card order; the URL can override it                                             |
-| `closedDays` | 0–365                                      | `0`                                  | Keeps items closed within this many days; see [Closed items](placement.md#closed-items) |
+| `closedDays` | 0–365                                      | `0`                                  | Keeps items closed within this many days; see [Closed items](reference.md#closed-items) |
 | `swimlanes`  | `Swimlane[]`, at least one                 | required (board)                     | Rows                                                                                    |
 | `columns`    | `Column[]`, at least one                   | required (board)                     | Columns                                                                                 |
 | `groups`     | `Group[]`                                  | `[]` (inbox)                         | Inbox groups, in order                                                                  |
@@ -62,7 +62,7 @@ to both. Switching the type in Settings keeps the shared fields and starts the r
 | `collapsed` | boolean            | `false`  | Start folded; the header still shows the count            |
 
 A filter combines terms such as `label:prio:high`, `is:pr`, `is:ci:failed` or `user:@me`; see
-[How placement works](placement.md#rules) for the syntax and every term.
+[Reference](reference.md#rules) for the syntax and every term.
 
 Rules the validator enforces: ids are unique per axis, per inbox and across dashboards, each filter
 parses, and a dashboard filter does not use `other`.

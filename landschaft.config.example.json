@@ -15,11 +15,16 @@
         {
           "id": "ready",
           "name": "Ready",
-          "filter": "other is:pr -is:ci:failed -is:ci:running -is:conflicting -is:unanswered"
+          "filter": "is:pr -is:draft -is:ci:failed -is:ci:running -is:conflicting -is:unanswered"
         },
-        { "id": "fix", "name": "Fix", "filter": "other is:pr" },
-        { "id": "jobs", "name": "Failing jobs", "filter": "other -has:pr is:ci-job" },
-        { "id": "triage", "name": "Triage", "filter": "is:issue -label:bug -label:feature" }
+        { "id": "fix", "name": "Fix", "filter": "is:pr" },
+        { "id": "jobs", "name": "Failing jobs", "filter": "-has:pr is:ci-job" },
+        {
+          "id": "triage",
+          "name": "Triage",
+          "filter": "is:issue -is:closed -label:bug -label:feature"
+        },
+        { "id": "other-jobs", "name": "Other jobs", "filter": "is:ci-job", "collapsed": true }
       ]
     },
     {

@@ -1,4 +1,4 @@
-# How placement works
+# Reference
 
 --8<-- "README.md:dashboards"
 

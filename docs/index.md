@@ -21,7 +21,7 @@
 - [Getting started](getting-started.md) — install, run, pin the engine
 - [Configuration](configuration.md) — every field of `landschaft.config.json`
 - [A working setup](workflow.md) — three real dashboards and how they get used
-- [How placement works](placement.md) — inboxes, filters, sync, sub-issues
+- [Reference](reference.md) — inboxes, filters, sync, sub-issues
 - [API](api.md) — the local JSON endpoints the islands talk to
 - [How it works](architecture.md) — the shape of the codebase
 - [Changelog](changelog.md) — what each release changed

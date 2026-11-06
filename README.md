@@ -49,7 +49,7 @@ holding a `package.json`, a `landschaft.config.json` and a git-ignored `landscha
   "private": true,
   "type": "module",
   "scripts": { "dev": "landschaft dev", "build": "landschaft build", "start": "landschaft start" },
-  "dependencies": { "landschaft": "github:fancysnake/landschaft#v5.1.0" }
+  "dependencies": { "landschaft": "github:fancysnake/landschaft#vX.Y.Z" }
 }
 ```
 
