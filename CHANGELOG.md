@@ -7,12 +7,13 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [5.2.0] - 2026-11-07
+
 ### Changed
 
 - A repo chip's name switches the repo on or off, with sync on its left edge and show-only on its
   right, revealed on hover or keyboard focus.
-- The sync dots are violet while a repo syncs or waits its turn, so they stand apart from the
-  health colours.
+- The sync dots are violet while a repo syncs or waits its turn.
 
 ## [5.1.0] - 2026-11-05
 
@@ -336,7 +337,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v5.1.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v5.2.0...HEAD
+[5.2.0]: https://github.com/fancysnake/landschaft/compare/v5.1.0...v5.2.0
 [5.1.0]: https://github.com/fancysnake/landschaft/compare/v5.0.0...v5.1.0
 [5.0.0]: https://github.com/fancysnake/landschaft/compare/v4.4.0...v5.0.0
 [4.4.0]: https://github.com/fancysnake/landschaft/compare/v4.3.0...v4.4.0
