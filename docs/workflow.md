@@ -34,13 +34,14 @@ to do with an item, and an item lands in the first group it matches, so the orde
 | Group       | Filter                                                                                                                               | What it holds                                                                       |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
 | Closed      | `is:closed is:pr`                                                                                                                    | PRs closed in the last 14 days, folded                                              |
-| Ready       | `(-user:@me OR label:qa OR label:v:review:done) is:pr -is:ci:failed -is:conflicting -is:ci:running -label:wontfix -is:unanswered`    | Clean PRs from others, or my own once they passed review: read and merge            |
+| Ready       | `(-user:@me OR label:qa OR label:v:review:done) is:pr -is:ci:failed -is:conflicting -is:ci:running -label:wontfix -is:unanswered`    | Clean bot PRs, or my own once they passed review: read and merge                    |
 | Heal        | `is:pr user:@me`                                                                                                                     | My PRs not yet clean and reviewed: fix CI, conflicts or comments, or get the review |
 | Failing job | `-has:pr is:ci-job`                                                                                                                  | Failed CI with no PR to fix it in                                                   |
 | Identify    | `user:@me is:issue -is:closed -label:epic -label:l -label:m -label:s -label:feature -label:chore -label:edit -label:bug -is:blocked` | My issues with neither size nor kind: label them so Planning can place them         |
 | Broken      | `-user:@me OR has:pr`                                                                                                                | What the groups above let through, folded                                           |
 
-A clean PR from someone else reaches Ready with no label on GitHub. My own also needs `qa` or
+A clean bot PR reaches Ready with no label on GitHub. `user:` matches author or assignee, so a
+PR I wrote or am assigned to, which is the only way someone else's PR gets in, also needs `qa` or
 `v:review:done`, and stays in Heal until it has one. CI, conflicts and review threads move a PR
 in and out of Ready as its state changes.
 

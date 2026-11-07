@@ -53,6 +53,8 @@ holding a `package.json`, a `landschaft.config.json` and a git-ignored `landscha
 }
 ```
 
+Replace `vX.Y.Z` with a tag from the [tags page](https://github.com/fancysnake/landschaft/tags).
+
 <!-- --8<-- [end:package-json] -->
 
 ```sh
