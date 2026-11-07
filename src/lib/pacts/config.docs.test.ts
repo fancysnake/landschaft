@@ -19,43 +19,41 @@ function parseDefault(cell: string): unknown {
 /** The fields of the table under `heading`, and the defaults of those that have one. */
 function table(heading: string) {
   const section = page.split(`## ${heading}\n`)[1]?.split("\n## ")[0] ?? "";
-  const rows = section
+  const cells = section
     .split("\n")
     .filter((line) => line.startsWith("| `"))
-    .map((line) => line.split(/(?<!\\)\|/).map((cell) => cell.trim()));
-  const fields = rows.map(([, field = ""]) => field.replaceAll("`", ""));
-  const defaults = rows.flatMap(([, field = "", , cell = ""]) => {
-    const value = parseDefault(cell);
-    return value === undefined ? [] : [[field.replaceAll("`", ""), value]];
-  });
-  return { fields, defaults: Object.fromEntries(defaults) as Record<string, unknown> };
+    .map((line): [string, unknown] => {
+      const [, field = "", , cell = ""] = line.split(/(?<!\\)\|/).map((text) => text.trim());
+      return [field.replaceAll("`", ""), parseDefault(cell)];
+    });
+  return {
+    fields: cells.map(([field]) => field),
+    defaults: Object.fromEntries(cells.filter(([, value]) => value !== undefined)),
+  };
 }
 
-const sorted = (fields: string[]) => [...fields].toSorted();
+const dashboard = { id: "d", name: "D" };
+const board = DashboardSchema.parse({
+  ...dashboard,
+  swimlanes: [{ id: "l", name: "L" }],
+  columns: [{ id: "c", name: "C" }],
+});
+const inbox = DashboardSchema.parse({ ...dashboard, type: "inbox" });
+if (board.type !== "board") throw new Error("a dashboard without type is a board");
 
-it("configuration.md states every config field and default", () => {
-  const dashboard = { id: "d", name: "D" };
-  const board = DashboardSchema.parse({
-    ...dashboard,
-    swimlanes: [{ id: "l", name: "L" }],
-    columns: [{ id: "c", name: "C" }],
-  });
-  const inbox = DashboardSchema.parse({ ...dashboard, type: "inbox" });
-  if (board.type !== "board") throw new Error("a dashboard without type is a board");
-
-  const global = table("Global");
+it("configuration.md states every Global field and default", () => {
+  const { fields, defaults } = table("Global");
   const config = ConfigSchema.parse({});
-  expect(sorted(global.fields)).toEqual(sorted(Object.keys(config)));
-  expect(ConfigSchema.parse(global.defaults)).toEqual(config);
+  expect(fields.toSorted()).toEqual(Object.keys(config).toSorted());
+  expect(ConfigSchema.parse(defaults)).toEqual(config);
+});
 
-  const cases = [
-    ["Dashboard", { ...inbox, ...board, groups: [] }],
-    ["Swimlane and column", { ...board.swimlanes[0], ...board.columns[0] }],
-    ["Inbox group", InboxGroupSchema.parse({ id: "g", name: "G" })],
-  ] as const;
-  for (const [heading, parsed] of cases) {
-    const { fields, defaults } = table(heading);
-    expect(sorted(fields)).toEqual(sorted(Object.keys(parsed)));
-    expect(parsed).toMatchObject(defaults);
-  }
+it.each<[string, object]>([
+  ["Dashboard", { ...inbox, ...board }],
+  ["Swimlane and column", { ...board.swimlanes[0], ...board.columns[0] }],
+  ["Inbox group", InboxGroupSchema.parse({ id: "g", name: "G" })],
+])("configuration.md states every %s field and default", (heading, parsed) => {
+  const { fields, defaults } = table(heading);
+  expect(fields.toSorted()).toEqual(Object.keys(parsed).toSorted());
+  expect(parsed).toMatchObject(defaults);
 });

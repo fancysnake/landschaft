@@ -1,23 +1,16 @@
 {% extends "base.html" %}
 
-{# The 404 page renders with page unset. page.is_homepage is false for an
-   index.md inside a nav group, so test the source path. #}
-{% set is_home = page and page.file.src_uri == "index.md" %}
+{% set is_home = page.is_homepage %}
 {% set home_title = "landschaft — a structured inbox for GitHub issues, PRs and failed CI" %}
+{% set title = home_title if is_home else (page.title | striptags ~ " - " ~ config.site_name if page else config.site_name) %}
 
 {% block htmltitle %}
-  {% if is_home %}
-    <title>{{ home_title }}</title>
-  {% else %}
-    {{ super() }}
-  {% endif %}
+  <title>{{ title | e }}</title>
 {% endblock %}
 
 {% block extrahead %}
 {% if page %}
   {% set description = page.meta.description or config.site_description %}
-  {# Material's <title> formula off the homepage. #}
-  {% set title = home_title if is_home else page.title | striptags ~ " - " ~ config.site_name %}
   {# MkDocs ends site_url with a slash, so none here. #}
   {% set card = config.site_url ~ "assets/landschaft-card.png" %}
   <meta property="og:type" content="website">

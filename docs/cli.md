@@ -8,21 +8,12 @@ description: "The landschaft command line: dev starts the local server, build ma
 build there too. `LANDSCHAFT_CONFIG` and `LANDSCHAFT_DB` override the two paths; see
 [Files and environment](configuration.md#files-and-environment).
 
-## landschaft dev
+--8<-- "README.md:cli"
 
-Starts the dev server at http://localhost:4321. It is the default command, so a bare `landschaft`
-does the same.
+`build` bundles every dependency in, so `dist/` runs from anywhere, with no `node_modules` beside
+it.
 
-## landschaft build
+Without a build, `start` says so and exits with status 1; run `landschaft build` first.
 
-Builds the production server into `./dist`. Every dependency is bundled in, so `dist/` runs from
-anywhere, with no `node_modules` beside it.
-
-## landschaft start
-
-Serves the production build from `./dist`. Without a build it says so and exits with status 1;
-run `landschaft build` first.
-
-## landschaft --help
-
-Prints the usage; `-h` does the same. An unknown command prints it too, and exits with status 1.
+`landschaft --help` prints the usage; `-h` does the same. An unknown command prints it too, and
+exits with status 1.
