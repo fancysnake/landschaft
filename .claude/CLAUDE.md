@@ -1,7 +1,7 @@
 # CLAUDE.md
 
-Local-only kanban dashboards over GitHub issues. Astro 7 SSR (`@astrojs/node`, standalone) with
-React 19 islands, Tailwind 4, `node:sqlite` cache, JSON config file.
+Local-only structured inbox for GitHub work: issues, PRs and failed CI jobs sorted by filters.
+Astro 7 SSR (`@astrojs/node`, standalone) with React 19 islands, Tailwind 4, `node:sqlite` cache, JSON config file.
 
 ## Tooling and commands
 
