@@ -4,39 +4,57 @@
   "refreshMinutes": 5,
   "dashboards": [
     {
-      "id": "main",
-      "name": "Main",
-      "filter": "",
-      "sort": { "by": "updated", "dir": "desc" },
-      "swimlanes": [
-        {
-          "id": "fix",
-          "name": "PRs to fix",
-          "filter": "is:pr is:conflicting|ci:failed|unanswered"
-        },
-        {
-          "id": "high",
-          "name": "High priority",
-          "filter": "label:prio:high",
-          "hideBlocked": false
-        },
-        { "id": "normal", "name": "Normal", "filter": "label:prio:normal", "hideBlocked": true },
-        { "id": "rest", "name": "Unprioritised", "filter": "other", "hideBlocked": true }
-      ],
-      "columns": [
-        { "id": "backlog", "name": "Backlog", "filter": "label:backlog" },
+      "type": "inbox",
+      "id": "today",
+      "name": "Today",
+      "filter": "-label:wait",
+      "sort": { "by": "updated", "dir": "asc" },
+      "closedDays": 14,
+      "groups": [
+        { "id": "closed", "name": "Closed", "filter": "is:closed is:pr", "collapsed": true },
         {
           "id": "ready",
           "name": "Ready",
-          "filter": "other -label:backlog"
+          "filter": "is:pr -is:draft -is:ci:failed -is:ci:running -is:conflicting -is:unanswered"
         },
-        { "id": "doing", "name": "In progress", "filter": "label:phase:doing" },
+        { "id": "fix", "name": "Fix", "filter": "is:pr" },
+        { "id": "jobs", "name": "Failing jobs", "filter": "-has:pr is:ci-job" },
         {
-          "id": "review",
-          "name": "In review",
-          "filter": "label:phase:review|\"needs review\" -label:wait"
+          "id": "triage",
+          "name": "Triage",
+          "filter": "is:issue -is:closed -label:bug -label:feature"
         },
-        { "id": "stuck", "name": "Review blocked", "filter": "label:phase:review label:wait" }
+        { "id": "other-jobs", "name": "Other jobs", "filter": "is:ci-job", "collapsed": true }
+      ]
+    },
+    {
+      "type": "board",
+      "id": "planning",
+      "name": "Planning",
+      "filter": "is:issue -label:wait",
+      "sort": { "by": "updated", "dir": "asc" },
+      "closedDays": 14,
+      "swimlanes": [
+        { "id": "closed", "name": "Closed", "filter": "is:closed", "collapsed": true },
+        { "id": "with-pr", "name": "With PR", "filter": "has:pr -is:closed", "hideBlocked": true },
+        {
+          "id": "large",
+          "name": "Large",
+          "filter": "label:large -has:pr -is:closed",
+          "hideBlocked": true,
+          "fluid": true
+        },
+        {
+          "id": "small",
+          "name": "Small",
+          "filter": "label:small -has:pr -is:closed",
+          "hideBlocked": true,
+          "fluid": true
+        }
+      ],
+      "columns": [
+        { "id": "bugs", "name": "Bugs", "filter": "label:bug" },
+        { "id": "features", "name": "Features", "filter": "label:feature" }
       ]
     }
   ]

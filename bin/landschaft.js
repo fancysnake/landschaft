@@ -10,7 +10,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const pkgRoot = fileURLToPath(new URL("..", import.meta.url));
 const outDir = path.resolve("dist");
 
-const USAGE = `landschaft — kanban dashboards over GitHub issues
+const USAGE = `landschaft — a structured inbox for your GitHub work
 
 Usage:
   landschaft [command]

@@ -2,23 +2,28 @@
 
 <!-- --8<-- [start:what] -->
 
-Local kanban dashboards over GitHub issues. _Landschaft_ is German for "landscape": the point
-is to see the whole terrain of a project at once, spot what is next and how far each issue has
-come, without paying for GitHub Projects.
+A structured inbox for your GitHub work: issues, PRs and failed CI jobs from all your
+repositories, sorted by your own filters into what to do next. _Landschaft_ is German for
+"landscape": the point is to see the whole terrain of your work at once, without paying for
+GitHub Projects.
 
 <!-- --8<-- [end:what] -->
 
-<!-- --8<-- [start:grid] -->
+<!-- --8<-- [start:dashboards] -->
 
-A dashboard spans one or more repositories and lays their open issues out on a grid of
-swimlanes × columns, each defined by a filter in GitHub search syntax. The board is read-only: labels are edited on
-GitHub. Everything runs on your machine against a local SQLite cache that refreshes in the
-background.
+A dashboard is one view of that inbox. It spans one or more repositories and places their open
+items by filters in GitHub search syntax, in one of two layouts:
 
-A dashboard can instead be an inbox: a flat list of PRs and issues, each in the first of its
-groups whose filter it matches, for triage.
+- An **inbox** is a list of groups. Each item lands in the first group whose filter it matches,
+  so the groups read as a queue of what to do.
+- A **board** is a grid of swimlanes × columns, for sorting by two things at once, such as size
+  and kind of work.
 
-<!-- --8<-- [end:grid] -->
+Items sort themselves from their labels, CI, review threads and linked PRs. Nothing moves by
+hand, and labels are edited on GitHub. Everything runs on your machine against a local SQLite
+cache that refreshes in the background.
+
+<!-- --8<-- [end:dashboards] -->
 
 Documentation is at [landschaft.fancysnake.dev](https://landschaft.fancysnake.dev).
 
@@ -44,9 +49,11 @@ holding a `package.json`, a `landschaft.config.json` and a git-ignored `landscha
   "private": true,
   "type": "module",
   "scripts": { "dev": "landschaft dev", "build": "landschaft build", "start": "landschaft start" },
-  "dependencies": { "landschaft": "github:fancysnake/landschaft#v0.4.0" }
+  "dependencies": { "landschaft": "github:fancysnake/landschaft#vX.Y.Z" }
 }
 ```
+
+Replace `vX.Y.Z` with a tag from the [tags page](https://github.com/fancysnake/landschaft/tags).
 
 <!-- --8<-- [end:package-json] -->
 
@@ -94,12 +101,12 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
 
 <!-- --8<-- [start:placement] -->
 
-- Every dashboard starts from the open issues in the **global repositories** that the
+- Every dashboard starts from the open items in the **global repositories** that the
   **global users** created or are assigned to (no users: everyone's). A dashboard's own
   **filter** narrows that, e.g. `repo:acme/app user:@me`; `@me` is the account behind the
   token.
-- Each swimlane and column has a **filter**. An issue shows up in **every** swimlane and
-  column whose filter it satisfies: with lanes `label:a` and `label:b`, an issue carrying
+- Each swimlane and column has a **filter**. An item shows up in **every** swimlane and
+  column whose filter it satisfies: with lanes `label:a` and `label:b`, an item carrying
   both appears in both. An empty filter matches everything.
 - Filters follow GitHub search: `label:bug is:pr` needs both (`AND` works too),
   `label:a OR -label:b` either, `-` negates, parens group, `label:a|b|c` takes any of the
@@ -140,7 +147,7 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
   collapsed** (per solid swimlane) folds it on every page load. A folded lane marks the columns with the
   lowest count; **leave out of lowest count** (per column) skips a column.
 - Open **pull requests** are cards like issues.
-- Repo chips in the top bar switch each global repository on or off for every board, saved in
+- Repo chips in the top bar switch each global repository on or off for every dashboard, saved in
   the config; a dashboard with no items in the repos switched on is dimmed. Each chip shows its
   repo's sync age, syncs it alone, and can show it as the only repo.
 - Filters (text, assignee, label, issue type, sort) live in the URL, so a view is a link.
