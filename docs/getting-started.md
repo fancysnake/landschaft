@@ -1,3 +1,7 @@
+---
+description: "Install landschaft from GitHub, run it in a dashboards repo of your own or from source, add repositories in Settings, and pin the engine to a tag."
+---
+
 # Getting started
 
 ## What you need
@@ -47,12 +51,9 @@ Saving writes `landschaft.config.json` next to `package.json` and triggers the f
 labels are cached the filter inputs suggest them, along with repos after `repo:` and users after
 `user:`, `author:` and `assignee:`. Commit the config; the cache is disposable.
 
-The CLI:
-
---8<-- "README.md:cli"
-
-Config, cache and the production build are read from and written to the directory you run in. `LANDSCHAFT_CONFIG` and
-`LANDSCHAFT_DB` override the paths.
+The commands are on the [CLI](cli.md) page. Config, cache and the production build are read from
+and written to the directory you run in. `LANDSCHAFT_CONFIG` and `LANDSCHAFT_DB` override the
+paths.
 
 ## Pin the version, and force the upgrade
 
