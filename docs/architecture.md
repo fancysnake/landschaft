@@ -1,3 +1,7 @@
+---
+description: "How landschaft is built: Astro SSR with React islands and a node:sqlite cache, the layout of the source tree, and why sync is sequential and labels rule."
+---
+
 # How it works
 
 Astro 7 in SSR mode (`@astrojs/node`, standalone) with React 19 islands, Tailwind 4, a

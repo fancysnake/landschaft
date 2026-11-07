@@ -56,7 +56,8 @@ type-checked (`astro check`), not formatted.
 - `src/components/board/` and `src/components/settings/` — React islands mounted with
   `client:only="react"` from `src/pages/d/[id].astro` and `src/pages/settings.astro`.
 
-- `docs/` + `mkdocs.yml` — MkDocs Material site (green theme in `docs/assets/extra.css`);
+- `docs/` + `mkdocs.yml` + `overrides/` — MkDocs Material site (green theme in
+  `docs/stylesheets/forest.css`, SEO head in `overrides/main.html`);
   shared prose is included from README.md through `--8<--` snippet markers.
 
 ## Conventions

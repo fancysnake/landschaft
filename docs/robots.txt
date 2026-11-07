@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://landschaft.fancysnake.dev/sitemap.xml

@@ -1,3 +1,7 @@
+---
+description: "Every field of landschaft.config.json with its type and default: repositories, users, dashboards, swimlanes, columns, inbox groups, files and env."
+---
+
 # Configuration
 
 `landschaft.config.json` holds the repositories to watch and every dashboard. The Settings page edits it through the API;

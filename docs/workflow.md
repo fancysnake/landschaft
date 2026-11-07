@@ -1,3 +1,7 @@
+---
+description: "A working landschaft setup: three real GitHub dashboards, an action queue, a planning board and a parking lot, with every filter and the daily routine."
+---
+
 # A working setup
 
 Filters can express a lot, so this page shows one real setup: the author's own config, three
