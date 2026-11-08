@@ -1,7 +1,7 @@
 # What `vekna cast <ritual>` runs here: cabinet's pull request maintenance
 # rituals (refresh, review, labels), read from the `[cabinet]` section.
 [rituals]
-modules = ["cabinet.rituals.refresh", "cabinet.rituals.review", "cabinet.rituals.labels"]
+modules = ["cabinet.rituals"]
 
 [cabinet]
 remote = "https-origin"
