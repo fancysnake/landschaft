@@ -1,183 +1,100 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { CiBranchNode } from "../links/forge/github/ci";
-import type { GithubClient, GqlOptions } from "../links/forge/github/client";
-import type { IssueNode, PullNode } from "../links/forge/github/issues";
+import type {
+  CiBranch,
+  CiBranchesPage,
+  CiJobsPage,
+  Forge,
+  IssuesPage,
+  PageOptions,
+} from "../pacts/forge";
+import type { CiJob, FetchedIssue, PullStatus } from "../pacts/issues";
 
-import { cachedIssue, DASHBOARD, makeIssue, REPO } from "../__fixtures__/issues";
+import { cachedIssue, DASHBOARD, makeIssue, makeJob, REPO } from "../__fixtures__/issues";
 import { Db } from "../links/db/sqlite";
-import { GithubForge } from "../links/forge/github/forge";
 import { ConfigSchema } from "../pacts/config";
 import { InvalidError, SyncBusyError } from "../pacts/services";
 import { closedSince, nextDue, type SyncDeps, Syncer } from "./sync";
 
-function toNode(number: number, state: "OPEN" | "CLOSED" = "OPEN"): IssueNode {
-  const issue = makeIssue({ number, state });
-  return {
-    id: issue.nodeId,
-    number,
-    title: issue.title,
-    state,
-    url: issue.url,
-    createdAt: issue.createdAt,
-    updatedAt: issue.updatedAt,
-    closedAt: null,
-    issueType: null,
-    author: null,
-    labels: { nodes: [] },
-    assignees: { nodes: [] },
-    parent: null,
-    subIssuesSummary: { total: 0, completed: 0, percentCompleted: 0 },
-    issueDependenciesSummary: { totalBlockedBy: 0 },
-    blockedBy: { nodes: [] },
-  };
+interface ForgeData {
+  /** Pages of issues and of PRs; a page's cursor is the index of the next one. */
+  issues?: FetchedIssue[][];
+  pulls?: FetchedIssue[][];
+  remaining?: number;
+  /** PRs whose status is conflicting. */
+  conflicting?: number[];
+  branches?: CiBranch[];
+  /** The jobs a job query returns for the branches it is asked for. */
+  jobs?: CiJob[];
+  /** Branches a job query fails on. */
+  failed?: string[];
 }
 
-interface Call {
-  query: string;
-  variables: Record<string, unknown>;
-}
-
-function toPullNode(number: number, updatedAt: string): PullNode {
-  return {
-    id: `PR_${number}`,
-    number,
-    title: `PR ${number}`,
-    state: "OPEN",
-    url: `https://github.com/${REPO}/pull/${number}`,
-    createdAt: updatedAt,
-    updatedAt,
-    closedAt: null,
-    author: null,
-    labels: { nodes: [] },
-    assignees: { nodes: [] },
-    closingIssuesReferences: { nodes: [{ number: 1, repository: { nameWithOwner: REPO } }] },
-  };
-}
-
-function fakeGithub(
-  pages: IssueNode[][],
+/** A forge serving `data`, every method a spy recording what the sync asked for. */
+function fakeForge({
+  issues = [],
+  pulls = [],
   remaining = 5000,
-  pulls: PullNode[][] = [],
-  conflicting: number[] = [],
-  /** Branches with a red head commit and what the job query returns for each; null when gone. */
-  failing: Record<string, CiBranchNode | null> = {},
-): { gh: GithubClient; calls: Call[] } {
-  const calls: Call[] = [];
-  const gh: GithubClient = {
-    async gql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
-      calls.push({ query, variables });
-      if (query.includes("query CiBranches")) {
-        const nodes = [
-          { name: "main", target: { statusCheckRollup: { state: "SUCCESS" } } },
-          ...Object.keys(failing).map((name) => ({
-            name,
-            target: { statusCheckRollup: { state: "FAILURE" } },
-          })),
-        ];
-        const refs = { pageInfo: { hasNextPage: false, endCursor: null }, nodes };
-        return {
-          rateLimit: { remaining },
-          repository: { defaultBranchRef: { name: "main" }, refs },
-        } as T;
-      }
-      if (query.includes("query CiJobs")) {
-        const branches = Object.entries(variables).filter(([key]) => key.startsWith("branch"));
-        const repository = Object.fromEntries(
-          branches.flatMap(([key, branch]) => {
-            const index = key.slice("branch".length);
-            return [
-              [`b${index}`, failing[branch as string] ?? null],
-              [`c${index}`, { name: "main", compare: null }],
-            ];
-          }),
-        );
-        return { rateLimit: { remaining }, repository } as T;
-      }
-      if (query.includes("query Labels")) {
-        return {
-          repository: {
-            labels: {
-              pageInfo: { hasNextPage: false, endCursor: null },
-              nodes: [{ name: "bug", color: "ff0000", description: null }],
-            },
-          },
-        } as T;
-      }
-      if (query.includes("query Viewer")) {
-        return { viewer: { login: "me" } } as T;
-      }
-      if (query.includes("query PullStatus")) {
-        const numbers = [...query.matchAll(/pr(\d+): pullRequest/g)].map((m) => Number(m[1]));
-        const repository = Object.fromEntries(
-          numbers.map((number) => [
-            `pr${number}`,
-            {
-              number,
-              isDraft: false,
-              mergeable: conflicting.includes(number) ? "CONFLICTING" : "MERGEABLE",
-              author: null,
-              commits: { nodes: [] },
-              reviewThreads: { nodes: [] },
-            },
-          ]),
-        );
-        return { rateLimit: { remaining }, repository } as T;
-      }
-      const pulled = query.includes("query PullsPage");
-      const source = pulled ? pulls : pages;
-      const index = variables.after ? Number(variables.after) : 0;
-      const nodes = source[index] ?? [];
-      const hasNextPage = index + 1 < source.length;
-      const connection = {
-        pageInfo: { hasNextPage, endCursor: hasNextPage ? String(index + 1) : null },
-        nodes,
-      };
-      return {
-        rateLimit: { remaining },
-        repository: pulled ? { pullRequests: connection } : { issues: connection },
-      } as T;
-    },
+  conflicting = [],
+  branches = [],
+  jobs = [],
+  failed = [],
+}: ForgeData = {}) {
+  const paged = (pages: FetchedIssue[][], after: string | null): IssuesPage => {
+    const index = after ? Number(after) : 0;
+    const hasNextPage = index + 1 < pages.length;
+    return {
+      issues: pages[index] ?? [],
+      hasNextPage,
+      endCursor: hasNextPage ? String(index + 1) : null,
+      rateRemaining: remaining,
+    };
   };
-  return { gh, calls };
+  return {
+    issuesPage: vi.fn(async (_: string, options: PageOptions) => paged(issues, options.after)),
+    pullsPage: vi.fn(async (_: string, options: PageOptions) => paged(pulls, options.after)),
+    pullStatuses: vi.fn(async (_: string, numbers: number[]) => ({
+      statuses: numbers.map((number): PullStatus => ({
+        number,
+        statuses: conflicting.includes(number) ? ["is:conflicting"] : [],
+      })),
+      rateRemaining: remaining,
+    })),
+    ciBranchesPage: vi.fn(async (): Promise<CiBranchesPage> => ({
+      branches,
+      hasNextPage: false,
+      endCursor: null,
+      rateRemaining: remaining,
+    })),
+    ciJobs: vi.fn(async (_: string, batch: CiBranch[]): Promise<CiJobsPage> => {
+      const names = new Set(batch.map(({ name }) => name));
+      return {
+        jobs: jobs.filter((job) => names.has(job.branch)),
+        failed: failed.filter((name) => names.has(name)),
+        rateRemaining: remaining,
+      };
+    }),
+    viewer: vi.fn(async () => "me"),
+    repoLabels: vi.fn(async () => [{ name: "bug", color: "ff0000", description: null }]),
+  } satisfies Forge;
 }
 
-/** A branch whose head commit has the failed commit status `name`. */
-const redBranch = (name: string): CiBranchNode => ({
-  associatedPullRequests: { nodes: [] },
-  mergedPullRequests: { nodes: [] },
-  target: {
-    oid: "abc",
-    url: "https://github.com/acme/app/commit/abc",
-    history: { nodes: [{ author: { user: { login: "ann" } } }] },
-    statusCheckRollup: {
-      contexts: {
-        nodes: [
-          {
-            type: "StatusContext",
-            context: name,
-            state: "FAILURE",
-            targetUrl: null,
-            createdAt: "2026-05-01T00:00:00Z",
-          },
-        ],
-      },
-    },
-  },
+/** A forge whose first query of a sync fails on the repos in `broken`, read per query. */
+const failingOn = (broken: Set<string>, forge = fakeForge()): Forge => ({
+  ...forge,
+  issuesPage: (repo, options) =>
+    broken.has(repo) ? Promise.reject(new Error("boom")) : forge.issuesPage(repo, options),
 });
 
-const pageCalls = (calls: Call[]) => calls.filter((c) => c.query.includes("query IssuesPage"));
-const statusCalls = (calls: Call[]) => calls.filter((c) => c.query.includes("query PullStatus"));
-
-const deferred = () => Promise.withResolvers<unknown>();
+const issues = (...numbers: number[]) => numbers.map((number) => makeIssue({ number }));
 
 const now = new Date("2026-05-01T12:00:00Z");
 
-/** A Syncer over `gh` whose clock stands at `now`, configured with `REPO` alone. */
-const syncerWith = (db: Db, gh: GithubClient, deps: Partial<SyncDeps> = {}) =>
+/** A Syncer over `forge` whose clock stands at `now`, configured with `REPO` alone. */
+const syncerWith = (db: Db, forge: Forge, deps: Partial<SyncDeps> = {}) =>
   new Syncer({
     db,
-    forge: new GithubForge(gh),
+    forge,
     config: () => ConfigSchema.parse({ repos: [REPO] }),
     now: () => now,
     ...deps,
@@ -196,15 +113,15 @@ describe("Syncer", () => {
 
   it("does a full open-only sync the first time, paging and closing stale rows", async () => {
     db.upsertIssues([makeIssue({ number: 99 })]);
-    const { gh, calls } = fakeGithub([[toNode(1), toNode(2)], [toNode(3)]]);
-    const syncer = syncerWith(db, gh);
+    const forge = fakeForge({ issues: [issues(1, 2), issues(3)] });
+    const syncer = syncerWith(db, forge);
 
     const result = await syncer.syncRepo(REPO);
 
     expect(result).toEqual({ repo: REPO, full: true, upserted: 3, closed: 1 });
-    expect(pageCalls(calls).map((c) => c.variables)).toEqual([
-      { owner: "acme", name: "app", since: null, states: ["OPEN"], after: null },
-      { owner: "acme", name: "app", since: null, states: ["OPEN"], after: "1" },
+    expect(forge.issuesPage.mock.calls).toEqual([
+      [REPO, { since: null, states: "open", after: null }],
+      [REPO, { since: null, states: "open", after: "1" }],
     ]);
     expect(cachedIssue(db, REPO, 99)?.state).toBe("CLOSED");
     expect(db.listLabels([REPO]).map((l) => l.name)).toEqual(["bug"]);
@@ -221,27 +138,23 @@ describe("Syncer", () => {
   });
 
   it("also fetches the items closed within the window on a full sync", async () => {
-    const { gh, calls } = fakeGithub([[toNode(1)]]);
-    const syncer = syncerWith(db, gh, {
+    const forge = fakeForge({ issues: [issues(1)] });
+    const syncer = syncerWith(db, forge, {
       config: () =>
         ConfigSchema.parse({ repos: [REPO], dashboards: [{ ...DASHBOARD, closedDays: 7 }] }),
     });
 
     await syncer.syncRepo(REPO);
 
-    expect(pageCalls(calls).map((c) => c.variables)).toEqual([
-      { owner: "acme", name: "app", since: null, states: ["OPEN"], after: null },
-      {
-        owner: "acme",
-        name: "app",
-        since: "2026-04-24T12:00:00.000Z",
-        states: ["CLOSED"],
-        after: null,
-      },
+    const closed = { since: "2026-04-24T12:00:00.000Z", states: "closed", after: null };
+    expect(forge.issuesPage.mock.calls).toEqual([
+      [REPO, { since: null, states: "open", after: null }],
+      [REPO, closed],
     ]);
-    expect(
-      calls.filter((c) => c.query.includes("query PullsPage")).map((c) => c.variables.states),
-    ).toEqual([["OPEN"], ["CLOSED", "MERGED"]]);
+    expect(forge.pullsPage.mock.calls.map(([, options]) => options.states)).toEqual([
+      "open",
+      "closed",
+    ]);
   });
 
   it("syncs incrementally afterwards with an overlapping since and all states", async () => {
@@ -250,43 +163,45 @@ describe("Syncer", () => {
       lastFullSyncAt: "2026-05-01T11:00:00.000Z",
     });
     db.upsertIssues([makeIssue({ number: 5 })]);
-    const { gh, calls } = fakeGithub([[toNode(5, "CLOSED")]]);
-    const syncer = syncerWith(db, gh);
+    const forge = fakeForge({ issues: [[makeIssue({ number: 5, state: "CLOSED" })]] });
+    const syncer = syncerWith(db, forge);
 
     const result = await syncer.syncRepo(REPO);
 
     expect(result).toEqual({ repo: REPO, full: false, upserted: 1, closed: 0 });
-    expect(pageCalls(calls)[0]?.variables).toMatchObject({
+    expect(forge.issuesPage.mock.calls[0]?.[1]).toMatchObject({
       since: "2026-05-01T10:58:00.000Z",
-      states: null,
+      states: "all",
     });
     expect(cachedIssue(db, REPO, 5)?.state).toBe("CLOSED");
     expect(db.getSyncState(REPO)?.lastFullSyncAt).toBe("2026-05-01T11:00:00.000Z");
   });
 
-  it("syncs pull requests newest first and stops paging at the first one older than since", async () => {
+  it("syncs pull requests from the same overlapping since", async () => {
     db.setSyncState(REPO, {
       lastSyncAt: "2026-05-01T11:00:00.000Z",
       lastFullSyncAt: "2026-05-01T11:00:00.000Z",
     });
-    const { gh, calls } = fakeGithub([[]], 5000, [
-      [toPullNode(20, "2026-05-01T11:30:00Z"), toPullNode(21, "2026-04-01T00:00:00Z")],
-      [toPullNode(22, "2026-03-01T00:00:00Z")],
-    ]);
-    const syncer = syncerWith(db, gh);
+    const pull = makeIssue({ number: 20, kind: "pr", linked: [{ repo: REPO, number: 1 }] });
+    const forge = fakeForge({ pulls: [[pull]] });
+    const syncer = syncerWith(db, forge);
 
     expect(await syncer.syncRepo(REPO)).toMatchObject({ upserted: 1 });
-    expect(calls.filter((c) => c.query.includes("query PullsPage"))).toHaveLength(1);
+    expect(forge.pullsPage.mock.calls).toEqual([
+      [REPO, { since: "2026-05-01T10:58:00.000Z", states: "all", after: null }],
+    ]);
     expect(cachedIssue(db, REPO, 20)).toMatchObject({
       kind: "pr",
       linked: [{ repo: REPO, number: 1 }],
     });
-    expect(cachedIssue(db, REPO, 21)).toBeNull();
   });
 
   it("keeps open pull requests open on a full sync", async () => {
-    const { gh } = fakeGithub([[toNode(1)]], 5000, [[toPullNode(2, "2026-05-01T00:00:00Z")]]);
-    const syncer = syncerWith(db, gh);
+    const forge = fakeForge({
+      issues: [issues(1)],
+      pulls: [[makeIssue({ number: 2, kind: "pr" })]],
+    });
+    const syncer = syncerWith(db, forge);
     expect(await syncer.syncRepo(REPO)).toMatchObject({ full: true, upserted: 2, closed: 0 });
     expect(cachedIssue(db, REPO, 2)?.state).toBe("OPEN");
   });
@@ -297,15 +212,12 @@ describe("Syncer", () => {
       lastFullSyncAt: "2026-05-01T11:00:00.000Z",
     });
     db.upsertIssues([makeIssue({ number: 7, kind: "pr" }), makeIssue({ number: 8 })]);
-    const { gh, calls } = fakeGithub([[]], 5000, [], [7]);
-    const syncer = syncerWith(db, gh);
+    const forge = fakeForge({ conflicting: [7] });
 
-    await syncer.syncRepo(REPO);
+    await syncerWith(db, forge).syncRepo(REPO);
 
     expect(cachedIssue(db, REPO, 7)?.statuses).toEqual(["is:conflicting"]);
-    const status = calls.find((c) => c.query.includes("query PullStatus"));
-    expect(status?.query).toContain("pr7:");
-    expect(status?.query).not.toContain("pr8:");
+    expect(forge.pullStatuses.mock.calls).toEqual([[REPO, [7]]]);
   });
 
   /** Cached open PRs and a recent sync, so the next one is incremental and keeps them open. */
@@ -321,85 +233,47 @@ describe("Syncer", () => {
 
   it("asks for PR statuses 50 at a time", async () => {
     openPulls(51);
-    const { gh, calls } = fakeGithub([[]], 5000, [], [51]);
-    await syncerWith(db, gh).syncRepo(REPO);
-    expect(statusCalls(calls)).toHaveLength(2);
+    const forge = fakeForge({ conflicting: [51] });
+    await syncerWith(db, forge).syncRepo(REPO);
+    expect(forge.pullStatuses.mock.calls.map(([, batch]) => batch.length)).toEqual([50, 1]);
     expect(cachedIssue(db, REPO, 51)?.statuses).toEqual(["is:conflicting"]);
   });
 
   it("aborts between PR status batches when the rate limit is nearly gone", async () => {
     openPulls(51);
     const everyPull = Array.from({ length: 51 }, (_, i) => i + 1);
-    const { gh, calls } = fakeGithub([[]], 50, [], everyPull);
-    const syncer = syncerWith(db, gh);
+    const forge = fakeForge({ remaining: 50, conflicting: everyPull });
+    const syncer = syncerWith(db, forge);
     await expect(syncer.syncRepo(REPO)).rejects.toThrow(/rate limit/);
-    expect(statusCalls(calls)).toHaveLength(1);
+    expect(forge.pullStatuses).toHaveBeenCalledTimes(1);
     const flagged = db.listIssues([REPO]).filter((issue) => issue.statuses.length > 0);
     expect(flagged).toHaveLength(50);
     expect(syncer.status().rateRemaining).toBe(50);
   });
 
-  it("reads jobs of the red and default branches alone and replaces the cached ones", async () => {
-    db.setCiJobs(REPO, [
-      {
-        repo: REPO,
-        branch: "old",
-        workflow: null,
-        name: "lint",
-        url: "",
-        failedAt: "",
-        authors: [],
-        pr: null,
-      },
-    ]);
-    const { gh, calls } = fakeGithub([[]], 5000, [], [], {
-      "feat/x": redBranch("lint"),
-      gone: null,
-    });
-    await syncerWith(db, gh).syncRepo(REPO);
-    const jobQueries = calls.filter((c) => c.query.includes("query CiJobs"));
-    expect(jobQueries.map((c) => c.variables)).toEqual([
-      expect.objectContaining({ branch0: "main", branch1: "feat/x", branch2: "gone" }),
-    ]);
-    // Check suites of the green default branch alone.
-    expect(jobQueries[0]?.query.match(/checkSuites\(/g)).toHaveLength(1);
-    expect(db.listCiJobs([REPO])).toEqual([
-      {
-        repo: REPO,
-        branch: "feat/x",
-        workflow: null,
-        name: "lint",
-        url: "https://github.com/acme/app/commit/abc",
-        failedAt: "2026-05-01T00:00:00Z",
-        authors: ["ann"],
-        pr: null,
-      },
-    ]);
+  it("reads jobs of the listed branches and replaces the cached ones", async () => {
+    db.setCiJobs(REPO, [makeJob({ name: "lint", branch: "old" })]);
+    const branches = [
+      { name: "main", suites: true },
+      { name: "feat/x", suites: false },
+    ];
+    const job = makeJob({ name: "lint", branch: "feat/x" });
+    const forge = fakeForge({ branches, jobs: [job] });
+
+    await syncerWith(db, forge).syncRepo(REPO);
+
+    expect(forge.ciJobs.mock.calls).toEqual([[REPO, branches]]);
+    expect(db.listCiJobs([REPO])).toEqual([job]);
   });
 
   it("keeps the cached jobs of a branch the job query failed on and finishes", async () => {
-    const cached = {
-      repo: REPO,
-      branch: "feat/x",
-      workflow: null,
-      name: "lint",
-      url: "",
-      failedAt: "",
-      authors: [],
-      pr: null,
-    };
+    const cached = makeJob({ name: "lint", branch: "feat/x" });
     db.setCiJobs(REPO, [cached, { ...cached, branch: "old" }]);
-    const { gh: fake } = fakeGithub([[]], 5000, [], [], { "feat/x": redBranch("lint") });
-    const error = { message: "Something went wrong", type: "INTERNAL", path: ["repository", "b1"] };
-    const gh: GithubClient = {
-      async gql<T>(query: string, variables: Record<string, unknown>, options?: GqlOptions) {
-        if (query.includes("query CiJobs") && !options?.acceptError?.(error)) {
-          throw new Error(error.message);
-        }
-        return fake.gql<T>(query, variables);
-      },
-    };
-    await syncerWith(db, gh).syncRepo(REPO);
+    const forge = fakeForge({
+      branches: [{ name: "feat/x", suites: false }],
+      failed: ["feat/x"],
+    });
+    await syncerWith(db, forge).syncRepo(REPO);
     expect(db.listCiJobs([REPO])).toEqual([cached]);
     expect(db.getSyncState(REPO)?.lastSyncAt).toBe(now.toISOString());
   });
@@ -419,19 +293,13 @@ describe("Syncer", () => {
       lastSyncAt: "2026-04-29T11:00:00.000Z",
       lastFullSyncAt: "2026-04-29T11:00:00.000Z",
     });
-    const { gh, calls } = fakeGithub([[]]);
-    const syncer = syncerWith(db, gh);
-    await syncer.syncRepo(REPO);
-    expect(pageCalls(calls)[0]?.variables).toMatchObject({ since: null, states: ["OPEN"] });
+    const forge = fakeForge();
+    await syncerWith(db, forge).syncRepo(REPO);
+    expect(forge.issuesPage.mock.calls[0]?.[1]).toMatchObject({ since: null, states: "open" });
   });
 
   it("keeps a repo's error in its sync state alone, clears the in-flight flag and bumps the version", async () => {
-    const gh: GithubClient = {
-      async gql() {
-        throw new Error("boom");
-      },
-    };
-    const syncer = syncerWith(db, gh);
+    const syncer = syncerWith(db, failingOn(new Set([REPO])));
     await expect(syncer.syncRepo(REPO)).rejects.toThrow("boom");
     expect(db.getSyncState(REPO)?.lastError).toBe("boom");
     expect(syncer.status()).toMatchObject({
@@ -442,78 +310,62 @@ describe("Syncer", () => {
   });
 
   it("refuses to overlap a running sync of the same repo", async () => {
-    const gate = deferred();
-    const { gh: labelsOnly } = fakeGithub([]);
-    const gh: GithubClient = {
-      gql: <T>(query: string, variables: Record<string, unknown>): Promise<T> =>
-        query.includes("query Labels")
-          ? labelsOnly.gql<T>(query, variables)
-          : (gate.promise as Promise<T>),
-    };
-    const syncer = syncerWith(db, gh);
+    const gate = Promise.withResolvers<IssuesPage>();
+    const forge = fakeForge();
+    forge.issuesPage.mockReturnValueOnce(gate.promise);
+    const syncer = syncerWith(db, forge);
     const running = syncer.syncRepo(REPO);
     await expect(syncer.syncRepo(REPO)).rejects.toBeInstanceOf(SyncBusyError);
     await expect(syncer.syncAll([REPO])).resolves.toBeUndefined();
     expect(syncer.status()).toMatchObject({ runs: 1, version: 0 });
-    const empty = { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] };
-    gate.resolve({
-      rateLimit: { remaining: 5000 },
-      repository: { issues: empty, pullRequests: empty, refs: empty },
-    });
+    gate.resolve({ issues: [], hasNextPage: false, endCursor: null, rateRemaining: 5000 });
     await expect(running).resolves.toMatchObject({ upserted: 0 });
     expect(syncer.status().inFlight).toEqual([]);
   });
 
   it("keeps a sync-all's early failure past a later success and counts the run", async () => {
-    const { gh: good } = fakeGithub([[]]);
-    const gh: GithubClient = {
-      gql: <T>(query: string, variables: Record<string, unknown>): Promise<T> =>
-        variables.name === "bad"
-          ? Promise.reject(new Error("boom"))
-          : good.gql<T>(query, variables),
-    };
-    const syncer = syncerWith(db, gh);
+    const syncer = syncerWith(db, failingOn(new Set(["acme/bad"])));
     await syncer.syncAll(["acme/bad", REPO]);
     expect(db.getSyncState(REPO)?.lastSyncAt).not.toBeNull();
     expect(syncer.status()).toMatchObject({ runs: 1, lastError: "acme/bad: boom" });
   });
 
   it("adds a sync-all's repos to the running one, keeping their full flag", async () => {
-    const gate = deferred();
-    const { gh: real, calls } = fakeGithub([[]]);
-    const gh: GithubClient = {
-      gql: async <T>(query: string, variables: Record<string, unknown>): Promise<T> => {
-        await gate.promise;
-        return real.gql<T>(query, variables);
-      },
-    };
+    const gate = Promise.withResolvers<void>();
+    const forge = fakeForge();
     db.setSyncState("acme/other", {
       lastSyncAt: "2026-05-01T11:00:00.000Z",
       lastFullSyncAt: "2026-05-01T11:00:00.000Z",
     });
-    const syncer = syncerWith(db, gh, {
+    const gated: Forge = {
+      ...forge,
+      issuesPage: async (repo, options) => {
+        await gate.promise;
+        return forge.issuesPage(repo, options);
+      },
+    };
+    const syncer = syncerWith(db, gated, {
       config: () => ConfigSchema.parse({ repos: [REPO, "acme/other"] }),
     });
     const first = syncer.syncAll([REPO]);
     await vi.waitFor(() => expect(syncer.status().inFlight).toContain(REPO));
     expect(syncer.start(["acme/other"], { full: true })).toBe(1);
     expect(syncer.status()).toMatchObject({ inFlight: [REPO], queued: ["acme/other"] });
-    gate.resolve(undefined);
+    gate.resolve();
     await first;
     expect(syncer.status()).toMatchObject({ runs: 1, inFlight: [], queued: [] });
     expect(syncer.start([])).toBe(2);
     await syncer.syncAll([]);
     expect(
-      pageCalls(calls)
-        .filter((c) => c.variables.name === "other")
-        .map((c) => c.variables.since),
+      forge.issuesPage.mock.calls
+        .filter(([repo]) => repo === "acme/other")
+        .map(([, options]) => options.since),
     ).toContain(null);
   });
 
   it("reports each repo's last sync and error in the status", async () => {
-    const { gh } = fakeGithub([[]]);
     db.setSyncState("acme/bad", { lastError: "boom" });
-    const syncer = syncerWith(db, gh);
+    const syncer = syncerWith(db, fakeForge());
     await syncer.syncRepo(REPO);
     expect(syncer.status().repos).toEqual({
       "acme/bad": { lastSyncAt: null, lastError: "boom" },
@@ -522,20 +374,19 @@ describe("Syncer", () => {
   });
 
   it("aborts when the rate limit is nearly gone and more pages remain", async () => {
-    const { gh } = fakeGithub([[toNode(1)], [toNode(2)]], 50);
-    const syncer = syncerWith(db, gh);
+    const syncer = syncerWith(db, fakeForge({ issues: [issues(1), issues(2)], remaining: 50 }));
     await expect(syncer.syncRepo(REPO)).rejects.toThrow(/rate limit/);
     expect(cachedIssue(db, REPO, 1)).not.toBeNull();
     expect(cachedIssue(db, REPO, 2)).toBeNull();
   });
 
   it("fetches the viewer once and exposes it in the status", async () => {
-    const { gh, calls } = fakeGithub([]);
-    const syncer = syncerWith(db, gh);
+    const forge = fakeForge();
+    const syncer = syncerWith(db, forge);
     expect(syncer.status().viewer).toBeNull();
     expect(await syncer.viewer()).toBe("me");
     expect(await syncer.viewer()).toBe("me");
-    expect(calls.filter((c) => c.query.includes("query Viewer"))).toHaveLength(1);
+    expect(forge.viewer).toHaveBeenCalledTimes(1);
     expect(syncer.status().viewer).toBe("me");
   });
 });
@@ -588,24 +439,13 @@ describe("nextDue", () => {
   });
 });
 
-/** A GitHub that fails every query on the repo names in `broken`, read per query. */
-const failingOn = (broken: Set<string>): GithubClient => {
-  const { gh: good } = fakeGithub([[]]);
-  return {
-    gql: <T>(query: string, variables: Record<string, unknown>): Promise<T> =>
-      broken.has(String(variables.name))
-        ? Promise.reject(new Error("boom"))
-        : good.gql<T>(query, variables),
-  };
-};
-
 describe("Syncer.syncDue", () => {
   it("puts a repo that just failed behind the others, though its last success is older", async () => {
     const db = new Db(":memory:");
     const repos = ["acme/bad", "acme/good"];
     db.setSyncState("acme/bad", { lastSyncAt: STALER, lastError: "boom", lastAttemptAt: STALE });
     db.setSyncState("acme/good", { lastSyncAt: STALER, lastAttemptAt: STALER });
-    const syncer = syncerWith(db, fakeGithub([]).gh, {
+    const syncer = syncerWith(db, fakeForge(), {
       config: () => ConfigSchema.parse({ repos, refreshMinutes: 5 }),
     });
     const syncAll = vi.spyOn(syncer, "syncAll").mockResolvedValue();
@@ -618,7 +458,7 @@ describe("Syncer.syncDue", () => {
 
   it("skips a tick while a sync-all runs", async () => {
     const db = new Db(":memory:");
-    const syncer = syncerWith(db, fakeGithub([]).gh);
+    const syncer = syncerWith(db, fakeForge());
     const run = syncer.syncAll([REPO]);
     const syncAll = vi.spyOn(syncer, "syncAll");
 
@@ -631,7 +471,7 @@ describe("Syncer.syncDue", () => {
 
   it("skips a tick while a single-repo sync runs", async () => {
     const db = new Db(":memory:");
-    const syncer = syncerWith(db, fakeGithub([]).gh);
+    const syncer = syncerWith(db, fakeForge());
     const run = syncer.syncRepo(REPO);
     const syncAll = vi.spyOn(syncer, "syncAll");
 
@@ -646,7 +486,7 @@ describe("Syncer.syncDue", () => {
     const db = new Db(":memory:");
     const repos = Array.from({ length: 12 }, (_, index) => `acme/r${index}`);
     let clock = now.getTime();
-    const syncer = syncerWith(db, fakeGithub([]).gh, {
+    const syncer = syncerWith(db, fakeForge(), {
       config: () => ConfigSchema.parse({ repos, refreshMinutes: 5 }),
       now: () => new Date(clock),
     });
@@ -666,14 +506,7 @@ describe("Syncer.syncDue", () => {
 
   it("leaves a user run's failure in place when a background run ends", async () => {
     const db = new Db(":memory:");
-    const { gh: good } = fakeGithub([[]]);
-    const gh: GithubClient = {
-      gql: <T>(query: string, variables: Record<string, unknown>): Promise<T> =>
-        variables.name === "bad"
-          ? Promise.reject(new Error("boom"))
-          : good.gql<T>(query, variables),
-    };
-    const syncer = syncerWith(db, gh, {
+    const syncer = syncerWith(db, failingOn(new Set(["acme/bad"])), {
       config: () => ConfigSchema.parse({ repos: ["acme/bad", REPO], refreshMinutes: 5 }),
       now: () => new Date(now.getTime() + (db.getSyncState("acme/bad") ? 200_000 : 0)),
     });
@@ -688,7 +521,7 @@ describe("Syncer.syncDue", () => {
 
   it("drops a user run's failure once a background sync recovers that repo", async () => {
     const db = new Db(":memory:");
-    const broken = new Set(["bad", "worse"]);
+    const broken = new Set(["acme/bad", "acme/worse"]);
     let clock = now.getTime();
     const syncer = syncerWith(db, failingOn(broken), {
       config: () => ConfigSchema.parse({ repos: ["acme/bad", "acme/worse"], refreshMinutes: 5 }),
@@ -710,11 +543,12 @@ describe("Syncer.syncDue", () => {
 
   it("reports no failure for a repo a later pass of the same run recovers", async () => {
     const db = new Db(":memory:");
-    const { gh: good } = fakeGithub([[]]);
+    const forge = fakeForge();
     let failed = false;
     const syncer: Syncer = syncerWith(db, {
-      gql: <T>(query: string, variables: Record<string, unknown>): Promise<T> => {
-        if (failed) return good.gql<T>(query, variables);
+      ...forge,
+      issuesPage: (repo, options) => {
+        if (failed) return forge.issuesPage(repo, options);
         failed = true;
         void syncer.syncAll([REPO]);
         return Promise.reject(new Error("boom"));
@@ -730,7 +564,7 @@ describe("Syncer.syncDue", () => {
   it("drops a user run's failure once its repo leaves the config", async () => {
     const db = new Db(":memory:");
     let repos = ["acme/bad"];
-    const syncer = syncerWith(db, failingOn(new Set(["bad"])), {
+    const syncer = syncerWith(db, failingOn(new Set(["acme/bad"])), {
       config: () => ConfigSchema.parse({ repos, refreshMinutes: 5 }),
     });
     await syncer.syncAll(repos);
@@ -745,7 +579,7 @@ describe("Syncer.syncDue", () => {
   it("clears its own error once it picks a repo again", async () => {
     const db = new Db(":memory:");
     let broken = true;
-    const syncer = syncerWith(db, fakeGithub([]).gh, {
+    const syncer = syncerWith(db, fakeForge(), {
       config: () => {
         if (broken) throw new Error("bad json");
         return ConfigSchema.parse({ repos: [REPO] });
@@ -763,8 +597,7 @@ describe("Syncer.syncDue", () => {
 
   it("records a config that fails to load and syncs nothing", async () => {
     const db = new Db(":memory:");
-    const { gh } = fakeGithub([]);
-    const syncer = syncerWith(db, gh, {
+    const syncer = syncerWith(db, fakeForge(), {
       config: () => {
         throw new Error("bad json");
       },
@@ -780,7 +613,7 @@ describe("Syncer.syncDue", () => {
 
   it("records a sync state that fails to load and syncs nothing", async () => {
     const db = new Db(":memory:");
-    const syncer = syncerWith(db, fakeGithub([]).gh);
+    const syncer = syncerWith(db, fakeForge());
     vi.spyOn(db, "listSyncStates").mockImplementationOnce(() => {
       throw new Error("disk I/O error");
     });
@@ -809,7 +642,7 @@ describe("closedSince", () => {
 describe("Syncer.start", () => {
   it("queues every configured repo when none are named", () => {
     const db = new Db(":memory:");
-    const syncer = syncerWith(db, fakeGithub([]).gh);
+    const syncer = syncerWith(db, fakeForge());
     const syncAll = vi.spyOn(syncer, "syncAll").mockResolvedValue();
 
     syncer.start(undefined, { full: true });
@@ -820,7 +653,7 @@ describe("Syncer.start", () => {
 
   it("rejects a repo outside the config before queuing anything", () => {
     const db = new Db(":memory:");
-    const syncer = syncerWith(db, fakeGithub([]).gh);
+    const syncer = syncerWith(db, fakeForge());
     const syncAll = vi.spyOn(syncer, "syncAll");
 
     expect(() => syncer.start([REPO, "acme/other"])).toThrow(InvalidError);

@@ -2,12 +2,16 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { PullStatusLabel } from "../../../pacts/status";
 
-import { createGithubClient, type StatusState } from "./client";
+import { createGithubClient, type GithubClient, type StatusState } from "./client";
 import {
   type CheckContext,
   fetchIssuesPage,
+  fetchPullsPage,
   fetchPullStatuses,
+  fetchRepoLabels,
+  fetchViewer,
   type IssueNode,
+  type PullNode,
   type PullStatusNode,
   toIssue,
   toPull,
@@ -270,5 +274,109 @@ describe("fetchIssuesPage", () => {
     await expect(
       fetchIssuesPage(gh, "acme/gone", { since: null, states: "all", after: null }),
     ).rejects.toThrow(/not found/);
+  });
+
+  it.each([
+    ["open", ["OPEN"]],
+    ["closed", ["CLOSED"]],
+  ] as const)("asks for %s issues as %j", async (states, expected) => {
+    const { gh, variables } = answering(connection("issues", []));
+    await fetchIssuesPage(gh, "acme/app", { since: null, states, after: null });
+    expect(variables[0]).toMatchObject({ states: expected });
+  });
+});
+
+/** A client answering its queries with `responses` in turn, recording the variables of each. */
+function answering(...responses: unknown[]): { gh: GithubClient; variables: unknown[] } {
+  const variables: unknown[] = [];
+  const gh: GithubClient = {
+    async gql<T>(_: string, vars: Record<string, unknown>): Promise<T> {
+      variables.push(vars);
+      return responses[variables.length - 1] as T;
+    },
+  };
+  return { gh, variables };
+}
+
+const connection = (key: "issues" | "pullRequests", nodes: unknown[], hasNextPage = false) => ({
+  rateLimit: { remaining: 4900 },
+  repository: {
+    [key]: { pageInfo: { hasNextPage, endCursor: hasNextPage ? "c2" : null }, nodes },
+  },
+});
+
+const pullNode = (number: number, updatedAt: string): PullNode => ({
+  id: `PR_${number}`,
+  number,
+  title: `PR ${number}`,
+  state: "OPEN",
+  url: `https://github.com/acme/app/pull/${number}`,
+  createdAt: updatedAt,
+  updatedAt,
+  closedAt: null,
+  author: null,
+  labels: { nodes: [] },
+  assignees: { nodes: [] },
+  closingIssuesReferences: { nodes: [] },
+});
+
+describe("fetchPullsPage", () => {
+  it.each([
+    ["open", ["OPEN"]],
+    ["closed", ["CLOSED", "MERGED"]],
+    ["all", null],
+  ] as const)("asks for %s pull requests as %j", async (states, expected) => {
+    const { gh, variables } = answering(connection("pullRequests", []));
+    await fetchPullsPage(gh, "acme/app", { since: null, states, after: "c1" });
+    expect(variables[0]).toEqual({ owner: "acme", name: "app", states: expected, after: "c1" });
+  });
+
+  it("keeps the PRs updated since the cutoff and stops paging at the first older one", async () => {
+    const nodes = [pullNode(20, "2026-05-01T11:30:00Z"), pullNode(21, "2026-04-01T00:00:00Z")];
+    const { gh } = answering(connection("pullRequests", nodes, true));
+    const page = await fetchPullsPage(gh, "acme/app", {
+      since: "2026-05-01T10:58:00Z",
+      states: "all",
+      after: null,
+    });
+    expect(page.issues.map((issue) => issue.number)).toEqual([20]);
+    expect(page).toMatchObject({ hasNextPage: false, rateRemaining: 4900 });
+  });
+
+  it("pages on without a cutoff", async () => {
+    const { gh } = answering(
+      connection("pullRequests", [pullNode(20, "2026-03-01T00:00:00Z")], true),
+    );
+    const page = await fetchPullsPage(gh, "acme/app", { since: null, states: "all", after: null });
+    expect(page).toMatchObject({ hasNextPage: true, endCursor: "c2" });
+    expect(page.issues).toHaveLength(1);
+  });
+});
+
+describe("fetchViewer", () => {
+  it("returns the token's login", async () => {
+    await expect(fetchViewer(answering({ viewer: { login: "me" } }).gh)).resolves.toBe("me");
+  });
+});
+
+/** A labels page holding `name`, followed by the page at `endCursor` when there is one. */
+const labels = (name: string, endCursor: string | null) => ({
+  repository: {
+    labels: {
+      pageInfo: { hasNextPage: endCursor !== null, endCursor },
+      nodes: [{ name, color: "ff0000", description: null }],
+    },
+  },
+});
+
+describe("fetchRepoLabels", () => {
+  it("collects the labels of every page", async () => {
+    const { gh, variables } = answering(labels("bug", "c1"), labels("chore", null));
+    const result = await fetchRepoLabels(gh, "acme/app");
+    expect(result.map((label) => label.name)).toEqual(["bug", "chore"]);
+    expect(variables).toEqual([
+      { owner: "acme", name: "app", after: null },
+      { owner: "acme", name: "app", after: "c1" },
+    ]);
   });
 });

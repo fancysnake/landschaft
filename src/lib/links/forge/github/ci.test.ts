@@ -4,6 +4,7 @@ import {
   type CiBranchNode,
   type CiContext,
   type DefaultBranchNode,
+  fetchCiBranchesPage,
   fetchCiJobs,
   toCiJobs,
 } from "./ci";
@@ -170,6 +171,54 @@ const respond = (repository: Record<string, unknown>, ...errors: GqlError[]) =>
     async () => Response.json({ data: { rateLimit: { remaining: 4000 }, repository }, errors }),
   );
 
+/** A client answering `data`, recording each request's query and variables. */
+const recording = (data: unknown) => {
+  const requests: { query: string; variables: Record<string, unknown> }[] = [];
+  const gh = createGithubClient(
+    async () => "tok",
+    async (_: string, init: RequestInit) => {
+      requests.push(JSON.parse(init.body as string) as (typeof requests)[number]);
+      return Response.json({ data });
+    },
+  );
+  return { gh, requests };
+};
+
+/** A listed branch whose head commit's rollup is `state`. */
+const rolled = (name: string, state: string | null) => ({
+  name,
+  target: { statusCheckRollup: state === null ? null : { state } },
+});
+
+describe("fetchCiBranchesPage", () => {
+  it("lists the red branches and the default one, which alone reads its check suites", async () => {
+    const refs = {
+      pageInfo: { hasNextPage: true, endCursor: "c2" },
+      nodes: [
+        rolled("main", "SUCCESS"),
+        rolled("feat/x", "FAILURE"),
+        rolled("feat/y", "SUCCESS"),
+        rolled("feat/z", null),
+      ],
+    };
+    const { gh, requests } = recording({
+      rateLimit: { remaining: 4000 },
+      repository: { defaultBranchRef: { name: "main" }, refs },
+    });
+
+    await expect(fetchCiBranchesPage(gh, "acme/app", "c1")).resolves.toEqual({
+      branches: [
+        { name: "main", suites: true },
+        { name: "feat/x", suites: false },
+      ],
+      hasNextPage: true,
+      endCursor: "c2",
+      rateRemaining: 4000,
+    });
+    expect(requests[0]?.variables).toEqual({ owner: "acme", name: "app", after: "c1" });
+  });
+});
+
 const red = branch([checkRun("lint", "FAILURE")]);
 const gone = (path: string[], type = "NOT_FOUND"): GqlError => ({
   message: "x",
@@ -182,6 +231,20 @@ describe("fetchCiJobs", () => {
     { name: "feat/x", suites: false },
     { name: "feat/y", suites: false },
   ];
+
+  it("asks for every branch in one query, check suites only where the branch wants them", async () => {
+    const { gh, requests } = recording({
+      rateLimit: { remaining: 4000 },
+      repository: { b0: red, c0: base(1), b1: red, c1: base(1) },
+    });
+    await fetchCiJobs(gh, "acme/app", [
+      { name: "main", suites: true },
+      { name: "feat/x", suites: false },
+    ]);
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.variables).toMatchObject({ branch0: "main", branch1: "feat/x" });
+    expect(requests[0]?.query.match(/checkSuites\(/g)).toHaveLength(1);
+  });
 
   it("skips a branch gone since it was listed", async () => {
     const gh = respond({ b0: null, c0: base(1), b1: red, c1: base(1) }, gone(["b0"]));
