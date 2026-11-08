@@ -1,5 +1,7 @@
 # landschaft
 
+Documentation is at [landschaft.fancysnake.dev](https://landschaft.fancysnake.dev).
+
 <!-- --8<-- [start:what] -->
 
 A structured inbox for your GitHub work: issues, PRs and failed CI jobs from all your
@@ -24,8 +26,6 @@ hand, and labels are edited on GitHub. Everything runs on your machine against a
 cache that refreshes in the background.
 
 <!-- --8<-- [end:dashboards] -->
-
-Documentation is at [landschaft.fancysnake.dev](https://landschaft.fancysnake.dev).
 
 <!-- --8<-- [start:built-with] -->
 

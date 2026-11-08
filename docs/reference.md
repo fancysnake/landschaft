@@ -1,3 +1,7 @@
+---
+description: "How landschaft places GitHub items: inboxes, the filter language, sync passes, sub-issues, pull request status, closed items and failed CI jobs."
+---
+
 # Reference
 
 --8<-- "README.md:dashboards"

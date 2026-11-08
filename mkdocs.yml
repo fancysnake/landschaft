@@ -1,6 +1,6 @@
 site_name: landschaft
 site_url: https://landschaft.fancysnake.dev
-site_description: A structured inbox for your GitHub work — issues, PRs and failed CI jobs sorted by your own filters into what to do next.
+site_description: "A structured inbox for your GitHub work: issues, PRs and failed CI jobs sorted by your own filters into what to do next. Local and read-only."
 repo_url: https://github.com/fancysnake/landschaft
 repo_name: fancysnake/landschaft
 copyright: MIT
@@ -16,6 +16,7 @@ validation:
 
 theme:
   name: material
+  custom_dir: overrides
   logo: assets/logo.png
   favicon: assets/favicon.png
   font:
@@ -32,6 +33,7 @@ theme:
     - content.code.copy
     - navigation.top
     - navigation.footer
+    - navigation.sections
 
 extra:
   social:
@@ -54,10 +56,14 @@ markdown_extensions:
 
 nav:
   - index.md
-  - getting-started.md
-  - configuration.md
-  - workflow.md
-  - reference.md
-  - api.md
-  - architecture.md
-  - changelog.md
+  - Guide:
+      - getting-started.md
+      - configuration.md
+      - workflow.md
+  - Reference:
+      - reference.md
+      - cli.md
+      - api.md
+  - Project:
+      - architecture.md
+      - changelog.md

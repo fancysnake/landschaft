@@ -1,3 +1,7 @@
+---
+description: "The local JSON API behind landschaft: config, board and inbox views, unmatched items, labels and sync endpoints, with their requests and responses."
+---
+
 # API
 
 All endpoints return JSON and carry no authentication: the server is meant to listen on

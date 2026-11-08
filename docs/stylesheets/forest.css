@@ -8,20 +8,30 @@
  * foreground on paper at 4.61:1, then the dark header's light end at 4.65:1.
  */
 
+:root {
+  --forest-paper: #f6fbf4;
+  --forest-ink: #16301f;
+  --forest-fern: #357a53;
+  --forest-pine: #143f27;
+  --forest-deep: #0e2d1c;
+  --forest-night-paper: #0f1d15;
+  --forest-night-ink: #e4efe6;
+}
+
 /* ---- Light ---- */
 
 [data-md-color-scheme="forest"] {
   color-scheme: light;
 
-  --md-default-bg-color: #f6fbf4;
-  --md-default-fg-color: #16301f;
+  --md-default-bg-color: var(--forest-paper);
+  --md-default-fg-color: var(--forest-ink);
   --md-default-fg-color--light: #2f4a3a;
   --md-default-fg-color--lighter: #5d7866;
   --md-default-fg-color--lightest: #dcebdf;
 
   --md-primary-fg-color: #1f5c3a;
-  --md-primary-fg-color--light: #357a53;
-  --md-primary-fg-color--dark: #143f27;
+  --md-primary-fg-color--light: var(--forest-fern);
+  --md-primary-fg-color--dark: var(--forest-pine);
   --md-primary-bg-color: #f3faf3;
   --md-primary-bg-color--light: #d9eedc;
 
@@ -35,20 +45,8 @@
   --md-code-bg-color: #e9f4ea;
   --md-code-fg-color: #1d3b2a;
 
-  --md-footer-bg-color: #143f27;
-  --md-footer-bg-color--dark: #0e2d1c;
-
-  /* Syntax: Material's defaults do not know this palette. */
-  --md-code-hl-keyword-color: #1f6d43;
-  --md-code-hl-function-color: #2f5f8f;
-  --md-code-hl-string-color: #5c6b12;
-  --md-code-hl-number-color: #8a5a10;
-  --md-code-hl-comment-color: #53705c;
-  --md-code-hl-name-color: var(--md-code-fg-color);
-  --md-code-hl-operator-color: var(--md-default-fg-color--light);
-  --md-code-hl-punctuation-color: var(--md-default-fg-color--light);
-  --md-code-hl-constant-color: #7a3e8a;
-  --md-code-hl-special-color: #8a5a10;
+  --md-footer-bg-color: var(--forest-pine);
+  --md-footer-bg-color--dark: var(--forest-deep);
 }
 
 /* ---- Dark ---- */
@@ -56,18 +54,18 @@
 [data-md-color-scheme="forest-night"] {
   color-scheme: dark;
 
-  --md-default-bg-color: #0f1d15;
+  --md-default-bg-color: var(--forest-night-paper);
   --md-default-bg-color--light: color-mix(in srgb, var(--md-default-bg-color) 54%, transparent);
   --md-default-bg-color--lighter: color-mix(in srgb, var(--md-default-bg-color) 26%, transparent);
   --md-default-bg-color--lightest: color-mix(in srgb, var(--md-default-bg-color) 7%, transparent);
-  --md-default-fg-color: #e4efe6;
+  --md-default-fg-color: var(--forest-night-ink);
   --md-default-fg-color--light: #b6cabc;
   --md-default-fg-color--lighter: #88a291;
   --md-default-fg-color--lightest: #24392c;
 
-  --md-primary-fg-color: #143f27;
-  --md-primary-fg-color--light: #357a53;
-  --md-primary-fg-color--dark: #0e2d1c;
+  --md-primary-fg-color: var(--forest-pine);
+  --md-primary-fg-color--light: var(--forest-fern);
+  --md-primary-fg-color--dark: var(--forest-deep);
   --md-primary-bg-color: #eaf6ec;
   --md-primary-bg-color--light: #bcd8c3;
 
@@ -83,15 +81,31 @@
   --md-code-bg-color: #16281d;
   --md-code-fg-color: #d9e8dc;
 
-  --md-footer-bg-color: #0e2d1c;
+  --md-footer-bg-color: var(--forest-deep);
   --md-footer-bg-color--dark: #0a2115;
 
   /* Material's slate shadows: the light ones vanish on a dark page. */
   --md-shadow-z1: 0 0.2rem 0.5rem #0000000d, 0 0 0.05rem #0000001a;
   --md-shadow-z2: 0 0.2rem 0.5rem #00000040, 0 0 0.05rem #00000040;
   --md-shadow-z3: 0 0.2rem 0.5rem #0006, 0 0 0.05rem #00000059;
+}
 
-  /* Syntax */
+/* Syntax: Material's defaults do not know this palette. */
+
+[data-md-color-scheme="forest"] {
+  --md-code-hl-keyword-color: #1f6d43;
+  --md-code-hl-function-color: #2f5f8f;
+  --md-code-hl-string-color: #5c6b12;
+  --md-code-hl-number-color: #8a5a10;
+  --md-code-hl-comment-color: #53705c;
+  --md-code-hl-name-color: var(--md-code-fg-color);
+  --md-code-hl-operator-color: var(--md-default-fg-color--light);
+  --md-code-hl-punctuation-color: var(--md-default-fg-color--light);
+  --md-code-hl-constant-color: #7a3e8a;
+  --md-code-hl-special-color: #8a5a10;
+}
+
+[data-md-color-scheme="forest-night"] {
   --md-code-hl-keyword-color: #8fd36f;
   --md-code-hl-function-color: #8fc1ee;
   --md-code-hl-string-color: #cdd97a;
