@@ -13,6 +13,11 @@ export function fakeGithub(...bodies: GqlBody[]) {
     async () => "tok",
     async (_, init) => {
       requests.push(JSON.parse(init.body as string) as (typeof requests)[number]);
+      if (requests.length > bodies.length) {
+        throw new Error(
+          `fakeGithub: request ${requests.length} but only ${bodies.length} bodies supplied`,
+        );
+      }
       return Response.json(bodies[requests.length - 1]);
     },
   );
