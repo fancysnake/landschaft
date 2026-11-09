@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type { PullStatusLabel } from "../../../pacts/status";
+import type { StatusState } from "./client";
 
-import { createGithubClient, type GithubClient, type StatusState } from "./client";
+import { fakeGithub } from "../../../__fixtures__/github";
 import {
   type CheckContext,
   fetchIssuesPage,
@@ -36,13 +37,6 @@ const node: IssueNode = {
   issueDependenciesSummary: { totalBlockedBy: 1 },
   blockedBy: { nodes: [{ number: 8, state: "CLOSED", repository: { nameWithOwner: "acme/lib" } }] },
 };
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
-}
 
 describe("toIssue", () => {
   it("maps a GraphQL node to the cache shape", () => {
@@ -196,22 +190,13 @@ describe("toPullStatus", () => {
 
 describe("fetchPullStatuses", () => {
   it("asks for every PR in one query, each aliased with its own number", async () => {
-    const queries: string[] = [];
-    const fetchImpl = vi.fn(async (_: string, init: RequestInit) => {
-      const { query } = JSON.parse(init.body as string) as { query: string };
-      queries.push(query);
-      const repository = {
-        pr7: statusNode({ number: 7, mergeable: "CONFLICTING" }),
-        pr8: null,
-      };
-      return jsonResponse({ data: { rateLimit: { remaining: 4321 }, repository } });
-    });
-    const gh = createGithubClient(async () => "tok", fetchImpl);
+    const repository = { pr7: statusNode({ number: 7, mergeable: "CONFLICTING" }), pr8: null };
+    const { gh, requests } = fakeGithub({ data: { rateLimit: { remaining: 4321 }, repository } });
 
     const page = await fetchPullStatuses(gh, "acme/app", [7, 8]);
 
-    expect(queries).toHaveLength(1);
-    expect(queries[0]).toContain("pr8: pullRequest(number: 8)");
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.query).toContain("pr8: pullRequest(number: 8)");
     expect(page).toEqual({
       statuses: [{ number: 7, statuses: ["is:conflicting"] }],
       rateRemaining: 4321,
@@ -221,19 +206,7 @@ describe("fetchPullStatuses", () => {
 
 describe("fetchIssuesPage", () => {
   it("maps a page of issues and passes pagination variables", async () => {
-    let variables: unknown;
-    const fetchImpl = vi.fn(async (_: string, init: RequestInit) => {
-      ({ variables } = JSON.parse(init.body as string) as { variables: unknown });
-      return jsonResponse({
-        data: {
-          rateLimit: { remaining: 4900 },
-          repository: {
-            issues: { pageInfo: { hasNextPage: true, endCursor: "c2" }, nodes: [node] },
-          },
-        },
-      });
-    });
-    const gh = createGithubClient(async () => "tok", fetchImpl);
+    const { gh, requests } = fakeGithub(connection("issues", [node], true));
     const page = await fetchIssuesPage(gh, "acme/app", {
       since: "2026-01-01T00:00:00Z",
       states: "all",
@@ -241,7 +214,7 @@ describe("fetchIssuesPage", () => {
     });
     expect(page).toMatchObject({ hasNextPage: true, endCursor: "c2", rateRemaining: 4900 });
     expect(page.issues[0]?.number).toBe(12);
-    expect(variables).toEqual({
+    expect(requests[0]?.variables).toEqual({
       owner: "acme",
       name: "app",
       since: "2026-01-01T00:00:00Z",
@@ -251,26 +224,13 @@ describe("fetchIssuesPage", () => {
   });
 
   it("asks for GitHub's maximum of 50 blockers", async () => {
-    let query = "";
-    const fetchImpl = vi.fn(async (_: string, init: RequestInit) => {
-      ({ query } = JSON.parse(init.body as string) as { query: string });
-      return jsonResponse({
-        data: {
-          rateLimit: { remaining: 4900 },
-          repository: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } },
-        },
-      });
-    });
-    const gh = createGithubClient(async () => "tok", fetchImpl);
+    const { gh, requests } = fakeGithub(connection("issues", []));
     await fetchIssuesPage(gh, "acme/app", { since: null, states: "all", after: null });
-    expect(query).toContain("blockedBy(first: 50)");
+    expect(requests[0]?.query).toContain("blockedBy(first: 50)");
   });
 
   it("fails clearly when the repository is not accessible", async () => {
-    const gh = createGithubClient(
-      async () => "tok",
-      async () => jsonResponse({ data: { rateLimit: { remaining: 1 }, repository: null } }),
-    );
+    const { gh } = fakeGithub({ data: { rateLimit: { remaining: 1 }, repository: null } });
     await expect(
       fetchIssuesPage(gh, "acme/gone", { since: null, states: "all", after: null }),
     ).rejects.toThrow(/not found/);
@@ -279,29 +239,20 @@ describe("fetchIssuesPage", () => {
   it.each([
     ["open", ["OPEN"]],
     ["closed", ["CLOSED"]],
+    ["all", null],
   ] as const)("asks for %s issues as %j", async (states, expected) => {
-    const { gh, variables } = answering(connection("issues", []));
+    const { gh, requests } = fakeGithub(connection("issues", []));
     await fetchIssuesPage(gh, "acme/app", { since: null, states, after: null });
-    expect(variables[0]).toMatchObject({ states: expected });
+    expect(requests[0]?.variables).toMatchObject({ states: expected });
   });
 });
 
-/** A client answering its queries with `responses` in turn, recording the variables of each. */
-function answering(...responses: unknown[]): { gh: GithubClient; variables: unknown[] } {
-  const variables: unknown[] = [];
-  const gh: GithubClient = {
-    async gql<T>(_: string, vars: Record<string, unknown>): Promise<T> {
-      variables.push(vars);
-      return responses[variables.length - 1] as T;
-    },
-  };
-  return { gh, variables };
-}
-
 const connection = (key: "issues" | "pullRequests", nodes: unknown[], hasNextPage = false) => ({
-  rateLimit: { remaining: 4900 },
-  repository: {
-    [key]: { pageInfo: { hasNextPage, endCursor: hasNextPage ? "c2" : null }, nodes },
+  data: {
+    rateLimit: { remaining: 4900 },
+    repository: {
+      [key]: { pageInfo: { hasNextPage, endCursor: hasNextPage ? "c2" : null }, nodes },
+    },
   },
 });
 
@@ -326,14 +277,19 @@ describe("fetchPullsPage", () => {
     ["closed", ["CLOSED", "MERGED"]],
     ["all", null],
   ] as const)("asks for %s pull requests as %j", async (states, expected) => {
-    const { gh, variables } = answering(connection("pullRequests", []));
+    const { gh, requests } = fakeGithub(connection("pullRequests", []));
     await fetchPullsPage(gh, "acme/app", { since: null, states, after: "c1" });
-    expect(variables[0]).toEqual({ owner: "acme", name: "app", states: expected, after: "c1" });
+    expect(requests[0]?.variables).toEqual({
+      owner: "acme",
+      name: "app",
+      states: expected,
+      after: "c1",
+    });
   });
 
   it("keeps the PRs updated since the cutoff and stops paging at the first older one", async () => {
     const nodes = [pullNode(20, "2026-05-01T11:30:00Z"), pullNode(21, "2026-04-01T00:00:00Z")];
-    const { gh } = answering(connection("pullRequests", nodes, true));
+    const { gh } = fakeGithub(connection("pullRequests", nodes, true));
     const page = await fetchPullsPage(gh, "acme/app", {
       since: "2026-05-01T10:58:00Z",
       states: "all",
@@ -344,7 +300,7 @@ describe("fetchPullsPage", () => {
   });
 
   it("pages on without a cutoff", async () => {
-    const { gh } = answering(
+    const { gh } = fakeGithub(
       connection("pullRequests", [pullNode(20, "2026-03-01T00:00:00Z")], true),
     );
     const page = await fetchPullsPage(gh, "acme/app", { since: null, states: "all", after: null });
@@ -355,26 +311,30 @@ describe("fetchPullsPage", () => {
 
 describe("fetchViewer", () => {
   it("returns the token's login", async () => {
-    await expect(fetchViewer(answering({ viewer: { login: "me" } }).gh)).resolves.toBe("me");
+    await expect(fetchViewer(fakeGithub({ data: { viewer: { login: "me" } } }).gh)).resolves.toBe(
+      "me",
+    );
   });
 });
 
 /** A labels page holding `name`, followed by the page at `endCursor` when there is one. */
 const labels = (name: string, endCursor: string | null) => ({
-  repository: {
-    labels: {
-      pageInfo: { hasNextPage: endCursor !== null, endCursor },
-      nodes: [{ name, color: "ff0000", description: null }],
+  data: {
+    repository: {
+      labels: {
+        pageInfo: { hasNextPage: endCursor !== null, endCursor },
+        nodes: [{ name, color: "ff0000", description: null }],
+      },
     },
   },
 });
 
 describe("fetchRepoLabels", () => {
   it("collects the labels of every page", async () => {
-    const { gh, variables } = answering(labels("bug", "c1"), labels("chore", null));
+    const { gh, requests } = fakeGithub(labels("bug", "c1"), labels("chore", null));
     const result = await fetchRepoLabels(gh, "acme/app");
     expect(result.map((label) => label.name)).toEqual(["bug", "chore"]);
-    expect(variables).toEqual([
+    expect(requests.map(({ variables }) => variables)).toEqual([
       { owner: "acme", name: "app", after: null },
       { owner: "acme", name: "app", after: "c1" },
     ]);

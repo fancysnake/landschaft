@@ -28,6 +28,8 @@ interface ForgeData {
   jobs?: CiJob[];
   /** Branches a job query fails on. */
   failed?: string[];
+  /** Repos every issue query fails on, read per query. */
+  broken?: Set<string>;
 }
 
 /** A forge serving `data`, every method a spy recording what the sync asked for. */
@@ -39,6 +41,7 @@ function fakeForge({
   branches = [],
   jobs = [],
   failed = [],
+  broken = new Set(),
 }: ForgeData = {}) {
   const paged = (pages: FetchedIssue[][], after: string | null): IssuesPage => {
     const index = after ? Number(after) : 0;
@@ -51,7 +54,10 @@ function fakeForge({
     };
   };
   return {
-    issuesPage: vi.fn(async (_: string, options: PageOptions) => paged(issues, options.after)),
+    issuesPage: vi.fn(async (repo: string, options: PageOptions) => {
+      if (broken.has(repo)) throw new Error("boom");
+      return paged(issues, options.after);
+    }),
     pullsPage: vi.fn(async (_: string, options: PageOptions) => paged(pulls, options.after)),
     pullStatuses: vi.fn(async (_: string, numbers: number[]) => ({
       statuses: numbers.map((number): PullStatus => ({
@@ -79,14 +85,14 @@ function fakeForge({
   } satisfies Forge;
 }
 
-/** A forge whose first query of a sync fails on the repos in `broken`, read per query. */
-const failingOn = (broken: Set<string>, forge = fakeForge()): Forge => ({
-  ...forge,
-  issuesPage: (repo, options) =>
-    broken.has(repo) ? Promise.reject(new Error("boom")) : forge.issuesPage(repo, options),
-});
-
 const issues = (...numbers: number[]) => numbers.map((number) => makeIssue({ number }));
+
+const EMPTY_PAGE: IssuesPage = {
+  issues: [],
+  hasNextPage: false,
+  endCursor: null,
+  rateRemaining: 5000,
+};
 
 const now = new Date("2026-05-01T12:00:00Z");
 
@@ -299,7 +305,7 @@ describe("Syncer", () => {
   });
 
   it("keeps a repo's error in its sync state alone, clears the in-flight flag and bumps the version", async () => {
-    const syncer = syncerWith(db, failingOn(new Set([REPO])));
+    const syncer = syncerWith(db, fakeForge({ broken: new Set([REPO]) }));
     await expect(syncer.syncRepo(REPO)).rejects.toThrow("boom");
     expect(db.getSyncState(REPO)?.lastError).toBe("boom");
     expect(syncer.status()).toMatchObject({
@@ -318,40 +324,34 @@ describe("Syncer", () => {
     await expect(syncer.syncRepo(REPO)).rejects.toBeInstanceOf(SyncBusyError);
     await expect(syncer.syncAll([REPO])).resolves.toBeUndefined();
     expect(syncer.status()).toMatchObject({ runs: 1, version: 0 });
-    gate.resolve({ issues: [], hasNextPage: false, endCursor: null, rateRemaining: 5000 });
+    gate.resolve(EMPTY_PAGE);
     await expect(running).resolves.toMatchObject({ upserted: 0 });
     expect(syncer.status().inFlight).toEqual([]);
   });
 
   it("keeps a sync-all's early failure past a later success and counts the run", async () => {
-    const syncer = syncerWith(db, failingOn(new Set(["acme/bad"])));
+    const syncer = syncerWith(db, fakeForge({ broken: new Set(["acme/bad"]) }));
     await syncer.syncAll(["acme/bad", REPO]);
     expect(db.getSyncState(REPO)?.lastSyncAt).not.toBeNull();
     expect(syncer.status()).toMatchObject({ runs: 1, lastError: "acme/bad: boom" });
   });
 
   it("adds a sync-all's repos to the running one, keeping their full flag", async () => {
-    const gate = Promise.withResolvers<void>();
+    const gate = Promise.withResolvers<IssuesPage>();
     const forge = fakeForge();
+    forge.issuesPage.mockReturnValueOnce(gate.promise);
     db.setSyncState("acme/other", {
       lastSyncAt: "2026-05-01T11:00:00.000Z",
       lastFullSyncAt: "2026-05-01T11:00:00.000Z",
     });
-    const gated: Forge = {
-      ...forge,
-      issuesPage: async (repo, options) => {
-        await gate.promise;
-        return forge.issuesPage(repo, options);
-      },
-    };
-    const syncer = syncerWith(db, gated, {
+    const syncer = syncerWith(db, forge, {
       config: () => ConfigSchema.parse({ repos: [REPO, "acme/other"] }),
     });
     const first = syncer.syncAll([REPO]);
     await vi.waitFor(() => expect(syncer.status().inFlight).toContain(REPO));
     expect(syncer.start(["acme/other"], { full: true })).toBe(1);
     expect(syncer.status()).toMatchObject({ inFlight: [REPO], queued: ["acme/other"] });
-    gate.resolve();
+    gate.resolve(EMPTY_PAGE);
     await first;
     expect(syncer.status()).toMatchObject({ runs: 1, inFlight: [], queued: [] });
     expect(syncer.start([])).toBe(2);
@@ -506,7 +506,7 @@ describe("Syncer.syncDue", () => {
 
   it("leaves a user run's failure in place when a background run ends", async () => {
     const db = new Db(":memory:");
-    const syncer = syncerWith(db, failingOn(new Set(["acme/bad"])), {
+    const syncer = syncerWith(db, fakeForge({ broken: new Set(["acme/bad"]) }), {
       config: () => ConfigSchema.parse({ repos: ["acme/bad", REPO], refreshMinutes: 5 }),
       now: () => new Date(now.getTime() + (db.getSyncState("acme/bad") ? 200_000 : 0)),
     });
@@ -523,7 +523,7 @@ describe("Syncer.syncDue", () => {
     const db = new Db(":memory:");
     const broken = new Set(["acme/bad", "acme/worse"]);
     let clock = now.getTime();
-    const syncer = syncerWith(db, failingOn(broken), {
+    const syncer = syncerWith(db, fakeForge({ broken }), {
       config: () => ConfigSchema.parse({ repos: ["acme/bad", "acme/worse"], refreshMinutes: 5 }),
       now: () => new Date(clock),
     });
@@ -544,15 +544,10 @@ describe("Syncer.syncDue", () => {
   it("reports no failure for a repo a later pass of the same run recovers", async () => {
     const db = new Db(":memory:");
     const forge = fakeForge();
-    let failed = false;
-    const syncer: Syncer = syncerWith(db, {
-      ...forge,
-      issuesPage: (repo, options) => {
-        if (failed) return forge.issuesPage(repo, options);
-        failed = true;
-        void syncer.syncAll([REPO]);
-        return Promise.reject(new Error("boom"));
-      },
+    const syncer = syncerWith(db, forge);
+    forge.issuesPage.mockImplementationOnce(async () => {
+      void syncer.syncAll([REPO]);
+      throw new Error("boom");
     });
 
     await syncer.syncAll([REPO]);
@@ -564,7 +559,7 @@ describe("Syncer.syncDue", () => {
   it("drops a user run's failure once its repo leaves the config", async () => {
     const db = new Db(":memory:");
     let repos = ["acme/bad"];
-    const syncer = syncerWith(db, failingOn(new Set(["acme/bad"])), {
+    const syncer = syncerWith(db, fakeForge({ broken: new Set(["acme/bad"]) }), {
       config: () => ConfigSchema.parse({ repos, refreshMinutes: 5 }),
     });
     await syncer.syncAll(repos);

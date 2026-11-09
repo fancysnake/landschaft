@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import type { GqlError } from "./client";
+
+import { fakeGithub } from "../../../__fixtures__/github";
 import {
   type CiBranchNode,
   type CiContext,
@@ -8,7 +11,6 @@ import {
   fetchCiJobs,
   toCiJobs,
 } from "./ci";
-import { createGithubClient, type GqlError } from "./client";
 
 const commits = (...logins: (string | null)[]) => ({
   nodes: logins.map((login) => ({ author: { user: login === null ? null : { login } } })),
@@ -164,25 +166,9 @@ describe("toCiJobs", () => {
   });
 });
 
-/** A client whose one response carries `repository` and `errors`. */
+/** A client whose one response carries `repository` and `errors`, recording the request. */
 const respond = (repository: Record<string, unknown>, ...errors: GqlError[]) =>
-  createGithubClient(
-    async () => "tok",
-    async () => Response.json({ data: { rateLimit: { remaining: 4000 }, repository }, errors }),
-  );
-
-/** A client answering `data`, recording each request's query and variables. */
-const recording = (data: unknown) => {
-  const requests: { query: string; variables: Record<string, unknown> }[] = [];
-  const gh = createGithubClient(
-    async () => "tok",
-    async (_: string, init: RequestInit) => {
-      requests.push(JSON.parse(init.body as string) as (typeof requests)[number]);
-      return Response.json({ data });
-    },
-  );
-  return { gh, requests };
-};
+  fakeGithub({ data: { rateLimit: { remaining: 4000 }, repository }, errors });
 
 /** A listed branch whose head commit's rollup is `state`. */
 const rolled = (name: string, state: string | null) => ({
@@ -201,10 +187,7 @@ describe("fetchCiBranchesPage", () => {
         rolled("feat/z", null),
       ],
     };
-    const { gh, requests } = recording({
-      rateLimit: { remaining: 4000 },
-      repository: { defaultBranchRef: { name: "main" }, refs },
-    });
+    const { gh, requests } = respond({ defaultBranchRef: { name: "main" }, refs });
 
     await expect(fetchCiBranchesPage(gh, "acme/app", "c1")).resolves.toEqual({
       branches: [
@@ -233,10 +216,7 @@ describe("fetchCiJobs", () => {
   ];
 
   it("asks for every branch in one query, check suites only where the branch wants them", async () => {
-    const { gh, requests } = recording({
-      rateLimit: { remaining: 4000 },
-      repository: { b0: red, c0: base(1), b1: red, c1: base(1) },
-    });
+    const { gh, requests } = respond({ b0: red, c0: base(1), b1: red, c1: base(1) });
     await fetchCiJobs(gh, "acme/app", [
       { name: "main", suites: true },
       { name: "feat/x", suites: false },
@@ -247,7 +227,7 @@ describe("fetchCiJobs", () => {
   });
 
   it("skips a branch gone since it was listed", async () => {
-    const gh = respond({ b0: null, c0: base(1), b1: red, c1: base(1) }, gone(["b0"]));
+    const { gh } = respond({ b0: null, c0: base(1), b1: red, c1: base(1) }, gone(["b0"]));
     await expect(fetchCiJobs(gh, "acme/app", branches)).resolves.toEqual({
       jobs: [expect.objectContaining({ branch: "feat/y" })],
       failed: [],
@@ -257,7 +237,10 @@ describe("fetchCiJobs", () => {
 
   it("reads a branch without a comparison once its ref is gone", async () => {
     const comparison = { name: "main", compare: null };
-    const gh = respond({ b0: red, c0: comparison, b1: red, c1: base(1) }, gone(["c0", "compare"]));
+    const { gh } = respond(
+      { b0: red, c0: comparison, b1: red, c1: base(1) },
+      gone(["c0", "compare"]),
+    );
     const page = await fetchCiJobs(gh, "acme/app", branches);
     expect(page.jobs.map((job) => job.branch)).toEqual(["feat/x", "feat/y"]);
     expect(page.failed).toEqual([]);
@@ -267,7 +250,7 @@ describe("fetchCiJobs", () => {
     const data = { b0: red, c0: base(1), b1: null, c1: { name: "main", compare: null } };
     for (const field of ["b1", "c1"]) {
       const page = await fetchCiJobs(
-        respond(data, gone([field], "INTERNAL")),
+        respond(data, gone([field], "INTERNAL")).gh,
         "acme/app",
         branches,
       );
@@ -282,14 +265,14 @@ describe("fetchCiJobs", () => {
       ["b1", "target", "statusCheckRollup"],
       ["c1", "compare", "commits"],
     ]) {
-      const page = await fetchCiJobs(respond(data, gone(path)), "acme/app", branches);
+      const page = await fetchCiJobs(respond(data, gone(path)).gh, "acme/app", branches);
       expect(page.jobs.map((job) => job.branch)).toEqual(["feat/x"]);
       expect(page.failed).toEqual(["feat/y"]);
     }
   });
 
   it("fails every branch on an error that hits none", async () => {
-    const gh = respond({ b0: red, c0: base(1), b1: red, c1: base(1) }, { message: "x" });
+    const { gh } = respond({ b0: red, c0: base(1), b1: red, c1: base(1) }, { message: "x" });
     await expect(fetchCiJobs(gh, "acme/app", branches)).resolves.toMatchObject({
       jobs: [],
       failed: ["feat/x", "feat/y"],
