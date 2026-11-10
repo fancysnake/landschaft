@@ -1,12 +1,13 @@
 {
+  "version": 2,
   "repos": ["owner/repo", "owner/other-repo"],
-  "users": ["@me"],
+  "users": ["@me", "dependabot[bot]", "renovate[bot]"],
   "refreshMinutes": 5,
   "dashboards": [
     {
       "type": "inbox",
-      "id": "today",
-      "name": "Today",
+      "id": "in-progress",
+      "name": "In progress",
       "filter": "-label:wait",
       "sort": { "by": "updated", "dir": "asc" },
       "closedDays": 14,
@@ -15,46 +16,79 @@
         {
           "id": "ready",
           "name": "Ready",
-          "filter": "is:pr -is:draft -is:ci:failed -is:ci:running -is:conflicting -is:unanswered"
+          "filter": "(-user:@me OR label:reviewed) is:pr -is:ci:failed -is:conflicting -is:ci:running -is:unanswered"
         },
-        { "id": "fix", "name": "Fix", "filter": "is:pr" },
-        { "id": "jobs", "name": "Failing jobs", "filter": "-has:pr is:ci-job" },
+        { "id": "heal", "name": "Heal", "filter": "is:pr user:@me" },
+        { "id": "failing-job", "name": "Failing job", "filter": "-has:pr is:ci-job" },
         {
-          "id": "triage",
-          "name": "Triage",
-          "filter": "is:issue -is:closed -label:bug -label:feature"
+          "id": "identify",
+          "name": "Identify",
+          "filter": "user:@me is:issue -is:closed -label:epic -label:L -label:M -label:S -label:feature -label:chore -label:edit -label:bug -is:blocked"
         },
-        { "id": "other-jobs", "name": "Other jobs", "filter": "is:ci-job", "collapsed": true }
+        { "id": "broken", "name": "Broken", "filter": "-user:@me OR has:pr", "collapsed": true }
       ]
     },
     {
       "type": "board",
       "id": "planning",
       "name": "Planning",
-      "filter": "is:issue -label:wait",
+      "filter": "user:@me is:issue -label:wait",
       "sort": { "by": "updated", "dir": "asc" },
       "closedDays": 14,
       "swimlanes": [
         { "id": "closed", "name": "Closed", "filter": "is:closed", "collapsed": true },
         { "id": "with-pr", "name": "With PR", "filter": "has:pr -is:closed", "hideBlocked": true },
         {
-          "id": "large",
-          "name": "Large",
-          "filter": "label:large -has:pr -is:closed",
+          "id": "epics",
+          "name": "Epics",
+          "filter": "label:epic -has:pr -is:closed",
           "hideBlocked": true,
           "fluid": true
         },
         {
-          "id": "small",
-          "name": "Small",
-          "filter": "label:small -has:pr -is:closed",
+          "id": "l",
+          "name": "L",
+          "filter": "label:L -has:pr -is:closed",
+          "hideBlocked": true,
+          "fluid": true
+        },
+        {
+          "id": "m",
+          "name": "M",
+          "filter": "label:M -has:pr -is:closed",
+          "hideBlocked": true,
+          "fluid": true
+        },
+        {
+          "id": "s",
+          "name": "S",
+          "filter": "label:S -has:pr -is:closed",
           "hideBlocked": true,
           "fluid": true
         }
       ],
       "columns": [
         { "id": "bugs", "name": "Bugs", "filter": "label:bug" },
-        { "id": "features", "name": "Features", "filter": "label:feature" }
+        { "id": "features", "name": "Features", "filter": "label:feature" },
+        { "id": "edits", "name": "Edits", "filter": "label:edit" },
+        { "id": "chores", "name": "Chores", "filter": "label:chore" }
+      ]
+    },
+    {
+      "type": "board",
+      "id": "waiting",
+      "name": "Waiting",
+      "filter": "label:wait",
+      "sort": { "by": "updated", "dir": "asc" },
+      "closedDays": 14,
+      "swimlanes": [
+        { "id": "closed", "name": "Closed", "filter": "is:closed", "collapsed": true },
+        { "id": "everything", "name": "Everything", "filter": "" }
+      ],
+      "columns": [
+        { "id": "pr", "name": "PR", "filter": "is:pr" },
+        { "id": "job", "name": "Job", "filter": "is:ci-job" },
+        { "id": "issue", "name": "Issue", "filter": "is:issue" }
       ]
     }
   ]

@@ -47,7 +47,7 @@ describe("config file", () => {
   });
 
   it("loads the example config", () => {
-    expect(loadConfig("landschaft.config.example.json").dashboards).toHaveLength(2);
+    expect(loadConfig("landschaft.config.example.json").dashboards).toHaveLength(3);
   });
 
   it("returns an empty config when the file is missing", () => {
