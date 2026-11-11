@@ -90,8 +90,11 @@ export interface CiJob {
   url: string;
   failedAt: string;
   authors: string[];
-  /** The open PR from the branch. */
-  pr: { number: number; url: string } | null;
+  /**
+   * The open PR from the branch, else the closed one its head commit ran for; `closedAt` is null
+   * for the open one.
+   */
+  pr: { number: number; url: string; closedAt: string | null } | null;
 }
 
 /** What a board is built from: the cached items and failed CI jobs of the configured repos. */

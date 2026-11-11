@@ -215,7 +215,7 @@ export interface FilterItem {
   assignees: { login: string }[];
   labels: { name: string }[];
   statuses: PullStatusLabel[];
-  /** An issue an open PR closes; a CI job whose branch an open PR comes from. */
+  /** An issue an open PR closes; a CI job with a PR (see `CiJob`). */
   hasPr: boolean;
   parent: IssueRef | null;
   subIssues: { total: number };

@@ -68,7 +68,8 @@ opened the PR, as long as the PR is in one of the global repos; such an issue ca
 A dashboard with `closedDays` above 0 keeps the issues and PRs closed (or merged) within that
 many days, placed by the same filters. `is:closed` picks them, so a `Done` column with
 `is:closed` gathers them and `-is:closed` keeps them out of a lane. Their cards are greyed
-with a `closed` pill, without PR status pills. A closed item
+with a `closed` pill, without PR status pills. The failed CI job of a closed PR is closed with
+it, from the day the PR closed. A closed issue or PR
 never counts for `has:pr`, `is:blocked` or `is:blocking`, and the unmatched view lists open
 items only.
 
@@ -76,7 +77,9 @@ items only.
 
 A job whose newest run on a branch failed shows as a card of its own: a GitHub Actions job, a
 check run from another app, or a commit status. The card links to the run and names the
-branch, when the job failed and the open PR from the branch, if any. A passing run on the
+branch, when the job failed and the PR from the branch, if any: the open one, else a closed
+one nobody pushed to the branch since. With a closed PR the job is a [closed item](#closed-items):
+`is:closed` picks it, and `closedDays` decides how long it stays. A passing run on the
 branch removes it, and so does merging the branch; an old failure stays however long the
 branch sits untouched.
 
@@ -86,7 +89,7 @@ nothing on top, one of its last three commits. A branch with nothing but a bot's
 top of main stays off. `author:` and `user:` match those commit authors.
 
 `is:ci-job` picks the jobs, `job:` and `branch:` match job and branch names (any case,
-`a|b` for either), and `has:pr` holds when an open PR comes from the branch. A job carries
+`a|b` for either), and `has:pr` holds when the job has that PR. A job carries
 that PR's labels: the card shows them, and `label:` and the label filter match them. A catch-all
 swimlane, column or inbox group takes jobs like any other item; `-is:ci-job` in a dashboard's
 filter keeps them off it. The search box matches job and branch names, and the CI job filter

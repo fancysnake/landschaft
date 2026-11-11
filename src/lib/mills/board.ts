@@ -21,6 +21,7 @@ import {
   ciJobKey,
   type Issue,
   issueKey,
+  type IssueState,
   type LabelRef,
   type Snapshot,
   type StatedRef,
@@ -116,12 +117,12 @@ export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Iss
 type JobItem = Omit<FilterItem, "kind" | "labels"> & { kind: "ci-job"; labels: LabelRef[] };
 
 /**
- * A failed CI job as filters see it: the labels of its open PR in `byKey`, no assignees or links,
- * never blocked.
+ * A failed CI job as filters see it: closed when its PR is, the labels of its open PR in `byKey`,
+ * no assignees or links, never blocked.
  */
 const jobItem = (job: CiJob, byKey: Map<string, Issue>): JobItem => ({
   kind: "ci-job",
-  state: "OPEN",
+  state: job.pr?.closedAt ? "CLOSED" : "OPEN",
   repo: job.repo,
   authors: job.authors,
   assignees: [],
@@ -139,10 +140,11 @@ const jobItem = (job: CiJob, byKey: Map<string, Issue>): JobItem => ({
   issueType: null,
 });
 
-/** `job` as a card showing `labels`. */
-const jobCard = (job: CiJob, labels: LabelRef[]): CiJobCard => ({
+/** `job`, whose item is `state`, as a card showing `labels`. */
+const jobCard = (job: CiJob, state: IssueState, labels: LabelRef[]): CiJobCard => ({
   key: ciJobKey(job),
   kind: "ci-job",
+  state,
   repo: job.repo,
   branch: job.branch,
   workflow: job.workflow,
@@ -199,15 +201,19 @@ function inScope(
   return (item) => matchesFilter(base, item, { viewer }) && matchesFilter(scope, item, { viewer });
 }
 
-/** An issue or failed CI job: its item, the `text` the search box matches, its card. */
+/**
+ * An issue or failed CI job: its item, when it closed, the `text` the search box matches, its
+ * card.
+ */
 interface Entry {
   item: Item | JobItem;
+  closedAt: string | null;
   text: string;
   card: (labels: LabelRef[]) => Card;
 }
 
 /**
- * The open `issues`, those closed at or after `cutoff` (ms), and the failed CI `jobs` that one
+ * The open `issues` and failed CI `jobs`, and those closed at or after `cutoff` (ms), that one
  * of the global `users` (empty for everyone) is in and that pass `scope`.
  */
 function scopedItems(
@@ -222,22 +228,29 @@ function scopedItems(
   // From all of `issues`, not just the open ones.
   const itemOf = itemsOf(issues, byKey);
   const passes = inScope(users, viewer, scope);
-  const shows = (issue: Issue) =>
-    issue.state === "OPEN" || (issue.closedAt !== null && Date.parse(issue.closedAt) >= cutoff);
-  const issueEntries = issues.filter(shows).map((issue): Entry => {
+  const issueEntries = issues.map((issue): Entry => {
     const item = itemOf(issue);
     return {
       item,
+      closedAt: issue.closedAt,
       text: `${item.number} ${item.title}`,
       card: (labels) => toCard(item, labels),
     };
   });
-  const jobEntries = jobs.map((job): Entry => ({
-    item: jobItem(job, byKey),
-    text: `${job.name} ${job.branch}`,
-    card: (labels) => jobCard(job, labels),
-  }));
-  return [...issueEntries, ...jobEntries].filter(({ item }) => passes(item));
+  const jobEntries = jobs.map((job): Entry => {
+    const item = jobItem(job, byKey);
+    return {
+      item,
+      closedAt: job.pr?.closedAt ?? null,
+      text: `${job.name} ${job.branch}`,
+      card: (labels) => jobCard(job, item.state, labels),
+    };
+  });
+  return [...issueEntries, ...jobEntries].filter(
+    ({ item, closedAt }) =>
+      (item.state === "OPEN" || (closedAt !== null && Date.parse(closedAt) >= cutoff)) &&
+      passes(item),
+  );
 }
 
 /** The dashboard's filter, swimlanes and columns, parsed. */
