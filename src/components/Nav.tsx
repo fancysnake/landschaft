@@ -52,6 +52,7 @@ export default function Nav({ path, nav }: Props) {
     };
   }, [reload]);
 
+  // A user sync on purpose: a page load's failures show in the top bar, as a Refresh's do.
   useEffect(() => {
     void sync({ stale: true });
   }, [sync]);

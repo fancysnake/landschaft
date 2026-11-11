@@ -14,7 +14,7 @@ import { cachedIssue, DASHBOARD, makeIssue, makeJob, REPO } from "../__fixtures_
 import { Db } from "../links/db/sqlite";
 import { ConfigSchema } from "../pacts/config";
 import { InvalidError, SyncBusyError } from "../pacts/services";
-import { closedSince, nextDue, type SyncDeps, Syncer } from "./sync";
+import { closedSince, nextDue, staleRepos, type SyncDeps, Syncer } from "./sync";
 
 interface ForgeData {
   /** Pages of issues and of PRs; a page's cursor is the index of the next one. */
@@ -349,12 +349,12 @@ describe("Syncer", () => {
     });
     const first = syncer.syncAll([REPO]);
     await vi.waitFor(() => expect(syncer.status().inFlight).toContain(REPO));
-    expect(syncer.start(["acme/other"], { full: true })).toBe(1);
+    expect(syncer.start({ repos: ["acme/other"], full: true, stale: false })).toBe(1);
     expect(syncer.status()).toMatchObject({ inFlight: [REPO], queued: ["acme/other"] });
     gate.resolve(EMPTY_PAGE);
     await first;
     expect(syncer.status()).toMatchObject({ runs: 1, inFlight: [], queued: [] });
-    expect(syncer.start([])).toBe(2);
+    expect(syncer.start({ repos: [], full: false, stale: false })).toBe(2);
     await syncer.syncAll([]);
     expect(
       forge.issuesPage.mock.calls
@@ -628,7 +628,7 @@ describe("Syncer.start", () => {
     const syncer = syncerWith(db, fakeForge());
     const syncAll = vi.spyOn(syncer, "syncAll").mockResolvedValue();
 
-    syncer.start(undefined, { full: true });
+    syncer.start({ full: true, stale: false });
 
     expect(syncAll).toHaveBeenCalledWith([REPO], { full: true });
     db.close();
@@ -642,9 +642,9 @@ describe("Syncer.start", () => {
     db.setSyncState("acme/stale", { lastSyncAt: new Date(now.getTime() - 90_000).toISOString() });
     const syncAll = vi.spyOn(syncer, "syncAll").mockResolvedValue();
 
-    syncer.start(undefined, { stale: true });
+    syncer.start({ full: false, stale: true });
 
-    expect(syncAll).toHaveBeenCalledWith(["acme/stale", "acme/new"], {});
+    expect(syncAll).toHaveBeenCalledWith(["acme/stale", "acme/new"], { full: false });
     db.close();
   });
 
@@ -653,8 +653,36 @@ describe("Syncer.start", () => {
     const syncer = syncerWith(db, fakeForge());
     const syncAll = vi.spyOn(syncer, "syncAll");
 
-    expect(() => syncer.start([REPO, "acme/other"])).toThrow(InvalidError);
+    expect(() => syncer.start({ repos: [REPO, "acme/other"], full: false, stale: false })).toThrow(
+      InvalidError,
+    );
     expect(syncAll).not.toHaveBeenCalled();
     db.close();
+  });
+});
+
+const ago = (ms: number) => new Date(now.getTime() - ms).toISOString();
+const state = (lastSyncAt: string | null, lastError: string | null = null) => ({
+  repo: REPO,
+  lastSyncAt,
+  lastFullSyncAt: null,
+  lastError,
+  lastAttemptAt: lastSyncAt,
+});
+
+describe("staleRepos", () => {
+  it.each([
+    ["synced just now", state(ago(0)), []],
+    ["synced exactly a minute ago", state(ago(60_000)), []],
+    ["synced just over a minute ago", state(ago(60_001)), [REPO]],
+    ["never synced", state(null), [REPO]],
+    ["never synced and failed", state(null, "boom"), [REPO]],
+    ["failed after a sync just now", state(ago(0), "boom"), [REPO]],
+  ])("for a repo %s gives %j", (_, synced, expected) => {
+    expect(staleRepos([REPO], [synced], now.getTime())).toEqual(expected);
+  });
+
+  it("keeps a repo without a sync state", () => {
+    expect(staleRepos([REPO], [], now.getTime())).toEqual([REPO]);
   });
 });

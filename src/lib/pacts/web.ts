@@ -13,7 +13,7 @@ export const SyncRequestSchema = z.strictObject({
   /** What a sync-all queues instead of every configured repo. */
   repos: z.array(repoName).optional(),
   full: z.boolean().default(false),
-  /** Leaves out the repos synced within the last minute. */
+  /** Leaves out the repos whose last sync succeeded within `FRESH_SYNC_MS`. */
   stale: z.boolean().default(false),
 });
 export type SyncRequest = z.infer<typeof SyncRequestSchema>;

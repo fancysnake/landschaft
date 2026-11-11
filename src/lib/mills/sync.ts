@@ -1,6 +1,7 @@
 import type { Config, Dashboard } from "../pacts/config";
 import type { SyncStore } from "../pacts/db";
 import type { CiJob } from "../pacts/issues";
+import type { SyncRequest } from "../pacts/web";
 
 import {
   CI_BATCH,
@@ -16,7 +17,7 @@ import {
   type SyncResult,
   type SyncService,
 } from "../pacts/services";
-import { type SyncStatus, syncIntervals } from "../pacts/sync";
+import { type SyncState, type SyncStatus, syncIntervals } from "../pacts/sync";
 import { FRESH_SYNC_MS, FULL_SYNC_MAX_AGE_MS, RATE_FLOOR, SINCE_OVERLAP_MS } from "../specs";
 
 export interface SyncDeps {
@@ -57,6 +58,24 @@ export function nextDue(
   // Two repos that never synced give Infinity - Infinity, NaN, which keeps config order.
   const due = ages.filter(({ age }) => age >= 1).toSorted((a, b) => b.age - a.age);
   return due[0]?.repo;
+}
+
+/**
+ * `repos` without a sync that succeeded within `FRESH_SYNC_MS` of `now`. Takes successes, unlike
+ * `nextDue`, so a page load retries a failed repo the way Refresh does.
+ */
+export function staleRepos(repos: string[], states: SyncState[], now: number): string[] {
+  const fresh = new Set(
+    states
+      .filter(
+        ({ lastSyncAt, lastError }) =>
+          lastSyncAt !== null &&
+          lastError === null &&
+          now - Date.parse(lastSyncAt) <= FRESH_SYNC_MS,
+      )
+      .map(({ repo }) => repo),
+  );
+  return repos.filter((repo) => !fresh.has(repo));
 }
 
 function errorMessage(error: unknown): string {
@@ -145,16 +164,16 @@ export class Syncer implements SyncService {
     return this.running;
   }
 
-  start(repos?: string[], { stale, ...options }: SyncOptions & { stale?: boolean } = {}): number {
+  start({ repos, full, stale }: SyncRequest): number {
     const configured = this.config().repos;
     const unknown = repos?.filter((repo) => !configured.includes(repo)) ?? [];
     if (unknown.length > 0) throw new InvalidError(`not configured: ${unknown.join(", ")}`);
     const run = this.runs + 1;
-    const freshFrom = this.now().getTime() - FRESH_SYNC_MS;
-    const fresh = (repo: string) =>
-      Date.parse(this.db.getSyncState(repo)?.lastSyncAt ?? "") >= freshFrom;
     const wanted = repos ?? configured;
-    void this.syncAll(stale ? wanted.filter((repo) => !fresh(repo)) : wanted, options);
+    const queued = stale
+      ? staleRepos(wanted, this.db.listSyncStates(), this.now().getTime())
+      : wanted;
+    void this.syncAll(queued, { full });
     return run;
   }
 

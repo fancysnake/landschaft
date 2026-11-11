@@ -3,6 +3,7 @@ import type { Offer } from "./filter";
 import type { LabelDef } from "./issues";
 import type { SyncStatus } from "./sync";
 import type { Board, Card, Filters, Inbox, NavData, UnmatchedQuery } from "./views";
+import type { SyncRequest } from "./web";
 
 export class NotFoundError extends Error {
   constructor(message: string) {
@@ -56,10 +57,10 @@ export interface SyncService {
   syncAll(repos: string[], options?: SyncOptions): Promise<void>;
   /**
    * Queues `repos`, or every configured repo, onto a sync-all without waiting for it, and returns
-   * that run's number; it ends once `runs` reaches it. `stale` leaves out the repos synced within
-   * the last minute. Throws `InvalidError` for a repo outside the config.
+   * that run's number; it ends once `runs` reaches it. `stale` leaves out the repos whose last
+   * sync succeeded within `FRESH_SYNC_MS`. Throws `InvalidError` for a repo outside the config.
    */
-  start(repos?: string[], options?: SyncOptions & { stale?: boolean }): number;
+  start(request: SyncRequest): number;
   /**
    * Syncs the stalest repo due, at most once per refresh interval split
    * by the configured repos; skips while a sync runs. Due: last attempt older than the interval.
