@@ -16,7 +16,7 @@
         {
           "id": "ready",
           "name": "Ready",
-          "filter": "(-user:@me OR label:reviewed) is:pr -is:ci:failed -is:conflicting -is:ci:running -is:unanswered"
+          "filter": "(-user:@me OR label:reviewed) is:pr -is:ci:failed -is:conflicting -is:ci:running -is:unanswered -is:draft"
         },
         { "id": "heal", "name": "Heal", "filter": "is:pr user:@me" },
         { "id": "failing-job", "name": "Failing job", "filter": "-has:pr is:ci-job" },

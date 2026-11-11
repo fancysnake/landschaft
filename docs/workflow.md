@@ -30,14 +30,14 @@ reviewed, `bug`, `feature`, `edit` and `chore` say what kind of work an issue is
 An inbox with the filter `-label:wait`, sorted by oldest update first. Each group names what
 to do with an item, and an item lands in the first group it matches, so the order is the logic.
 
-| Group       | Filter                                                                                                                               | What it holds                                                                         |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| Closed      | `is:closed is:pr`                                                                                                                    | PRs closed in the last 14 days, folded                                                |
-| Ready       | `(-user:@me OR label:reviewed) is:pr -is:ci:failed -is:conflicting -is:ci:running -is:unanswered`                                    | Clean bot PRs, or your own once they passed review: read and merge                    |
-| Heal        | `is:pr user:@me`                                                                                                                     | Your PRs not yet clean and reviewed: fix CI, conflicts or comments, or get the review |
-| Failing job | `-has:pr is:ci-job`                                                                                                                  | Failed CI with no PR to fix it in                                                     |
-| Identify    | `user:@me is:issue -is:closed -label:epic -label:L -label:M -label:S -label:feature -label:chore -label:edit -label:bug -is:blocked` | Your issues with neither size nor kind: label them so Planning can place them         |
-| Broken      | `-user:@me OR has:pr`                                                                                                                | What the groups above let through, folded                                             |
+| Group       | Filter                                                                                                                               | Settings         | What it holds                                                                         |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------- | ------------------------------------------------------------------------------------- |
+| Closed      | `is:closed is:pr`                                                                                                                    | Starts collapsed | PRs closed in the last 14 days                                                        |
+| Ready       | `(-user:@me OR label:reviewed) is:pr -is:ci:failed -is:conflicting -is:ci:running -is:unanswered -is:draft`                          | none             | Clean bot PRs, or your own once they passed review: read and merge                    |
+| Heal        | `is:pr user:@me`                                                                                                                     | none             | Your PRs not yet clean and reviewed: fix CI, conflicts or comments, or get the review |
+| Failing job | `-has:pr is:ci-job`                                                                                                                  | none             | Failed CI with no PR to fix it in                                                     |
+| Identify    | `user:@me is:issue -is:closed -label:epic -label:L -label:M -label:S -label:feature -label:chore -label:edit -label:bug -is:blocked` | none             | Your issues with neither size nor kind: label them so Planning can place them         |
+| Broken      | `-user:@me OR has:pr`                                                                                                                | Starts collapsed | What the groups above let through                                                     |
 
 A clean bot PR reaches Ready with no label on GitHub. `user:` matches author or assignee, so a
 PR you wrote or are assigned to, which is the only way someone else's PR gets in, also needs

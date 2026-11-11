@@ -46,8 +46,9 @@ describe("config file", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("loads the example config", () => {
-    expect(loadConfig("landschaft.config.example.json").dashboards).toHaveLength(3);
+  it("loads the example config unchanged", () => {
+    const example = "landschaft.config.example.json";
+    expect(loadConfig(example)).toMatchObject(JSON.parse(readFileSync(example, "utf8")));
   });
 
   it("returns an empty config when the file is missing", () => {
