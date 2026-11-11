@@ -648,6 +648,27 @@ describe("Syncer.start", () => {
     db.close();
   });
 
+  it("leaves out the repos syncing right now when asked for the stale ones", async () => {
+    const db = new Db(":memory:");
+    const gate = Promise.withResolvers<IssuesPage>();
+    const forge = fakeForge();
+    forge.issuesPage.mockReturnValueOnce(gate.promise);
+    const syncer = syncerWith(db, forge);
+    const running = syncer.syncRepo(REPO);
+    const syncAll = vi.spyOn(syncer, "syncAll").mockResolvedValue();
+
+    syncer.start({ full: false, stale: true });
+    syncer.start({ full: false, stale: false });
+
+    expect(syncAll.mock.calls).toEqual([
+      [[], { full: false }],
+      [[REPO], { full: false }],
+    ]);
+    gate.resolve(EMPTY_PAGE);
+    await running;
+    db.close();
+  });
+
   it("rejects a repo outside the config before queuing anything", () => {
     const db = new Db(":memory:");
     const syncer = syncerWith(db, fakeForge());

@@ -170,8 +170,11 @@ export class Syncer implements SyncService {
     if (unknown.length > 0) throw new InvalidError(`not configured: ${unknown.join(", ")}`);
     const run = this.runs + 1;
     const wanted = repos ?? configured;
+    // A repo syncing now is fresh once it ends, though its lastSyncAt is still old.
     const queued = stale
-      ? staleRepos(wanted, this.db.listSyncStates(), this.now().getTime())
+      ? staleRepos(wanted, this.db.listSyncStates(), this.now().getTime()).filter(
+          (repo) => !this.inFlight.has(repo),
+        )
       : wanted;
     void this.syncAll(queued, { full });
     return run;

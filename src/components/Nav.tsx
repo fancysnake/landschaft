@@ -113,7 +113,7 @@ export default function Nav({ path, nav }: Props) {
           </a>
         )}
         <div className="ml-auto flex flex-wrap items-center gap-3">
-          {status && (
+          {status ? (
             <SyncStatus
               status={status}
               repos={repos}
@@ -122,6 +122,8 @@ export default function Nav({ path, nav }: Props) {
               onSync={(full) => void sync({ full })}
               onDismissError={dismissError}
             />
+          ) : (
+            error && <ErrorBanner error={error} onDismiss={dismissError} />
           )}
           <a href="/settings" aria-current={current(path === "/settings")} className={link()}>
             Settings
