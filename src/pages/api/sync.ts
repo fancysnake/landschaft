@@ -13,9 +13,8 @@ export const POST = route(
         throw new ApiError(400, "invalid JSON body");
       }
     }
-    const { repos, full } = SyncRequestSchema.parse(raw);
     const { sync } = locals.services;
-    const run = sync.start(repos, { full });
+    const run = sync.start(SyncRequestSchema.parse(raw));
     // The run ends once /api/version reports `runs >= run`, its failures in `lastError`.
     return json({ status: sync.status(), run }, 202);
   },

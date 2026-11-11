@@ -28,15 +28,15 @@ everything the token does. Two kinds of pass:
 
 - **Incremental** — issues updated since the last run, every `refreshMinutes`. The background
   sync splits that interval by the number of repositories and syncs one at a time, the stalest
-  first: repositories switched on before those switched off. A repository whose sync fails is
-  retried after the interval too, or at once with Refresh.
+  first, whether switched on or off. A repository whose sync fails is retried after the interval
+  too, or at once with Refresh.
 - **Full** — every open issue, plus every item updated within the longest `closedDays` of
   any dashboard, once a day, for repositories just added in settings, after a dashboard's
   `closedDays` grows past the longest, and on demand from the full resync button in the top bar.
 
 The top bar shows the sync status on every page, with the remaining rate-limit budget and the
-Refresh and full resync buttons. Both sync only the repositories switched on, and are disabled
-when none is. It polls `/api/version`, and an open dashboard reloads itself when a sync has landed.
+Refresh and full resync buttons. Both sync every repository, switched on or off, and every page load
+starts the same sync as Refresh, leaving out the repositories synced within the last minute. It polls `/api/version`, and an open dashboard reloads itself when a sync has landed.
 
 ## Sub-issues
 

@@ -52,6 +52,11 @@ export default function Nav({ path, nav }: Props) {
     };
   }, [reload]);
 
+  // A user sync on purpose: a page load's failures show in the top bar, as a Refresh's do.
+  useEffect(() => {
+    void sync({ stale: true });
+  }, [sync]);
+
   const shown = repos.filter((repo) => !hidden.includes(repo));
   const setShown = (selected: string[]) => {
     const flipped = repos.filter((repo) => selected.includes(repo) === hidden.includes(repo));
@@ -109,16 +114,17 @@ export default function Nav({ path, nav }: Props) {
           </a>
         )}
         <div className="ml-auto flex flex-wrap items-center gap-3">
-          {status && (
+          {status ? (
             <SyncStatus
               status={status}
               repos={repos}
               syncing={syncing}
-              allOff={shown.length === 0}
               error={error}
-              onSync={(full) => void sync({ full, repos: shown })}
+              onSync={(full) => void sync({ full })}
               onDismissError={dismissError}
             />
+          ) : (
+            error && <ErrorBanner error={error} onDismiss={dismissError} />
           )}
           <a
             href={`/settings${active ? `#${active.id}` : ""}`}

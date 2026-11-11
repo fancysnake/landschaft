@@ -14,7 +14,7 @@ import { cachedIssue, DASHBOARD, makeIssue, makeJob, REPO } from "../__fixtures_
 import { Db } from "../links/db/sqlite";
 import { ConfigSchema } from "../pacts/config";
 import { InvalidError, SyncBusyError } from "../pacts/services";
-import { closedSince, nextDue, type SyncDeps, Syncer } from "./sync";
+import { closedSince, nextDue, staleRepos, type SyncDeps, Syncer } from "./sync";
 
 interface ForgeData {
   /** Pages of issues and of PRs; a page's cursor is the index of the next one. */
@@ -349,12 +349,12 @@ describe("Syncer", () => {
     });
     const first = syncer.syncAll([REPO]);
     await vi.waitFor(() => expect(syncer.status().inFlight).toContain(REPO));
-    expect(syncer.start(["acme/other"], { full: true })).toBe(1);
+    expect(syncer.start({ repos: ["acme/other"], full: true, stale: false })).toBe(1);
     expect(syncer.status()).toMatchObject({ inFlight: [REPO], queued: ["acme/other"] });
     gate.resolve(EMPTY_PAGE);
     await first;
     expect(syncer.status()).toMatchObject({ runs: 1, inFlight: [], queued: [] });
-    expect(syncer.start([])).toBe(2);
+    expect(syncer.start({ repos: [], full: false, stale: false })).toBe(2);
     await syncer.syncAll([]);
     expect(
       forge.issuesPage.mock.calls
@@ -395,12 +395,8 @@ const FRESH = "2026-05-01T11:56:00.000Z";
 const STALE = "2026-05-01T11:50:00.000Z";
 const STALER = "2026-05-01T11:40:00.000Z";
 
-const due = (attempts: Record<string, string | null>, hiddenRepos: string[] = []) =>
-  nextDue(
-    { repos: Object.keys(attempts), hiddenRepos, refreshMinutes: 5 },
-    attempts,
-    now.getTime(),
-  );
+const due = (attempts: Record<string, string | null>) =>
+  nextDue({ repos: Object.keys(attempts), refreshMinutes: 5 }, attempts, now.getTime());
 
 describe("nextDue", () => {
   it("picks the repo with the oldest attempt", () => {
@@ -417,16 +413,8 @@ describe("nextDue", () => {
     expect(due({ "acme/b": null, "acme/a": null })).toBe("acme/b");
   });
 
-  it("prefers a due repo that is on over a staler one that is off", () => {
-    expect(due({ "acme/off": STALER, "acme/on": STALE }, ["acme/off"])).toBe("acme/on");
-  });
-
-  it("picks a repo that is off once every repo that is on is fresh", () => {
-    expect(due({ "acme/off": STALE, "acme/on": FRESH }, ["acme/off"])).toBe("acme/off");
-  });
-
   it("picks nothing when no repo is older than the interval", () => {
-    expect(due({ "acme/on": FRESH, "acme/off": FRESH }, ["acme/off"])).toBeUndefined();
+    expect(due({ "acme/a": FRESH, "acme/b": FRESH })).toBeUndefined();
   });
 
   it("picks nothing within a slot of the newest attempt", () => {
@@ -640,9 +628,44 @@ describe("Syncer.start", () => {
     const syncer = syncerWith(db, fakeForge());
     const syncAll = vi.spyOn(syncer, "syncAll").mockResolvedValue();
 
-    syncer.start(undefined, { full: true });
+    syncer.start({ full: true, stale: false });
 
     expect(syncAll).toHaveBeenCalledWith([REPO], { full: true });
+    db.close();
+  });
+
+  it("leaves out the repos synced within the last minute when asked for the stale ones", () => {
+    const db = new Db(":memory:");
+    const repos = ["acme/fresh", "acme/stale", "acme/new"];
+    const syncer = syncerWith(db, fakeForge(), { config: () => ConfigSchema.parse({ repos }) });
+    db.setSyncState("acme/fresh", { lastSyncAt: new Date(now.getTime() - 30_000).toISOString() });
+    db.setSyncState("acme/stale", { lastSyncAt: new Date(now.getTime() - 90_000).toISOString() });
+    const syncAll = vi.spyOn(syncer, "syncAll").mockResolvedValue();
+
+    syncer.start({ full: false, stale: true });
+
+    expect(syncAll).toHaveBeenCalledWith(["acme/stale", "acme/new"], { full: false });
+    db.close();
+  });
+
+  it("leaves out the repos syncing right now when asked for the stale ones", async () => {
+    const db = new Db(":memory:");
+    const gate = Promise.withResolvers<IssuesPage>();
+    const forge = fakeForge();
+    forge.issuesPage.mockReturnValueOnce(gate.promise);
+    const syncer = syncerWith(db, forge);
+    const running = syncer.syncRepo(REPO);
+    const syncAll = vi.spyOn(syncer, "syncAll").mockResolvedValue();
+
+    syncer.start({ full: false, stale: true });
+    syncer.start({ full: false, stale: false });
+
+    expect(syncAll.mock.calls).toEqual([
+      [[], { full: false }],
+      [[REPO], { full: false }],
+    ]);
+    gate.resolve(EMPTY_PAGE);
+    await running;
     db.close();
   });
 
@@ -651,8 +674,36 @@ describe("Syncer.start", () => {
     const syncer = syncerWith(db, fakeForge());
     const syncAll = vi.spyOn(syncer, "syncAll");
 
-    expect(() => syncer.start([REPO, "acme/other"])).toThrow(InvalidError);
+    expect(() => syncer.start({ repos: [REPO, "acme/other"], full: false, stale: false })).toThrow(
+      InvalidError,
+    );
     expect(syncAll).not.toHaveBeenCalled();
     db.close();
+  });
+});
+
+const ago = (ms: number) => new Date(now.getTime() - ms).toISOString();
+const state = (lastSyncAt: string | null, lastError: string | null = null) => ({
+  repo: REPO,
+  lastSyncAt,
+  lastFullSyncAt: null,
+  lastError,
+  lastAttemptAt: lastSyncAt,
+});
+
+describe("staleRepos", () => {
+  it.each([
+    ["synced just now", state(ago(0)), []],
+    ["synced exactly a minute ago", state(ago(60_000)), []],
+    ["synced just over a minute ago", state(ago(60_001)), [REPO]],
+    ["never synced", state(null), [REPO]],
+    ["never synced and failed", state(null, "boom"), [REPO]],
+    ["failed after a sync just now", state(ago(0), "boom"), [REPO]],
+  ])("for a repo %s gives %j", (_, synced, expected) => {
+    expect(staleRepos([REPO], [synced], now.getTime())).toEqual(expected);
+  });
+
+  it("keeps a repo without a sync state", () => {
+    expect(staleRepos([REPO], [], now.getTime())).toEqual([REPO]);
   });
 });

@@ -1,6 +1,7 @@
 import type { Config, Dashboard } from "../pacts/config";
 import type { SyncStore } from "../pacts/db";
 import type { CiJob } from "../pacts/issues";
+import type { SyncRequest } from "../pacts/web";
 
 import {
   CI_BATCH,
@@ -16,8 +17,8 @@ import {
   type SyncResult,
   type SyncService,
 } from "../pacts/services";
-import { type SyncStatus, syncIntervals } from "../pacts/sync";
-import { FULL_SYNC_MAX_AGE_MS, RATE_FLOOR, SINCE_OVERLAP_MS } from "../specs";
+import { type SyncState, type SyncStatus, syncIntervals } from "../pacts/sync";
+import { FRESH_SYNC_MS, FULL_SYNC_MAX_AGE_MS, RATE_FLOOR, SINCE_OVERLAP_MS } from "../specs";
 
 export interface SyncDeps {
   db: SyncStore;
@@ -37,15 +38,15 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const closedSince = (days: number, now: Date): number =>
   days > 0 ? now.getTime() - days * DAY_MS : Number.POSITIVE_INFINITY;
 
-type Schedule = Pick<Config, "repos" | "hiddenRepos" | "refreshMinutes">;
+type Schedule = Pick<Config, "repos" | "refreshMinutes">;
 
 /**
  * The repo to sync next: none within a slot of the newest attempt, a slot being the refresh
- * interval split by the repos, else the stalest due repo, those that are on first. Takes attempts
- * rather than successes, so a failing repo waits its turn instead of staying the stalest.
+ * interval split by the repos, else the stalest due repo. Takes attempts rather than successes,
+ * so a failing repo waits its turn instead of staying the stalest.
  */
 export function nextDue(
-  { repos, hiddenRepos, refreshMinutes }: Schedule,
+  { repos, refreshMinutes }: Schedule,
   attempts: Record<string, string | null>,
   now: number,
 ): string | undefined {
@@ -56,7 +57,25 @@ export function nextDue(
   if (Math.min(...ages.map(({ age }) => age)) < 1 / repos.length) return undefined;
   // Two repos that never synced give Infinity - Infinity, NaN, which keeps config order.
   const due = ages.filter(({ age }) => age >= 1).toSorted((a, b) => b.age - a.age);
-  return (due.find(({ repo }) => !hiddenRepos.includes(repo)) ?? due[0])?.repo;
+  return due[0]?.repo;
+}
+
+/**
+ * `repos` without a sync that succeeded within `FRESH_SYNC_MS` of `now`. Takes successes, unlike
+ * `nextDue`, so a page load retries a failed repo the way Refresh does.
+ */
+export function staleRepos(repos: string[], states: SyncState[], now: number): string[] {
+  const fresh = new Set(
+    states
+      .filter(
+        ({ lastSyncAt, lastError }) =>
+          lastSyncAt !== null &&
+          lastError === null &&
+          now - Date.parse(lastSyncAt) <= FRESH_SYNC_MS,
+      )
+      .map(({ repo }) => repo),
+  );
+  return repos.filter((repo) => !fresh.has(repo));
 }
 
 function errorMessage(error: unknown): string {
@@ -145,12 +164,19 @@ export class Syncer implements SyncService {
     return this.running;
   }
 
-  start(repos?: string[], options: SyncOptions = {}): number {
+  start({ repos, full, stale }: SyncRequest): number {
     const configured = this.config().repos;
     const unknown = repos?.filter((repo) => !configured.includes(repo)) ?? [];
     if (unknown.length > 0) throw new InvalidError(`not configured: ${unknown.join(", ")}`);
     const run = this.runs + 1;
-    void this.syncAll(repos ?? configured, options);
+    const wanted = repos ?? configured;
+    // A repo syncing now is fresh once it ends, though its lastSyncAt is still old.
+    const queued = stale
+      ? staleRepos(wanted, this.db.listSyncStates(), this.now().getTime()).filter(
+          (repo) => !this.inFlight.has(repo),
+        )
+      : wanted;
+    void this.syncAll(queued, { full });
     return run;
   }
 

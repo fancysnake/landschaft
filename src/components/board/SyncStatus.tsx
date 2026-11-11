@@ -10,23 +10,13 @@ interface Props {
   /** The configured repos, whose failures the dot reports. */
   repos: string[];
   syncing: boolean;
-  /** No repo is on, so Refresh has nothing to sync. */
-  allOff: boolean;
   /** A failed sync request, or the error the sync it started finished with. */
   error: string | null;
   onSync(full: boolean): void;
   onDismissError(): void;
 }
 
-export function SyncStatus({
-  status,
-  repos,
-  syncing,
-  allOff,
-  error,
-  onSync,
-  onDismissError,
-}: Props) {
+export function SyncStatus({ status, repos, syncing, error, onSync, onDismissError }: Props) {
   const now = useNow();
   const errors = syncErrors(status, repos);
 
@@ -61,18 +51,18 @@ export function SyncStatus({
       )}
       <button
         type="button"
-        disabled={busy || allOff}
+        disabled={busy}
         onClick={() => onSync(false)}
-        title={allOff ? "No repos on" : "Sync the repos that are on"}
+        title="Sync every repo"
         className="btn btn-sm"
       >
         Refresh
       </button>
       <button
         type="button"
-        disabled={busy || allOff}
+        disabled={busy}
         onClick={() => onSync(true)}
-        title={allOff ? "No repos on" : "Re-fetch every open issue of the repos that are on"}
+        title="Re-fetch every open issue of every repo"
         className="text-xs text-neutral-500 hover:underline disabled:text-neutral-300"
       >
         full resync
