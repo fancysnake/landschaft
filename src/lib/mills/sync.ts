@@ -84,6 +84,7 @@ function errorMessage(error: unknown): string {
 
 export class Syncer implements SyncService {
   private version = 0;
+  private readonly boot = crypto.randomUUID();
   /** Sync-all runs finished. */
   private runs = 0;
   private lastSyncAt: string | null = null;
@@ -118,6 +119,7 @@ export class Syncer implements SyncService {
   status(): SyncStatus {
     return {
       version: this.version,
+      boot: this.boot,
       runs: this.runs,
       lastSyncAt: this.lastSyncAt,
       lastError: [...this.userErrors.values(), this.dueError].filter(Boolean).join("; ") || null,

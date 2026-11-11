@@ -15,7 +15,7 @@ vi.mock("./api", async (importOriginal) => {
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const status = (version: number, extra: Partial<SyncStatus> = {}) =>
-  ({ version, runs: 0, inFlight: [], lastError: null, ...extra }) as SyncStatus;
+  ({ version, boot: "a", runs: 0, inFlight: [], lastError: null, ...extra }) as SyncStatus;
 
 let root: Root;
 
@@ -107,6 +107,21 @@ test("an older run answering last does not end the wait for a newer one", async 
 
   await poll();
   expect(result.current!.error).toBe("rate limited");
+  expect(result.current!.syncing).toBe(false);
+});
+
+test("a server restart ends the wait and reports the sync as interrupted", async () => {
+  vi.mocked(api.version)
+    .mockResolvedValueOnce(status(7, { runs: 4 }))
+    .mockResolvedValue(status(0, { boot: "b" }));
+  vi.mocked(api.sync).mockResolvedValue({ status: status(7, { runs: 4 }), run: 5 });
+
+  const result = await renderStatus();
+  await act(() => result.current!.sync());
+  expect(result.current!.syncing).toBe(true);
+
+  await poll();
+  expect(result.current!.error).toBe("Sync interrupted: the server restarted");
   expect(result.current!.syncing).toBe(false);
 });
 

@@ -15,6 +15,8 @@ export function syncIntervals(since: string | null, refreshMinutes: number, now:
 
 export interface SyncStatus {
   version: number;
+  /** Id the server picked at start; a new one means `version` and `runs` began again at zero. */
+  boot: string;
   /** Sync-all runs finished since the server started. */
   runs: number;
   lastSyncAt: string | null;

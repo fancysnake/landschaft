@@ -8,6 +8,7 @@ import { api, errorMessage } from "./api";
 const POLL_MS = 4000;
 /** Tells the boards on this page that synced data landed; `detail` is the new version. */
 export const SYNCED = "landschaft:synced";
+const RESTARTED = "Sync interrupted: the server restarted";
 
 export interface SyncController {
   status: SyncStatus | null;
@@ -24,8 +25,9 @@ export function useSyncStatus(): SyncController {
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const versionRef = useRef<number | null>(null);
-  // The run sync() joined; the first status that counts it reports that run's errors.
-  const awaitedRun = useRef<number | null>(null);
+  // The run sync() joined, on the server that answered. The first status that counts the run
+  // reports its errors; a status from another server reports the run as interrupted.
+  const awaited = useRef<{ boot: string; run: number } | null>(null);
 
   const apply = useCallback((next: SyncStatus) => {
     setStatus(next);
@@ -33,10 +35,11 @@ export function useSyncStatus(): SyncController {
       window.dispatchEvent(new CustomEvent(SYNCED, { detail: next.version }));
     }
     versionRef.current = next.version;
-    if (awaitedRun.current !== null && next.runs >= awaitedRun.current) {
-      awaitedRun.current = null;
+    const wait = awaited.current;
+    if (wait && (next.boot !== wait.boot || next.runs >= wait.run)) {
+      awaited.current = null;
       setSyncing(false);
-      setError(next.lastError);
+      setError(next.boot === wait.boot ? next.lastError : RESTARTED);
     }
   }, []);
 
@@ -67,13 +70,15 @@ export function useSyncStatus(): SyncController {
       setError(null);
       try {
         const response = await api.sync(request);
+        const { boot } = response.status;
         // Responses can land out of order; wait for the newest run any of them joined.
-        awaitedRun.current = Math.max(awaitedRun.current ?? 0, response.run);
+        const joined = awaited.current?.boot === boot ? awaited.current.run : 0;
+        awaited.current = { boot, run: Math.max(joined, response.run) };
         apply(response.status);
       } catch (cause) {
         setError(`Sync failed: ${errorMessage(cause)}`);
       }
-      if (awaitedRun.current === null) setSyncing(false);
+      if (awaited.current === null) setSyncing(false);
     },
     [apply],
   );

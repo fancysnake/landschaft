@@ -51,6 +51,7 @@ describe("repoSyncView", () => {
   const repo = "o/a";
   const status = (over: Partial<SyncStatus> = {}): SyncStatus => ({
     version: 1,
+    boot: "a",
     runs: 0,
     lastSyncAt: null,
     lastError: null,
