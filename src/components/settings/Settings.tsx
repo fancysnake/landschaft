@@ -30,7 +30,8 @@ const entry =
 
 export default function Settings() {
   const [config, setConfig] = useState<Config | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
+  // The nav links here with the id of the dashboard it was on.
+  const [selected, setSelected] = useState(() => window.location.hash.slice(1));
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
@@ -41,10 +42,7 @@ export default function Settings() {
   useEffect(() => {
     api
       .config()
-      .then((loaded) => {
-        setConfig(loaded);
-        setSelected(loaded.dashboards[0]?.id ?? null);
-      })
+      .then(setConfig)
       .catch((cause: unknown) => setNotice({ kind: "error", text: errorMessage(cause) }));
   }, []);
 
@@ -83,9 +81,7 @@ export default function Settings() {
     setSelected(dashboard.id);
   };
   const removeDashboard = (id: string) => {
-    const dashboards = config.dashboards.filter((d) => d.id !== id);
-    update({ ...config, dashboards });
-    if (selected === id) setSelected(dashboards[0]?.id ?? null);
+    update({ ...config, dashboards: config.dashboards.filter((d) => d.id !== id) });
   };
 
   const save = async () => {
@@ -99,8 +95,6 @@ export default function Settings() {
       setConfig(saved);
       setJsonText(null);
       setDirty(false);
-      if (selected !== null && !saved.dashboards.some((d) => d.id === selected))
-        setSelected(saved.dashboards[0]?.id ?? null);
       setNotice({
         kind: "ok",
         text: "Saved. Newly added repositories are syncing in the background.",
@@ -112,7 +106,9 @@ export default function Settings() {
     }
   };
 
-  const current = config.dashboards.find((d) => d.id === selected) ?? null;
+  const current = config.dashboards.find((d) => d.id === selected) ?? config.dashboards[0];
+  // Pin the fallback, or moving it away would swap the open editor.
+  if (current && current.id !== selected) setSelected(current.id);
   const offer = {
     labels: [...new Set(catalog.map((label) => label.name))],
     repos: config.repos,
@@ -171,7 +167,7 @@ export default function Settings() {
                   <button
                     type="button"
                     onClick={() => setSelected(dashboard.id)}
-                    aria-current={dashboard.id === selected ? "true" : undefined}
+                    aria-current={dashboard === current ? "true" : undefined}
                     className={entry}
                   >
                     {dashboard.name}

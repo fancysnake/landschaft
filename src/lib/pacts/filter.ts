@@ -364,12 +364,15 @@ export function matchesFilter(
 
 /**
  * Completions for the last term of `text`: keys, then the key's values (from `offer` for
- * `label:`, `repo:` and the user keys), each as the whole filter text with that term completed.
+ * `label:`, `repo:` and the user keys), each as the whole filter text with that term completed
+ * and as the completed term alone, its label.
  */
-export function suggestFilter(text: string, offer: Offer): string[] {
+export function suggestFilter(text: string, offer: Offer): { text: string; label: string }[] {
   // ponytail: a term is what follows the last space or paren, so a half-typed quoted value
   // holding a space gets no suggestions.
-  const word = /[^\s(]*$/.exec(text)![0].replace(/^-+/, "");
+  const term = /[^\s(]*$/.exec(text)![0];
+  const start = text.length - term.length;
+  const word = term.replace(/^-+/, "");
   const colon = word.indexOf(":");
   const key = colon < 0 ? null : word.slice(0, colon);
   const partial = key === null ? word : word.slice(Math.max(colon, word.lastIndexOf("|")) + 1);
@@ -381,5 +384,5 @@ export function suggestFilter(text: string, offer: Offer): string[] {
       : (spec?.suggest?.(offer) ?? []);
   return candidates
     .filter((option) => option !== partial && same(option.slice(0, partial.length), partial))
-    .map((option) => head + option);
+    .map((option) => ({ text: head + option, label: (head + option).slice(start) }));
 }

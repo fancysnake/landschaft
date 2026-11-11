@@ -77,6 +77,7 @@ export default function Nav({ path, nav }: Props) {
       }
     })();
   };
+  const active = dashboards.find((dashboard) => path === `/d/${dashboard.id}`);
   const inactive = (dashboard: NavData["dashboards"][number]) =>
     dashboard.repos.every((repo) => !shown.includes(repo));
 
@@ -91,7 +92,7 @@ export default function Nav({ path, nav }: Props) {
             key={dashboard.id}
             href={`/d/${dashboard.id}`}
             title={inactive(dashboard) ? "No items in the repositories switched on" : undefined}
-            aria-current={current(path === `/d/${dashboard.id}`)}
+            aria-current={current(dashboard === active)}
             className={link(inactive(dashboard))}
           >
             {dashboard.name}
@@ -119,7 +120,11 @@ export default function Nav({ path, nav }: Props) {
               onDismissError={dismissError}
             />
           )}
-          <a href="/settings" aria-current={current(path === "/settings")} className={link()}>
+          <a
+            href={`/settings${active ? `#${active.id}` : ""}`}
+            aria-current={current(path === "/settings")}
+            className={link()}
+          >
             Settings
           </a>
         </div>

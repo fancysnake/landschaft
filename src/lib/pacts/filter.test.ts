@@ -245,34 +245,31 @@ const offer = (extra: Partial<Offer> = {}): Offer => ({
   ...extra,
 });
 
+/** The whole filter text each completion would leave. */
+const texts = (text: string, extra: Offer) =>
+  suggestFilter(text, extra).map((option) => option.text);
+
 describe("suggestFilter", () => {
   it("completes keys, then the key's values", () => {
-    expect(suggestFilter("", offer())).toContain("label:");
-    expect(suggestFilter("oth", offer())).toEqual(["other"]);
-    expect(suggestFilter("is:pr -la", offer())).toEqual(["is:pr -label:"]);
-    expect(suggestFilter("label:", offer({ labels: ["bug", "needs review"] }))).toEqual([
+    expect(texts("", offer())).toContain("label:");
+    expect(texts("oth", offer())).toEqual(["other"]);
+    expect(texts("is:pr -la", offer())).toEqual(["is:pr -label:"]);
+    expect(texts("label:", offer({ labels: ["bug", "needs review"] }))).toEqual([
       "label:bug",
       'label:"needs review"',
     ]);
-    expect(suggestFilter("(label:x|B", offer({ labels: ["bug", "x"] }))).toEqual(["(label:x|bug"]);
-    expect(suggestFilter("is:ci", offer())).toEqual(["is:ci-job", "is:ci:failed", "is:ci:running"]);
-    expect(suggestFilter("constructor:", offer())).toEqual([]);
-    expect(suggestFilter("has:", offer())).toEqual([
-      "has:pr",
-      "has:parent-issue",
-      "has:sub-issues",
-    ]);
+    expect(texts("(label:x|B", offer({ labels: ["bug", "x"] }))).toEqual(["(label:x|bug"]);
+    expect(texts("is:ci", offer())).toEqual(["is:ci-job", "is:ci:failed", "is:ci:running"]);
+    expect(texts("constructor:", offer())).toEqual([]);
+    expect(texts("has:", offer())).toEqual(["has:pr", "has:parent-issue", "has:sub-issues"]);
   });
 
   it("completes repos and users from the offer", () => {
     const repos = ["acme/app", "acme/lib"];
-    expect(suggestFilter("repo:", offer())).toEqual([]);
-    expect(suggestFilter("repo:acme/l", offer({ repos }))).toEqual(["repo:acme/lib"]);
-    expect(suggestFilter("user:", offer({ users: ["ann", "@me"] }))).toEqual([
-      "user:@me",
-      "user:ann",
-    ]);
-    expect(suggestFilter("author:a", offer({ users: ["ann"] }))).toEqual(["author:ann"]);
+    expect(texts("repo:", offer())).toEqual([]);
+    expect(texts("repo:acme/l", offer({ repos }))).toEqual(["repo:acme/lib"]);
+    expect(texts("user:", offer({ users: ["ann", "@me"] }))).toEqual(["user:@me", "user:ann"]);
+    expect(texts("author:a", offer({ users: ["ann"] }))).toEqual(["author:ann"]);
   });
 });
 
@@ -282,5 +279,14 @@ describe("usesOther", () => {
     expect(usesOther(parseFilter(""))).toBe(false);
     expect(usesOther(parseFilter("other"))).toBe(true);
     expect(usesOther(parseFilter("label:a (is:pr OR -other)"))).toBe(true);
+  });
+
+  it("labels each completion with the completed term", () => {
+    expect(suggestFilter("is:pr -la", offer())).toEqual([
+      { text: "is:pr -label:", label: "-label:" },
+    ]);
+    expect(suggestFilter("(label:x|B", offer({ labels: ["bug", "x"] }))).toEqual([
+      { text: "(label:x|bug", label: "label:x|bug" },
+    ]);
   });
 });
