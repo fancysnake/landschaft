@@ -56,12 +56,12 @@ export interface SyncService {
   syncAll(repos: string[], options?: SyncOptions): Promise<void>;
   /**
    * Queues `repos`, or every configured repo, onto a sync-all without waiting for it, and returns
-   * that run's number; it ends once `runs` reaches it. Throws `InvalidError` for a repo outside
-   * the config.
+   * that run's number; it ends once `runs` reaches it. `stale` leaves out the repos synced within
+   * the last minute. Throws `InvalidError` for a repo outside the config.
    */
-  start(repos?: string[], options?: SyncOptions): number;
+  start(repos?: string[], options?: SyncOptions & { stale?: boolean }): number;
   /**
-   * Syncs the stalest repo due, those that are on first, at most once per refresh interval split
+   * Syncs the stalest repo due, at most once per refresh interval split
    * by the configured repos; skips while a sync runs. Due: last attempt older than the interval.
    * The repo's failure stays in its sync state, out of `lastError`. Never rejects.
    */

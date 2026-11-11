@@ -395,12 +395,8 @@ const FRESH = "2026-05-01T11:56:00.000Z";
 const STALE = "2026-05-01T11:50:00.000Z";
 const STALER = "2026-05-01T11:40:00.000Z";
 
-const due = (attempts: Record<string, string | null>, hiddenRepos: string[] = []) =>
-  nextDue(
-    { repos: Object.keys(attempts), hiddenRepos, refreshMinutes: 5 },
-    attempts,
-    now.getTime(),
-  );
+const due = (attempts: Record<string, string | null>) =>
+  nextDue({ repos: Object.keys(attempts), refreshMinutes: 5 }, attempts, now.getTime());
 
 describe("nextDue", () => {
   it("picks the repo with the oldest attempt", () => {
@@ -417,16 +413,8 @@ describe("nextDue", () => {
     expect(due({ "acme/b": null, "acme/a": null })).toBe("acme/b");
   });
 
-  it("prefers a due repo that is on over a staler one that is off", () => {
-    expect(due({ "acme/off": STALER, "acme/on": STALE }, ["acme/off"])).toBe("acme/on");
-  });
-
-  it("picks a repo that is off once every repo that is on is fresh", () => {
-    expect(due({ "acme/off": STALE, "acme/on": FRESH }, ["acme/off"])).toBe("acme/off");
-  });
-
   it("picks nothing when no repo is older than the interval", () => {
-    expect(due({ "acme/on": FRESH, "acme/off": FRESH }, ["acme/off"])).toBeUndefined();
+    expect(due({ "acme/a": FRESH, "acme/b": FRESH })).toBeUndefined();
   });
 
   it("picks nothing within a slot of the newest attempt", () => {
@@ -643,6 +631,20 @@ describe("Syncer.start", () => {
     syncer.start(undefined, { full: true });
 
     expect(syncAll).toHaveBeenCalledWith([REPO], { full: true });
+    db.close();
+  });
+
+  it("leaves out the repos synced within the last minute when asked for the stale ones", () => {
+    const db = new Db(":memory:");
+    const repos = ["acme/fresh", "acme/stale", "acme/new"];
+    const syncer = syncerWith(db, fakeForge(), { config: () => ConfigSchema.parse({ repos }) });
+    db.setSyncState("acme/fresh", { lastSyncAt: new Date(now.getTime() - 30_000).toISOString() });
+    db.setSyncState("acme/stale", { lastSyncAt: new Date(now.getTime() - 90_000).toISOString() });
+    const syncAll = vi.spyOn(syncer, "syncAll").mockResolvedValue();
+
+    syncer.start(undefined, { stale: true });
+
+    expect(syncAll).toHaveBeenCalledWith(["acme/stale", "acme/new"], {});
     db.close();
   });
 

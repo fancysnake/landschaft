@@ -14,7 +14,7 @@ export interface SyncController {
   error: string | null;
   syncing: boolean;
   /** Queues `repos`, or every configured repo, one at a time on the server. */
-  sync(request?: Partial<Pick<SyncRequest, "full" | "repos">>): Promise<void>;
+  sync(request?: Partial<SyncRequest>): Promise<void>;
   dismissError(): void;
 }
 

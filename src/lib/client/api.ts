@@ -96,7 +96,7 @@ export const api = {
   unmatched: (filter: string) =>
     request<UnmatchedResponse>(`/api/unmatched?${new URLSearchParams({ filter })}`),
   version: () => request<SyncStatus>("/api/version"),
-  sync: (body: Partial<Pick<SyncRequest, "full" | "repos">>) =>
+  sync: (body: Partial<SyncRequest>) =>
     request<SyncResponse>("/api/sync", { method: "POST", body: JSON.stringify(body) }),
   config: () => request<Config>("/api/config"),
   saveConfig: (config: unknown) => saveTo<Config>("/api/config", "PUT", config),

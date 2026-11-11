@@ -9,6 +9,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Changed
 
+- Repos switched off sync like those switched on: the background sync no longer puts them last,
+  and Refresh and full resync cover every repo.
+- Every page load starts the same sync as Refresh, leaving out the repos synced within the last
+  minute. `POST /api/sync` takes `"stale": true` for that.
 - landschaft describes itself as a structured inbox for GitHub work, in the docs, the CLI help
   and the package metadata. Config, API and code keep `board` and `inbox` as the two layouts.
 - The docs page "How the board works" is now "Reference", at `/reference/`, and

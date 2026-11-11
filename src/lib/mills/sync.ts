@@ -17,7 +17,7 @@ import {
   type SyncService,
 } from "../pacts/services";
 import { type SyncStatus, syncIntervals } from "../pacts/sync";
-import { FULL_SYNC_MAX_AGE_MS, RATE_FLOOR, SINCE_OVERLAP_MS } from "../specs";
+import { FRESH_SYNC_MS, FULL_SYNC_MAX_AGE_MS, RATE_FLOOR, SINCE_OVERLAP_MS } from "../specs";
 
 export interface SyncDeps {
   db: SyncStore;
@@ -37,15 +37,15 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const closedSince = (days: number, now: Date): number =>
   days > 0 ? now.getTime() - days * DAY_MS : Number.POSITIVE_INFINITY;
 
-type Schedule = Pick<Config, "repos" | "hiddenRepos" | "refreshMinutes">;
+type Schedule = Pick<Config, "repos" | "refreshMinutes">;
 
 /**
  * The repo to sync next: none within a slot of the newest attempt, a slot being the refresh
- * interval split by the repos, else the stalest due repo, those that are on first. Takes attempts
- * rather than successes, so a failing repo waits its turn instead of staying the stalest.
+ * interval split by the repos, else the stalest due repo. Takes attempts rather than successes,
+ * so a failing repo waits its turn instead of staying the stalest.
  */
 export function nextDue(
-  { repos, hiddenRepos, refreshMinutes }: Schedule,
+  { repos, refreshMinutes }: Schedule,
   attempts: Record<string, string | null>,
   now: number,
 ): string | undefined {
@@ -56,7 +56,7 @@ export function nextDue(
   if (Math.min(...ages.map(({ age }) => age)) < 1 / repos.length) return undefined;
   // Two repos that never synced give Infinity - Infinity, NaN, which keeps config order.
   const due = ages.filter(({ age }) => age >= 1).toSorted((a, b) => b.age - a.age);
-  return (due.find(({ repo }) => !hiddenRepos.includes(repo)) ?? due[0])?.repo;
+  return due[0]?.repo;
 }
 
 function errorMessage(error: unknown): string {
@@ -145,12 +145,16 @@ export class Syncer implements SyncService {
     return this.running;
   }
 
-  start(repos?: string[], options: SyncOptions = {}): number {
+  start(repos?: string[], { stale, ...options }: SyncOptions & { stale?: boolean } = {}): number {
     const configured = this.config().repos;
     const unknown = repos?.filter((repo) => !configured.includes(repo)) ?? [];
     if (unknown.length > 0) throw new InvalidError(`not configured: ${unknown.join(", ")}`);
     const run = this.runs + 1;
-    void this.syncAll(repos ?? configured, options);
+    const freshFrom = this.now().getTime() - FRESH_SYNC_MS;
+    const fresh = (repo: string) =>
+      Date.parse(this.db.getSyncState(repo)?.lastSyncAt ?? "") >= freshFrom;
+    const wanted = repos ?? configured;
+    void this.syncAll(stale ? wanted.filter((repo) => !fresh(repo)) : wanted, options);
     return run;
   }
 

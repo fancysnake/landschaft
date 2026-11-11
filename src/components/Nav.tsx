@@ -52,6 +52,10 @@ export default function Nav({ path, nav }: Props) {
     };
   }, [reload]);
 
+  useEffect(() => {
+    void sync({ stale: true });
+  }, [sync]);
+
   const shown = repos.filter((repo) => !hidden.includes(repo));
   const setShown = (selected: string[]) => {
     const flipped = repos.filter((repo) => selected.includes(repo) === hidden.includes(repo));
@@ -113,9 +117,8 @@ export default function Nav({ path, nav }: Props) {
               status={status}
               repos={repos}
               syncing={syncing}
-              allOff={shown.length === 0}
               error={error}
-              onSync={(full) => void sync({ full, repos: shown })}
+              onSync={(full) => void sync({ full })}
               onDismissError={dismissError}
             />
           )}

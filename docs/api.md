@@ -15,7 +15,7 @@ localhost only. Errors are `{ "error": "message" }` with a matching status.
 | `GET /api/dashboards/:id/board` | Computed board; the query string is the filter set                      |
 | `GET /api/dashboards/:id/inbox` | Computed inbox; same query string as the board                          |
 | `GET /api/unmatched?filter=`    | Open items no dashboard places; see [Board](#board)                     |
-| `POST /api/sync`                | `{ "repos"?, "full"? }`; see [Sync](#sync)                              |
+| `POST /api/sync`                | `{ "repos"?, "full"?, "stale"? }`; see [Sync](#sync)                    |
 | `GET /api/version`              | Sync status per repository plus rate-limit budget                       |
 | `GET /api/labels?repos=a/b,c/d` | Cached label catalogue for the pickers                                  |
 | `GET /api/nav`                  | Nav tabs with their repos, global and hidden repos, refresh interval    |
@@ -49,7 +49,8 @@ repositories off on every view (`false` switches them back on) and returns the c
 `{ "repos": ["owner/repo"] }` just those, and answers `202` with `{ "status", "run" }` at once,
 never `409`; a repository that is not configured, or an unknown key, is refused with
 `400`. `"full": true` refetches
-every open issue instead of only those changed since the last sync. A call during a running
+every open issue instead of only those changed since the last sync. `"stale": true` leaves out
+the repositories synced within the last minute. A call during a running
 sync-all joins that run and adds its repositories to it. Follow progress by polling
 `GET /api/version`: a repository is waiting while it is in `queued` and busy while it is in
 `inFlight`, the run is done once `runs`
