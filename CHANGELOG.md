@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Fixed
+
+- The sync indicator no longer keeps spinning when the server restarts during a sync: the next
+  status poll stops it and reports the sync as interrupted. The sync status carries `boot`, an
+  id the server picks at start.
+
 ## [5.3.0] - 2026-11-11
 
 ### Added

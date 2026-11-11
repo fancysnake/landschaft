@@ -55,4 +55,6 @@ sync-all joins that run and adds its repositories to it. Follow progress by poll
 `GET /api/version`: a repository is waiting while it is in `queued` and busy while it is in
 `inFlight`, the run is done once `runs`
 reaches `run`, and its failures land in `lastError`, each until its repository next syncs. A
-background sync's failure stays in that repository's entry under `repos`.
+background sync's failure stays in that repository's entry under `repos`. `boot` is an id the
+server picks when it starts: once it differs from the one in the `202` answer, the server has
+restarted, `runs` counts from zero again, and the run is lost.
