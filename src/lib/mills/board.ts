@@ -21,6 +21,7 @@ import {
   ciJobKey,
   type Issue,
   issueKey,
+  type IssueState,
   type LabelRef,
   type Snapshot,
   type StatedRef,
@@ -139,10 +140,11 @@ const jobItem = (job: CiJob, byKey: Map<string, Issue>): JobItem => ({
   issueType: null,
 });
 
-/** `job` as a card showing `labels`. */
-const jobCard = (job: CiJob, labels: LabelRef[]): CiJobCard => ({
+/** `job`, whose item is `state`, as a card showing `labels`. */
+const jobCard = (job: CiJob, state: IssueState, labels: LabelRef[]): CiJobCard => ({
   key: ciJobKey(job),
   kind: "ci-job",
+  state,
   repo: job.repo,
   branch: job.branch,
   workflow: job.workflow,
@@ -199,9 +201,13 @@ function inScope(
   return (item) => matchesFilter(base, item, { viewer }) && matchesFilter(scope, item, { viewer });
 }
 
-/** An issue or failed CI job: its item, the `text` the search box matches, its card. */
+/**
+ * An issue or failed CI job: its item, when it closed, the `text` the search box matches, its
+ * card.
+ */
 interface Entry {
   item: Item | JobItem;
+  closedAt: string | null;
   text: string;
   card: (labels: LabelRef[]) => Card;
 }
@@ -222,25 +228,29 @@ function scopedItems(
   // From all of `issues`, not just the open ones.
   const itemOf = itemsOf(issues, byKey);
   const passes = inScope(users, viewer, scope);
-  const since = (closedAt: string | null) => closedAt !== null && Date.parse(closedAt) >= cutoff;
-  const issueEntries = issues
-    .filter((issue) => issue.state === "OPEN" || since(issue.closedAt))
-    .map((issue): Entry => {
-      const item = itemOf(issue);
-      return {
-        item,
-        text: `${item.number} ${item.title}`,
-        card: (labels) => toCard(item, labels),
-      };
-    });
-  const jobEntries = jobs
-    .filter((job) => !job.pr?.closedAt || since(job.pr.closedAt))
-    .map((job): Entry => ({
-      item: jobItem(job, byKey),
+  const issueEntries = issues.map((issue): Entry => {
+    const item = itemOf(issue);
+    return {
+      item,
+      closedAt: issue.closedAt,
+      text: `${item.number} ${item.title}`,
+      card: (labels) => toCard(item, labels),
+    };
+  });
+  const jobEntries = jobs.map((job): Entry => {
+    const item = jobItem(job, byKey);
+    return {
+      item,
+      closedAt: job.pr?.closedAt ?? null,
       text: `${job.name} ${job.branch}`,
-      card: (labels) => jobCard(job, labels),
-    }));
-  return [...issueEntries, ...jobEntries].filter(({ item }) => passes(item));
+      card: (labels) => jobCard(job, item.state, labels),
+    };
+  });
+  return [...issueEntries, ...jobEntries].filter(
+    ({ item, closedAt }) =>
+      (item.state === "OPEN" || (closedAt !== null && Date.parse(closedAt) >= cutoff)) &&
+      passes(item),
+  );
 }
 
 /** The dashboard's filter, swimlanes and columns, parsed. */

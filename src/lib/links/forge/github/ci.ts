@@ -95,9 +95,11 @@ interface CommitAuthors {
 }
 
 export interface CiBranchNode {
-  associatedPullRequests: { nodes: NonNullable<CiJob["pr"]>[] };
+  associatedPullRequests: { nodes: { number: number; url: string }[] };
   mergedPullRequests: { nodes: { headRefOid: string }[] };
-  closedPullRequests: { nodes: (NonNullable<CiJob["pr"]> & { headRefOid: string })[] };
+  closedPullRequests: {
+    nodes: { number: number; url: string; closedAt: string; headRefOid: string }[];
+  };
   target: {
     oid: string;
     url: string;
@@ -189,17 +191,16 @@ export function toCiJobs(
   // Merged: its head is the newest merged PR's, or the default branch holds all of it.
   if (node.mergedPullRequests.nodes[0]?.headRefOid === target.oid || compare?.aheadBy === 0)
     return [];
+  const open = node.associatedPullRequests.nodes[0];
   // Without an open PR, the newest closed one whose head is this commit ran the checks.
-  const closed = node.closedPullRequests.nodes[0];
+  const [closed] = node.closedPullRequests.nodes.flatMap(({ headRefOid, ...pr }) =>
+    headRefOid === target.oid ? [pr] : [],
+  );
   const head: HeadOf = {
     repo,
     branch,
     authors: loginsOf(compare ? compare.commits : target.history),
-    pr:
-      node.associatedPullRequests.nodes[0] ??
-      (closed?.headRefOid === target.oid
-        ? { number: closed.number, url: closed.url, closedAt: closed.closedAt }
-        : null),
+    pr: open ? { ...open, closedAt: null } : (closed ?? null),
   };
   // Also merges a job an app reports as a check run and as a commit status alike.
   const newest = new Map<string, Run>();
@@ -233,7 +234,7 @@ function ciBranchFields(index: number, suites: boolean): string {
     ? `checkSuites(last: 50) { nodes { checkRuns(first: 50) { nodes { type: __typename ${CHECK_RUN} } } } }`
     : "";
   return `${aliases.branch}: ref(qualifiedName: $ref${index}) {
-    associatedPullRequests(states: OPEN, first: 1) { nodes { number url closedAt } }
+    associatedPullRequests(states: OPEN, first: 1) { nodes { number url } }
     mergedPullRequests: associatedPullRequests(
       states: MERGED, first: 1, orderBy: { field: CREATED_AT, direction: DESC }
     ) { nodes { headRefOid } }

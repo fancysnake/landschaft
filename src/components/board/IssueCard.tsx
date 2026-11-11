@@ -18,6 +18,8 @@ const STATUS_PILLS: Record<PullStatusLabel, { text: string; title: string; tone:
 const cardClass = (accent: string, surface = "bg-white") =>
   `border-l-[3px] px-3 py-2 text-sm ${surface} ${accent}`;
 
+const closedCard = cardClass("border-l-neutral-400", "bg-neutral-50 opacity-70");
+
 const metaRow = "mt-1 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500";
 
 const titleLink = "leading-snug font-medium text-neutral-900 hover:underline";
@@ -36,13 +38,7 @@ function Labels({ labels }: { labels: LabelRef[] }) {
 
 function CiJobItem({ card, showRepo }: { card: CiJobCard; showRepo: boolean }) {
   return (
-    <article
-      className={
-        card.pr?.closedAt
-          ? cardClass("border-l-neutral-400", "bg-neutral-50 opacity-70")
-          : cardClass("border-l-orange-500")
-      }
-    >
+    <article className={card.state === "CLOSED" ? closedCard : cardClass("border-l-orange-500")}>
       <a href={card.url} target="_blank" rel="noreferrer" className={titleLink}>
         {card.workflow ? `${card.workflow} / ${card.name}` : card.name}
       </a>
@@ -62,7 +58,7 @@ function CiJobItem({ card, showRepo }: { card: CiJobCard; showRepo: boolean }) {
             PR #{card.pr.number}
           </a>
         )}
-        {card.pr?.closedAt && <span className={`pill ${TONE.neutral}`}>closed</span>}
+        {card.state === "CLOSED" && <span className={`pill ${TONE.neutral}`}>closed</span>}
         <Labels labels={card.labels} />
         <span className="ml-auto tabular-nums" title={card.failedAt}>
           failed {relativeTime(card.failedAt)}
@@ -104,9 +100,7 @@ export function CardList({
 
 /** The card's classes: closed over blocked over PR or issue. */
 function toneOf(card: IssueItemCard): string {
-  if (card.state === "CLOSED") {
-    return cardClass("border-l-neutral-400", "bg-neutral-50 opacity-70");
-  }
+  if (card.state === "CLOSED") return closedCard;
   if (card.blocked) return cardClass("border-l-red-500", "bg-red-50");
   return cardClass(card.kind === "pr" ? "border-l-sky-500" : "border-l-emerald-500");
 }

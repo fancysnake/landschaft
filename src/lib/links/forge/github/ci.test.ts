@@ -31,9 +31,7 @@ const checkRun = (
   checkSuite: { workflowRun: workflow === null ? null : { workflow: { name: workflow } } },
 });
 const branch = (contexts: CiContext[], history = commits("ann")): CiBranchNode => ({
-  associatedPullRequests: {
-    nodes: [{ number: 4, url: "https://github.com/acme/app/pull/4", closedAt: null }],
-  },
+  associatedPullRequests: { nodes: [{ number: 4, url: "https://github.com/acme/app/pull/4" }] },
   mergedPullRequests: { nodes: [] },
   closedPullRequests: { nodes: [] },
   target: {

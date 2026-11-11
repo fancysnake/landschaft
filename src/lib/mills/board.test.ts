@@ -1055,10 +1055,21 @@ describe("CI jobs", () => {
   });
 
   it("takes no labels from a closed PR", () => {
-    const pr = makeIssue({ number: 7, kind: "pr", state: "CLOSED", labels: [label("bug")] });
-    const withPr = [makeJob({ name: "lint", pr: { number: 7, url: pr.url, closedAt: null } })];
-    const dashboard = { ...DASHBOARD, filter: "is:ci-job" };
-    const board = buildBoard(snapshot([pr], withPr), dashboard, EVERYONE);
+    const closedAt = "2026-05-09T00:00:00Z";
+    const pr = makeIssue({
+      number: 7,
+      kind: "pr",
+      state: "CLOSED",
+      closedAt,
+      labels: [label("bug")],
+    });
+    const withPr = [makeJob({ name: "lint", pr: { number: 7, url: pr.url, closedAt } })];
+    const dashboard = { ...DASHBOARD, filter: "is:ci-job", closedDays: 7 };
+    const board = buildBoard(snapshot([pr], withPr), dashboard, {
+      ...EVERYONE,
+      now: new Date("2026-05-10T00:00:00Z"),
+    });
+    expect(board.total).toBe(1);
     expect(board.labels).toEqual([]);
   });
 

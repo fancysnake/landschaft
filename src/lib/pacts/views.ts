@@ -17,6 +17,8 @@ export type Card = IssueItemCard | CiJobCard;
 export interface CiJobCard extends Omit<CiJob, "authors"> {
   key: string;
   kind: "ci-job";
+  /** Closed when its PR is. */
+  state: IssueState;
   /** Its open PR's labels. */
   labels: LabelRef[];
 }
