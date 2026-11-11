@@ -95,9 +95,9 @@ interface CommitAuthors {
 }
 
 export interface CiBranchNode {
-  associatedPullRequests: { nodes: { number: number; url: string }[] };
+  associatedPullRequests: { nodes: NonNullable<CiJob["pr"]>[] };
   mergedPullRequests: { nodes: { headRefOid: string }[] };
-  closedPullRequests: { nodes: { number: number; url: string; headRefOid: string }[] };
+  closedPullRequests: { nodes: (NonNullable<CiJob["pr"]> & { headRefOid: string })[] };
   target: {
     oid: string;
     url: string;
@@ -197,7 +197,9 @@ export function toCiJobs(
     authors: loginsOf(compare ? compare.commits : target.history),
     pr:
       node.associatedPullRequests.nodes[0] ??
-      (closed?.headRefOid === target.oid ? { number: closed.number, url: closed.url } : null),
+      (closed?.headRefOid === target.oid
+        ? { number: closed.number, url: closed.url, closedAt: closed.closedAt }
+        : null),
   };
   // Also merges a job an app reports as a check run and as a commit status alike.
   const newest = new Map<string, Run>();
@@ -231,13 +233,13 @@ function ciBranchFields(index: number, suites: boolean): string {
     ? `checkSuites(last: 50) { nodes { checkRuns(first: 50) { nodes { type: __typename ${CHECK_RUN} } } } }`
     : "";
   return `${aliases.branch}: ref(qualifiedName: $ref${index}) {
-    associatedPullRequests(states: OPEN, first: 1) { nodes { number url } }
+    associatedPullRequests(states: OPEN, first: 1) { nodes { number url closedAt } }
     mergedPullRequests: associatedPullRequests(
       states: MERGED, first: 1, orderBy: { field: CREATED_AT, direction: DESC }
     ) { nodes { headRefOid } }
     closedPullRequests: associatedPullRequests(
       states: CLOSED, first: 1, orderBy: { field: CREATED_AT, direction: DESC }
-    ) { nodes { number url headRefOid } }
+    ) { nodes { number url closedAt headRefOid } }
     target { ... on Commit {
       oid
       url

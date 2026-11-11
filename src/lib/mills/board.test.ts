@@ -1034,7 +1034,10 @@ describe("CI jobs", () => {
 
   it("takes its open PR's labels for filters, facets and the card", () => {
     const pr = makeIssue({ number: 7, kind: "pr", labels: [label("team-a"), label("bug")] });
-    const withPr = [makeJob({ name: "lint", pr: { number: 7, url: pr.url } }), ...jobs];
+    const withPr = [
+      makeJob({ name: "lint", pr: { number: 7, url: pr.url, closedAt: null } }),
+      ...jobs,
+    ];
     const lanes = [
       makeLane({ id: "a", filter: "label:team-a" }),
       makeLane({ id: "rest", filter: "other" }),
@@ -1053,10 +1056,34 @@ describe("CI jobs", () => {
 
   it("takes no labels from a closed PR", () => {
     const pr = makeIssue({ number: 7, kind: "pr", state: "CLOSED", labels: [label("bug")] });
-    const withPr = [makeJob({ name: "lint", pr: { number: 7, url: pr.url } })];
+    const withPr = [makeJob({ name: "lint", pr: { number: 7, url: pr.url, closedAt: null } })];
     const dashboard = { ...DASHBOARD, filter: "is:ci-job" };
     const board = buildBoard(snapshot([pr], withPr), dashboard, EVERYONE);
     expect(board.labels).toEqual([]);
+  });
+
+  it("counts the job of a closed PR as closed, within the dashboard's closed days", () => {
+    const pr = { number: 7, url: "https://github.com/acme/app/pull/7" };
+    const closed = [makeJob({ name: "lint", pr: { ...pr, closedAt: "2026-05-30T00:00:00Z" } })];
+    const dashboard = {
+      ...DASHBOARD,
+      closedDays: 7,
+      columns: [
+        makeColumn({ id: "todo", name: "Todo", filter: "other" }),
+        makeColumn({ id: "done", name: "Done", filter: "is:closed" }),
+      ],
+    };
+    const at = (now: string, closedDays = 7) =>
+      buildBoard(
+        snapshot([], [...closed, ...jobs]),
+        { ...dashboard, closedDays },
+        { ...EVERYONE, now: new Date(now) },
+      );
+    const board = at("2026-06-01T00:00:00Z");
+    expect(board.cells[cell("rest", "done")]?.map(numberOf)).toEqual(["lint"]);
+    expect(board.cells[cell("rest", "todo")]?.map(numberOf)).toEqual(["test", "lint"]);
+    expect(at("2026-07-01T00:00:00Z").total).toBe(2);
+    expect(at("2026-06-01T00:00:00Z", 0).total).toBe(2);
   });
 
   it("lists a job no dashboard places as unmatched", () => {

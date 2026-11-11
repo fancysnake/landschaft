@@ -68,7 +68,8 @@ opened the PR, as long as the PR is in one of the global repos; such an issue ca
 A dashboard with `closedDays` above 0 keeps the issues and PRs closed (or merged) within that
 many days, placed by the same filters. `is:closed` picks them, so a `Done` column with
 `is:closed` gathers them and `-is:closed` keeps them out of a lane. Their cards are greyed
-with a `closed` pill, without PR status pills. A closed item
+with a `closed` pill, without PR status pills. The failed CI job of a closed PR is closed with
+it, from the day the PR closed. A closed issue or PR
 never counts for `has:pr`, `is:blocked` or `is:blocking`, and the unmatched view lists open
 items only.
 
@@ -77,7 +78,8 @@ items only.
 A job whose newest run on a branch failed shows as a card of its own: a GitHub Actions job, a
 check run from another app, or a commit status. The card links to the run and names the
 branch, when the job failed and the PR from the branch, if any: the open one, else a closed
-one nobody pushed to the branch since. A passing run on the
+one nobody pushed to the branch since. With a closed PR the job is a [closed item](#closed-items):
+`is:closed` picks it, and `closedDays` decides how long it stays. A passing run on the
 branch removes it, and so does merging the branch; an old failure stays however long the
 branch sits untouched.
 

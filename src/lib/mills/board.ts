@@ -116,12 +116,12 @@ export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Iss
 type JobItem = Omit<FilterItem, "kind" | "labels"> & { kind: "ci-job"; labels: LabelRef[] };
 
 /**
- * A failed CI job as filters see it: the labels of its open PR in `byKey`, no assignees or links,
- * never blocked.
+ * A failed CI job as filters see it: closed when its PR is, the labels of its open PR in `byKey`,
+ * no assignees or links, never blocked.
  */
 const jobItem = (job: CiJob, byKey: Map<string, Issue>): JobItem => ({
   kind: "ci-job",
-  state: "OPEN",
+  state: job.pr?.closedAt ? "CLOSED" : "OPEN",
   repo: job.repo,
   authors: job.authors,
   assignees: [],
@@ -207,7 +207,7 @@ interface Entry {
 }
 
 /**
- * The open `issues`, those closed at or after `cutoff` (ms), and the failed CI `jobs` that one
+ * The open `issues` and failed CI `jobs`, and those closed at or after `cutoff` (ms), that one
  * of the global `users` (empty for everyone) is in and that pass `scope`.
  */
 function scopedItems(
@@ -222,21 +222,24 @@ function scopedItems(
   // From all of `issues`, not just the open ones.
   const itemOf = itemsOf(issues, byKey);
   const passes = inScope(users, viewer, scope);
-  const shows = (issue: Issue) =>
-    issue.state === "OPEN" || (issue.closedAt !== null && Date.parse(issue.closedAt) >= cutoff);
-  const issueEntries = issues.filter(shows).map((issue): Entry => {
-    const item = itemOf(issue);
-    return {
-      item,
-      text: `${item.number} ${item.title}`,
-      card: (labels) => toCard(item, labels),
-    };
-  });
-  const jobEntries = jobs.map((job): Entry => ({
-    item: jobItem(job, byKey),
-    text: `${job.name} ${job.branch}`,
-    card: (labels) => jobCard(job, labels),
-  }));
+  const since = (closedAt: string | null) => closedAt !== null && Date.parse(closedAt) >= cutoff;
+  const issueEntries = issues
+    .filter((issue) => issue.state === "OPEN" || since(issue.closedAt))
+    .map((issue): Entry => {
+      const item = itemOf(issue);
+      return {
+        item,
+        text: `${item.number} ${item.title}`,
+        card: (labels) => toCard(item, labels),
+      };
+    });
+  const jobEntries = jobs
+    .filter((job) => !job.pr?.closedAt || since(job.pr.closedAt))
+    .map((job): Entry => ({
+      item: jobItem(job, byKey),
+      text: `${job.name} ${job.branch}`,
+      card: (labels) => jobCard(job, labels),
+    }));
   return [...issueEntries, ...jobEntries].filter(({ item }) => passes(item));
 }
 

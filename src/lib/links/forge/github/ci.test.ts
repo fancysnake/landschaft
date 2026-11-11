@@ -31,7 +31,9 @@ const checkRun = (
   checkSuite: { workflowRun: workflow === null ? null : { workflow: { name: workflow } } },
 });
 const branch = (contexts: CiContext[], history = commits("ann")): CiBranchNode => ({
-  associatedPullRequests: { nodes: [{ number: 4, url: "https://github.com/acme/app/pull/4" }] },
+  associatedPullRequests: {
+    nodes: [{ number: 4, url: "https://github.com/acme/app/pull/4", closedAt: null }],
+  },
   mergedPullRequests: { nodes: [] },
   closedPullRequests: { nodes: [] },
   target: {
@@ -47,11 +49,12 @@ const base = (aheadBy: number, ahead = commits()): DefaultBranchNode => ({
 });
 
 /** A failing branch with no open PR, and a closed one whose head is `headRefOid`. */
+const closedAt = "2026-04-30T00:00:00Z";
 const closed = (headRefOid: string): CiBranchNode => ({
   ...branch([checkRun("test", "FAILURE")]),
   associatedPullRequests: { nodes: [] },
   closedPullRequests: {
-    nodes: [{ number: 7, url: "https://github.com/acme/app/pull/7", headRefOid }],
+    nodes: [{ number: 7, url: "https://github.com/acme/app/pull/7", headRefOid, closedAt }],
   },
 });
 
@@ -179,6 +182,7 @@ describe("toCiJobs", () => {
     expect(toCiJobs("acme/app", "x", closed("abc"), null)[0]?.pr).toEqual({
       number: 7,
       url: "https://github.com/acme/app/pull/7",
+      closedAt,
     });
     expect(toCiJobs("acme/app", "x", closed("old"), null)[0]?.pr).toBeNull();
   });

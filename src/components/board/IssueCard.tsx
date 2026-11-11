@@ -36,7 +36,13 @@ function Labels({ labels }: { labels: LabelRef[] }) {
 
 function CiJobItem({ card, showRepo }: { card: CiJobCard; showRepo: boolean }) {
   return (
-    <article className={cardClass("border-l-orange-500")}>
+    <article
+      className={
+        card.pr?.closedAt
+          ? cardClass("border-l-neutral-400", "bg-neutral-50 opacity-70")
+          : cardClass("border-l-orange-500")
+      }
+    >
       <a href={card.url} target="_blank" rel="noreferrer" className={titleLink}>
         {card.workflow ? `${card.workflow} / ${card.name}` : card.name}
       </a>
@@ -56,6 +62,7 @@ function CiJobItem({ card, showRepo }: { card: CiJobCard; showRepo: boolean }) {
             PR #{card.pr.number}
           </a>
         )}
+        {card.pr?.closedAt && <span className={`pill ${TONE.neutral}`}>closed</span>}
         <Labels labels={card.labels} />
         <span className="ml-auto tabular-nums" title={card.failedAt}>
           failed {relativeTime(card.failedAt)}
