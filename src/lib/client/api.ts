@@ -29,7 +29,7 @@ export interface UnmatchedResponse {
 
 /** A sync-all's answer, sent with `202` before any repo finishes. */
 export interface SyncResponse {
-  /** The run it joined, done once `status.runs` reaches it. */
+  /** The run it joined, done once `status.runs` reaches it, lost once `status.boot` changes. */
   run: number;
   status: SyncStatus;
 }

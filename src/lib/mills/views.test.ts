@@ -13,6 +13,7 @@ function views(extra: { hiddenRepos?: string[] } = {}, issues: Issue[] = []) {
   const syncer = {
     status: () => ({
       version: 0,
+      boot: "a",
       runs: 0,
       lastSyncAt: null,
       lastError: null,

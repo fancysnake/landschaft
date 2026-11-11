@@ -315,6 +315,11 @@ describe("Syncer", () => {
     });
   });
 
+  it("tells one server start from the next", () => {
+    const first = syncerWith(db, fakeForge()).status().boot;
+    expect(syncerWith(db, fakeForge()).status().boot).not.toBe(first);
+  });
+
   it("refuses to overlap a running sync of the same repo", async () => {
     const gate = Promise.withResolvers<IssuesPage>();
     const forge = fakeForge();
