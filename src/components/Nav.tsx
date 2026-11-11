@@ -119,7 +119,11 @@ export default function Nav({ path, nav }: Props) {
               onDismissError={dismissError}
             />
           )}
-          <a href="/settings" aria-current={current(path === "/settings")} className={link()}>
+          <a
+            href={`/settings${path.startsWith("/d/") ? `#${path.slice(3)}` : ""}`}
+            aria-current={current(path === "/settings")}
+            className={link()}
+          >
             Settings
           </a>
         </div>

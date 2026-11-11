@@ -43,7 +43,10 @@ export default function Settings() {
       .config()
       .then((loaded) => {
         setConfig(loaded);
-        setSelected(loaded.dashboards[0]?.id ?? null);
+        // The nav links here with the id of the dashboard it was on.
+        const asked = decodeURIComponent(window.location.hash.slice(1));
+        const start = loaded.dashboards.find((d) => d.id === asked) ?? loaded.dashboards[0];
+        setSelected(start?.id ?? null);
       })
       .catch((cause: unknown) => setNotice({ kind: "error", text: errorMessage(cause) }));
   }, []);
