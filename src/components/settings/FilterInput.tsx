@@ -1,8 +1,11 @@
-import { useId } from "react";
+import { useId, useLayoutEffect, useRef } from "react";
 
 import { type Offer, suggestFilter } from "../../lib/pacts/filter";
 
-/** A filter expression with completions for its last term and the parse error below it. */
+/**
+ * A filter expression, shown whole, with completions for its last term and the parse error
+ * below it.
+ */
 export function FilterInput({
   value,
   onChange,
@@ -17,26 +20,52 @@ export function FilterInput({
   validate(value: string): string | null;
   placeholder: string;
 }) {
-  const listId = useId();
   const errorId = useId();
+  const area = useRef<HTMLTextAreaElement>(null);
   const error = validate(value);
+  const termStart = value.length - /[^\s(]*$/.exec(value)![0].length;
+
+  // shortcut: the height is set on render, not on resize, so a narrower window can clip the
+  // last line until the next edit; observe the size if that shows.
+  useLayoutEffect(() => {
+    const element = area.current;
+    if (!element) return;
+    element.style.height = "auto";
+    element.style.height = `${element.scrollHeight + element.offsetHeight - element.clientHeight}px`;
+  });
+
   return (
-    <div>
-      <input
-        list={listId}
+    <div className="group">
+      <textarea
+        ref={area}
+        rows={1}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         aria-invalid={error !== null}
         aria-describedby={error ? errorId : undefined}
         spellCheck={false}
-        className="field w-full font-mono aria-invalid:border-red-400"
+        className="field block w-full resize-none overflow-hidden font-mono aria-invalid:border-red-400"
       />
-      <datalist id={listId}>
+      <ul
+        aria-label="Completions"
+        className="mt-1 hidden max-h-24 flex-wrap gap-1 overflow-auto group-focus-within:flex"
+      >
         {suggestFilter(value, offer).map((option) => (
-          <option key={option} value={option} />
+          <li key={option}>
+            <button
+              type="button"
+              onClick={() => {
+                onChange(option);
+                area.current?.focus();
+              }}
+              className="btn btn-sm font-mono"
+            >
+              {option.slice(termStart)}
+            </button>
+          </li>
         ))}
-      </datalist>
+      </ul>
       {error && (
         <p id={errorId} className="mt-0.5 text-xs text-red-700">
           {error}
