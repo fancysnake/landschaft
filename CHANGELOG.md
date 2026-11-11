@@ -7,18 +7,31 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [5.3.0] - 2026-11-11
+
+### Added
+
+- A filter field in settings grows to show its whole expression, with the completions for the
+  last term as buttons under it.
+- The Settings link on a dashboard opens settings on that dashboard.
+- `POST /api/sync` takes `"stale": true`, which leaves out the repos synced within the last
+  minute. Every page load starts that sync.
+
 ### Changed
 
 - Repos switched off sync like those switched on: the background sync no longer puts them last,
   and Refresh and full resync cover every repo.
-- Every page load starts the same sync as Refresh, leaving out the repos synced within the last
-  minute. `POST /api/sync` takes `"stale": true` for that.
 - landschaft describes itself as a structured inbox for GitHub work, in the docs, the CLI help
   and the package metadata. Config, API and code keep `board` and `inbox` as the two layouts.
-- The docs page "How the board works" is now "Reference", at `/reference/`, and
-  `/board/` is gone. A new page, "A working setup", walks through the three dashboards of the example config.
+- The docs page "How the board works" is "Reference", at `/reference/`, and `/board/` is gone.
+  A page, "A working setup", walks through the three dashboards of the example config.
 - The example config is an action inbox, a planning board and a parking board. It states its
   config version, so loading it no longer adds a "Failed CI" lane to its boards.
+
+### Fixed
+
+- `has:pr` holds for a failed CI job whose PR closed unmerged. The job is `is:closed`, greyed
+  with a `closed` pill, and stays for the dashboard's `closedDays`.
 
 ## [5.2.0] - 2026-11-07
 
@@ -350,7 +363,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v5.2.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v5.3.0...HEAD
+[5.3.0]: https://github.com/fancysnake/landschaft/compare/v5.2.0...v5.3.0
 [5.2.0]: https://github.com/fancysnake/landschaft/compare/v5.1.0...v5.2.0
 [5.1.0]: https://github.com/fancysnake/landschaft/compare/v5.0.0...v5.1.0
 [5.0.0]: https://github.com/fancysnake/landschaft/compare/v4.4.0...v5.0.0
