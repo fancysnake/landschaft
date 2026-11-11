@@ -30,7 +30,7 @@ Add the engine to the `package.json` of a repo of your own:
 
 - [Getting started](getting-started.md) — install, run, pin the engine
 - [Configuration](configuration.md) — every field of `landschaft.config.json`
-- [A working setup](workflow.md) — three real dashboards and how they get used
+- [A working setup](workflow.md) — three dashboards and how they get used
 - [Reference](reference.md) — inboxes, filters, sync, sub-issues
 - [CLI](cli.md) — the commands that run and build it
 - [API](api.md) — the local JSON endpoints the islands talk to
