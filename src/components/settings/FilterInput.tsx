@@ -23,7 +23,6 @@ export function FilterInput({
   const errorId = useId();
   const area = useRef<HTMLTextAreaElement>(null);
   const error = validate(value);
-  const termStart = value.length - /[^\s(]*$/.exec(value)![0].length;
 
   // shortcut: the height is set on render, not on resize, so a narrower window can clip the
   // last line until the next edit; observe the size if that shows.
@@ -51,17 +50,17 @@ export function FilterInput({
         aria-label="Completions"
         className="mt-1 hidden max-h-24 flex-wrap gap-1 overflow-auto group-focus-within:flex"
       >
-        {suggestFilter(value, offer).map((option) => (
-          <li key={option}>
+        {suggestFilter(value, offer).map(({ text, label }) => (
+          <li key={text}>
             <button
               type="button"
               onClick={() => {
-                onChange(option);
+                onChange(text);
                 area.current?.focus();
               }}
               className="btn btn-sm font-mono"
             >
-              {option.slice(termStart)}
+              {label}
             </button>
           </li>
         ))}
