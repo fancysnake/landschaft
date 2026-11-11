@@ -97,6 +97,7 @@ interface CommitAuthors {
 export interface CiBranchNode {
   associatedPullRequests: { nodes: { number: number; url: string }[] };
   mergedPullRequests: { nodes: { headRefOid: string }[] };
+  closedPullRequests: { nodes: { number: number; url: string; headRefOid: string }[] };
   target: {
     oid: string;
     url: string;
@@ -188,11 +189,15 @@ export function toCiJobs(
   // Merged: its head is the newest merged PR's, or the default branch holds all of it.
   if (node.mergedPullRequests.nodes[0]?.headRefOid === target.oid || compare?.aheadBy === 0)
     return [];
+  // Without an open PR, the newest closed one whose head is this commit ran the checks.
+  const closed = node.closedPullRequests.nodes[0];
   const head: HeadOf = {
     repo,
     branch,
     authors: loginsOf(compare ? compare.commits : target.history),
-    pr: node.associatedPullRequests.nodes[0] ?? null,
+    pr:
+      node.associatedPullRequests.nodes[0] ??
+      (closed?.headRefOid === target.oid ? { number: closed.number, url: closed.url } : null),
   };
   // Also merges a job an app reports as a check run and as a commit status alike.
   const newest = new Map<string, Run>();
@@ -230,6 +235,9 @@ function ciBranchFields(index: number, suites: boolean): string {
     mergedPullRequests: associatedPullRequests(
       states: MERGED, first: 1, orderBy: { field: CREATED_AT, direction: DESC }
     ) { nodes { headRefOid } }
+    closedPullRequests: associatedPullRequests(
+      states: CLOSED, first: 1, orderBy: { field: CREATED_AT, direction: DESC }
+    ) { nodes { number url headRefOid } }
     target { ... on Commit {
       oid
       url

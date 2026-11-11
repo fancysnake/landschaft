@@ -90,7 +90,7 @@ export interface CiJob {
   url: string;
   failedAt: string;
   authors: string[];
-  /** The open PR from the branch. */
+  /** The open PR from the branch, else the closed one its head commit ran for. */
   pr: { number: number; url: string } | null;
 }
 

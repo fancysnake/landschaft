@@ -33,6 +33,7 @@ const checkRun = (
 const branch = (contexts: CiContext[], history = commits("ann")): CiBranchNode => ({
   associatedPullRequests: { nodes: [{ number: 4, url: "https://github.com/acme/app/pull/4" }] },
   mergedPullRequests: { nodes: [] },
+  closedPullRequests: { nodes: [] },
   target: {
     oid: "abc",
     url: "https://github.com/acme/app/commit/abc",
@@ -43,6 +44,15 @@ const branch = (contexts: CiContext[], history = commits("ann")): CiBranchNode =
 const base = (aheadBy: number, ahead = commits()): DefaultBranchNode => ({
   name: "main",
   compare: { aheadBy, commits: ahead },
+});
+
+/** A failing branch with no open PR, and a closed one whose head is `headRefOid`. */
+const closed = (headRefOid: string): CiBranchNode => ({
+  ...branch([checkRun("test", "FAILURE")]),
+  associatedPullRequests: { nodes: [] },
+  closedPullRequests: {
+    nodes: [{ number: 7, url: "https://github.com/acme/app/pull/7", headRefOid }],
+  },
 });
 
 describe("toCiJobs", () => {
@@ -163,6 +173,14 @@ describe("toCiJobs", () => {
     const pushedSince = { ...head, mergedPullRequests: { nodes: [{ headRefOid: "old" }] } };
     expect(toCiJobs("acme/app", "x", pushedSince, base(2))).toHaveLength(1);
     expect(toCiJobs("acme/app", "x", head, { name: "main", compare: null })).toHaveLength(1);
+  });
+
+  it("takes the closed PR the head commit ran for when no PR is open", () => {
+    expect(toCiJobs("acme/app", "x", closed("abc"), null)[0]?.pr).toEqual({
+      number: 7,
+      url: "https://github.com/acme/app/pull/7",
+    });
+    expect(toCiJobs("acme/app", "x", closed("old"), null)[0]?.pr).toBeNull();
   });
 });
 
