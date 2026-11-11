@@ -1,38 +1,27 @@
 // @vitest-environment happy-dom
-import { act, createElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { act } from "react";
 
+import { renderHook } from "./renderHook";
 import { useDebouncedText } from "./useDebouncedText";
-
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const valid = (text: string) => !text.includes("!");
 const onCommit = vi.fn();
-let root: Root;
-const result: { current: ReturnType<typeof useDebouncedText> | null } = { current: null };
-const report = (value: ReturnType<typeof useDebouncedText>) => {
-  result.current = value;
-};
 
 type Options = Parameters<typeof useDebouncedText>[2];
 
-function Probe({ committed, options }: { committed: string; options: Options }) {
-  report(useDebouncedText(committed, onCommit, options));
-  return null;
-}
+const { result, render } = renderHook((committed: string, options: Options) =>
+  useDebouncedText(committed, onCommit, options),
+);
 
-const show = (committed: string, options: Options = { valid }) =>
-  act(async () => root.render(createElement(Probe, { committed, options })));
+const show = (committed: string, options: Options = { valid }) => render(committed, options);
 const type = (text: string) => act(async () => result.current![1](text));
 const wait = (ms: number) => act(async () => vi.advanceTimersByTime(ms));
 
-beforeEach(async () => {
+beforeEach(() => {
   vi.useFakeTimers();
-  root = createRoot(document.createElement("div"));
 });
 
-afterEach(async () => {
-  await act(async () => root.unmount());
+afterEach(() => {
   vi.useRealTimers();
   vi.resetAllMocks();
 });

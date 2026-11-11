@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
-import { act, createElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { act } from "react";
 
 import type { Filters } from "../pacts/views";
 
 import { api, type BoardResponse } from "./api";
-import { type BoardController, useBoard } from "./useBoard";
+import { renderHook } from "./renderHook";
+import { useBoard } from "./useBoard";
 import { SYNCED } from "./useSyncStatus";
 
 vi.mock("./api", async (importOriginal) => {
@@ -13,31 +13,15 @@ vi.mock("./api", async (importOriginal) => {
   return { ...actual, api: { board: vi.fn() } };
 });
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-
 const response = () => ({ status: { version: 1 } }) as BoardResponse;
 
-const roots: Root[] = [];
-
 async function renderBoard(initial: Filters) {
-  const root = createRoot(document.createElement("div"));
-  roots.push(root);
-  const result: { current: BoardController | null } = { current: null };
-  const report = (board: BoardController) => {
-    result.current = board;
-  };
-  function Probe({ filters }: { filters: Filters }) {
-    report(useBoard("main", filters));
-    return null;
-  }
-  const render = (filters: Filters) =>
-    act(async () => root.render(createElement(Probe, { filters })));
-  await render(initial);
-  return { result, render };
+  const board = renderHook((filters: Filters) => useBoard("main", filters));
+  await board.render(initial);
+  return board;
 }
 
-afterEach(async () => {
-  for (const root of roots.splice(0)) await act(async () => root.unmount());
+afterEach(() => {
   vi.resetAllMocks();
 });
 

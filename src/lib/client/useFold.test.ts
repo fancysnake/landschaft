@@ -1,31 +1,11 @@
 // @vitest-environment happy-dom
-import { act, createElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { act } from "react";
 
+import { renderHook } from "./renderHook";
 import { useFold } from "./useFold";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-
-let root: Root;
-const result: { current: ReturnType<typeof useFold> | null } = { current: null };
-const report = (value: ReturnType<typeof useFold>) => {
-  result.current = value;
-};
-
-function Probe({ configured }: { configured: boolean }) {
-  report(useFold(configured));
-  return null;
-}
-
-const show = (configured: boolean) =>
-  act(async () => root.render(createElement(Probe, { configured })));
+const { result, render: show } = renderHook(useFold);
 const toggle = () => act(async () => result.current![1]());
-
-beforeEach(() => {
-  root = createRoot(document.createElement("div"));
-});
-
-afterEach(() => act(async () => root.unmount()));
 
 describe("useFold", () => {
   it("follows the config until toggled", async () => {

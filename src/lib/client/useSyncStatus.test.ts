@@ -1,40 +1,27 @@
 // @vitest-environment happy-dom
-import { act, createElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { act } from "react";
 
 import type { SyncStatus } from "../pacts/sync";
 
 import { api } from "./api";
-import { SYNCED, type SyncController, useSyncStatus } from "./useSyncStatus";
+import { renderHook } from "./renderHook";
+import { SYNCED, useSyncStatus } from "./useSyncStatus";
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return { ...actual, api: { sync: vi.fn(), version: vi.fn() } };
 });
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-
 const status = (version: number, extra: Partial<SyncStatus> = {}) =>
   ({ version, runs: 0, inFlight: [], lastError: null, ...extra }) as SyncStatus;
 
-let root: Root;
-
 async function renderStatus() {
-  root = createRoot(document.createElement("div"));
-  const result: { current: SyncController | null } = { current: null };
-  const report = (controller: SyncController) => {
-    result.current = controller;
-  };
-  function Probe() {
-    report(useSyncStatus());
-    return null;
-  }
-  await act(async () => root.render(createElement(Probe)));
+  const { result, render } = renderHook(useSyncStatus);
+  await render();
   return result;
 }
 
-afterEach(async () => {
-  await act(async () => root.unmount());
+afterEach(() => {
   vi.resetAllMocks();
 });
 
