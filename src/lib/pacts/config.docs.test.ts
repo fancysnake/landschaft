@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 
+import { rows, section } from "../__fixtures__/markdown";
 import { ConfigSchema, DashboardSchema, InboxGroupSchema } from "./config";
 
 const page = readFileSync(new URL("../../../docs/configuration.md", import.meta.url), "utf8");
@@ -18,14 +19,12 @@ function parseDefault(cell: string): unknown {
 
 /** The fields of the table under `heading`, and the defaults of those that have one. */
 function table(heading: string) {
-  const section = page.split(`## ${heading}\n`)[1]?.split("\n## ")[0] ?? "";
-  const cells = section
-    .split("\n")
-    .filter((line) => line.startsWith("| `"))
-    .map((line): [string, unknown] => {
-      const [, field = "", , cell = ""] = line.split(/(?<!\\)\|/).map((text) => text.trim());
-      return [field.replaceAll("`", ""), parseDefault(cell)];
-    });
+  const cells = rows(section(page, heading), "Field").map(
+    ([field = "", , cell = ""]): [string, unknown] => [
+      field.replaceAll("`", ""),
+      parseDefault(cell),
+    ],
+  );
   return {
     fields: cells.map(([field]) => field),
     defaults: Object.fromEntries(cells.filter(([, value]) => value !== undefined)),
