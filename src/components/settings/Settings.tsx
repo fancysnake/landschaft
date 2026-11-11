@@ -107,6 +107,8 @@ export default function Settings() {
   };
 
   const current = config.dashboards.find((d) => d.id === selected) ?? config.dashboards[0];
+  // Pin the fallback, or moving it away would swap the open editor.
+  if (current && current.id !== selected) setSelected(current.id);
   const offer = {
     labels: [...new Set(catalog.map((label) => label.name))],
     repos: config.repos,
