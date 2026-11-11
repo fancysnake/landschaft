@@ -3,8 +3,8 @@ import { act } from "react";
 
 import type { Filters } from "../pacts/views";
 
+import { renderHook } from "../__fixtures__/renderHook";
 import { api, type BoardResponse } from "./api";
-import { renderHook } from "./renderHook";
 import { useBoard } from "./useBoard";
 import { SYNCED } from "./useSyncStatus";
 
@@ -15,11 +15,7 @@ vi.mock("./api", async (importOriginal) => {
 
 const response = () => ({ status: { version: 1 } }) as BoardResponse;
 
-async function renderBoard(initial: Filters) {
-  const board = renderHook((filters: Filters) => useBoard("main", filters));
-  await board.render(initial);
-  return board;
-}
+const { result, render } = renderHook((filters: Filters) => useBoard("main", filters));
 
 afterEach(() => {
   vi.resetAllMocks();
@@ -30,7 +26,7 @@ const synced = (version: number) =>
 
 test("a landed sync reloads the board with the current query", async () => {
   vi.mocked(api.board).mockImplementation(() => Promise.resolve(response()));
-  const { render } = await renderBoard({ q: "a b" });
+  await render({ q: "a b" });
   await render({ q: "a" });
   const calls = vi.mocked(api.board).mock.calls.length;
 
@@ -50,12 +46,12 @@ test("a stale board response does not replace a newer one", async () => {
     pending.push({ board, resolve: () => resolve(board) });
     return promise;
   });
-  const { result, render } = await renderBoard({ q: "a b" });
+  await render({ q: "a b" });
   await render({ q: "a" });
 
   const [older, newer] = pending;
   await act(async () => newer.resolve());
   await act(async () => older.resolve());
 
-  expect(result.current!.data).toBe(newer.board);
+  expect(result.current.data).toBe(newer.board);
 });
