@@ -17,13 +17,13 @@ import { InvalidError, SyncBusyError } from "../pacts/services";
 import { closedSince, nextDue, staleRepos, type SyncDeps, Syncer } from "./sync";
 
 interface ForgeData {
-  /** Pages of issues and of PRs; a page's cursor is the index of the next one. */
+  /** Pages of issues, of PRs and of CI branches; a page's cursor is the index of the next one. */
   issues?: FetchedIssue[][];
   pulls?: FetchedIssue[][];
+  branches?: CiBranch[][];
   remaining?: number;
   /** PRs whose status is conflicting. */
   conflicting?: number[];
-  branches?: CiBranch[];
   /** The jobs a job query returns for the branches it is asked for. */
   jobs?: CiJob[];
   /** Branches a job query fails on. */
@@ -43,22 +43,26 @@ function fakeForge({
   failed = [],
   broken = new Set(),
 }: ForgeData = {}) {
-  const paged = (pages: FetchedIssue[][], after: string | null): IssuesPage => {
+  const paged = <T>(pages: T[][], after: string | null) => {
     const index = after ? Number(after) : 0;
     const hasNextPage = index + 1 < pages.length;
     return {
-      issues: pages[index] ?? [],
+      items: pages[index] ?? [],
       hasNextPage,
       endCursor: hasNextPage ? String(index + 1) : null,
       rateRemaining: remaining,
     };
   };
+  const toIssuesPage = (pages: FetchedIssue[][], after: string | null): IssuesPage => {
+    const { items, ...page } = paged(pages, after);
+    return { issues: items, ...page };
+  };
   return {
     issuesPage: vi.fn(async (repo: string, options: PageOptions) => {
       if (broken.has(repo)) throw new Error("boom");
-      return paged(issues, options.after);
+      return toIssuesPage(issues, options.after);
     }),
-    pullsPage: vi.fn(async (_: string, options: PageOptions) => paged(pulls, options.after)),
+    pullsPage: vi.fn(async (_: string, options: PageOptions) => toIssuesPage(pulls, options.after)),
     pullStatuses: vi.fn(async (_: string, numbers: number[]) => ({
       statuses: numbers.map((number): PullStatus => ({
         number,
@@ -66,12 +70,10 @@ function fakeForge({
       })),
       rateRemaining: remaining,
     })),
-    ciBranchesPage: vi.fn(async (): Promise<CiBranchesPage> => ({
-      branches,
-      hasNextPage: false,
-      endCursor: null,
-      rateRemaining: remaining,
-    })),
+    ciBranchesPage: vi.fn(async (_: string, after: string | null): Promise<CiBranchesPage> => {
+      const { items, ...page } = paged(branches, after);
+      return { branches: items, ...page };
+    }),
     ciJobs: vi.fn(async (_: string, batch: CiBranch[]): Promise<CiJobsPage> => {
       const names = new Set(batch.map(({ name }) => name));
       return {
@@ -86,6 +88,9 @@ function fakeForge({
 }
 
 const issues = (...numbers: number[]) => numbers.map((number) => makeIssue({ number }));
+
+const ciBranches = (count: number): CiBranch[] =>
+  Array.from({ length: count }, (_, i) => ({ name: `b${i + 1}`, suites: false }));
 
 const EMPTY_PAGE: IssuesPage = {
   issues: [],
@@ -264,7 +269,7 @@ describe("Syncer", () => {
       { name: "feat/x", suites: false },
     ];
     const job = makeJob({ name: "lint", branch: "feat/x" });
-    const forge = fakeForge({ branches, jobs: [job] });
+    const forge = fakeForge({ branches: [branches], jobs: [job] });
 
     await syncerWith(db, forge).syncRepo(REPO);
 
@@ -272,11 +277,76 @@ describe("Syncer", () => {
     expect(db.listCiJobs([REPO])).toEqual([job]);
   });
 
+  it("pages through the CI branches by cursor and reads the jobs of them all", async () => {
+    const [first, second, third] = ciBranches(3);
+    const forge = fakeForge({ branches: [[first], [second], [third]] });
+    const serve = forge.ciBranchesPage.getMockImplementation()!;
+    forge.ciBranchesPage.mockImplementation(async (repo, after) => {
+      // A cursor the sync does not pass on would page forever instead of failing the test.
+      if (forge.ciBranchesPage.mock.calls.length > 3) throw new Error("a fourth branch page");
+      return serve(repo, after);
+    });
+    await syncerWith(db, forge).syncRepo(REPO);
+    expect(forge.ciBranchesPage.mock.calls).toEqual([
+      [REPO, null],
+      [REPO, "1"],
+      [REPO, "2"],
+    ]);
+    expect(forge.ciJobs.mock.calls).toEqual([[REPO, [first, second, third]]]);
+  });
+
+  it("asks for CI jobs 20 branches at a time", async () => {
+    const branches = ciBranches(21);
+    const jobs = [
+      makeJob({ name: "lint", branch: "b20" }),
+      makeJob({ name: "lint", branch: "b21" }),
+    ];
+    const forge = fakeForge({ branches: [branches], jobs });
+    await syncerWith(db, forge).syncRepo(REPO);
+    expect(forge.ciJobs.mock.calls.map(([, batch]) => batch)).toEqual([
+      branches.slice(0, 20),
+      branches.slice(20),
+    ]);
+    expect(db.listCiJobs([REPO])).toEqual(jobs);
+  });
+
+  it("aborts between CI branch pages when the rate limit is nearly gone", async () => {
+    const forge = fakeForge({ remaining: 50, branches: [[], ciBranches(1)] });
+    await expect(syncerWith(db, forge).syncRepo(REPO)).rejects.toThrow(/rate limit/);
+    expect(forge.ciBranchesPage).toHaveBeenCalledTimes(1);
+    expect(forge.ciJobs).not.toHaveBeenCalled();
+  });
+
+  it("aborts before the CI job queries when the rate limit is nearly gone", async () => {
+    const forge = fakeForge({ remaining: 50, branches: [ciBranches(1)] });
+    await expect(syncerWith(db, forge).syncRepo(REPO)).rejects.toThrow(/rate limit/);
+    expect(forge.ciJobs).not.toHaveBeenCalled();
+  });
+
+  it("finishes on a low rate limit when no CI branch needs a job query", async () => {
+    const forge = fakeForge({ remaining: 50 });
+    await syncerWith(db, forge).syncRepo(REPO);
+    expect(forge.ciJobs).not.toHaveBeenCalled();
+    expect(db.getSyncState(REPO)?.lastSyncAt).toBe(now.toISOString());
+  });
+
+  it("aborts between CI job batches when the rate limit is nearly gone", async () => {
+    const cached = makeJob({ name: "lint", branch: "old" });
+    db.setCiJobs(REPO, [cached]);
+    const forge = fakeForge({ branches: [ciBranches(21)] });
+    forge.ciJobs.mockResolvedValueOnce({ jobs: [], failed: [], rateRemaining: 50 });
+    const syncer = syncerWith(db, forge);
+    await expect(syncer.syncRepo(REPO)).rejects.toThrow(/rate limit/);
+    expect(forge.ciJobs).toHaveBeenCalledTimes(1);
+    expect(db.listCiJobs([REPO])).toEqual([cached]);
+    expect(syncer.status().rateRemaining).toBe(50);
+  });
+
   it("keeps the cached jobs of a branch the job query failed on and finishes", async () => {
     const cached = makeJob({ name: "lint", branch: "feat/x" });
     db.setCiJobs(REPO, [cached, { ...cached, branch: "old" }]);
     const forge = fakeForge({
-      branches: [{ name: "feat/x", suites: false }],
+      branches: [[{ name: "feat/x", suites: false }]],
       failed: ["feat/x"],
     });
     await syncerWith(db, forge).syncRepo(REPO);
