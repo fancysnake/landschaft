@@ -53,16 +53,16 @@ function fakeForge({
       rateRemaining: remaining,
     };
   };
-  const issuesPage = (pages: FetchedIssue[][], after: string | null): IssuesPage => {
+  const toIssuesPage = (pages: FetchedIssue[][], after: string | null): IssuesPage => {
     const { items, ...page } = paged(pages, after);
     return { issues: items, ...page };
   };
   return {
     issuesPage: vi.fn(async (repo: string, options: PageOptions) => {
       if (broken.has(repo)) throw new Error("boom");
-      return issuesPage(issues, options.after);
+      return toIssuesPage(issues, options.after);
     }),
-    pullsPage: vi.fn(async (_: string, options: PageOptions) => issuesPage(pulls, options.after)),
+    pullsPage: vi.fn(async (_: string, options: PageOptions) => toIssuesPage(pulls, options.after)),
     pullStatuses: vi.fn(async (_: string, numbers: number[]) => ({
       statuses: numbers.map((number): PullStatus => ({
         number,
@@ -280,6 +280,12 @@ describe("Syncer", () => {
   it("pages through the CI branches by cursor and reads the jobs of them all", async () => {
     const [first, second, third] = ciBranches(3);
     const forge = fakeForge({ branches: [[first], [second], [third]] });
+    const serve = forge.ciBranchesPage.getMockImplementation()!;
+    forge.ciBranchesPage.mockImplementation(async (repo, after) => {
+      // A cursor the sync does not pass on would page forever instead of failing the test.
+      if (forge.ciBranchesPage.mock.calls.length > 3) throw new Error("a fourth branch page");
+      return serve(repo, after);
+    });
     await syncerWith(db, forge).syncRepo(REPO);
     expect(forge.ciBranchesPage.mock.calls).toEqual([
       [REPO, null],
@@ -305,8 +311,7 @@ describe("Syncer", () => {
   });
 
   it("aborts between CI branch pages when the rate limit is nearly gone", async () => {
-    const [first, second] = ciBranches(2);
-    const forge = fakeForge({ remaining: 50, branches: [[first], [second]] });
+    const forge = fakeForge({ remaining: 50, branches: [[], ciBranches(1)] });
     await expect(syncerWith(db, forge).syncRepo(REPO)).rejects.toThrow(/rate limit/);
     expect(forge.ciBranchesPage).toHaveBeenCalledTimes(1);
     expect(forge.ciJobs).not.toHaveBeenCalled();
