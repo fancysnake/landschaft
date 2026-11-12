@@ -40,7 +40,7 @@ export function FilterBar({ filters, facets, onChange }: Props) {
       </select>
       <select
         aria-label="Label"
-        value={filters.label ?? ""}
+        value={facets.selected.label}
         onChange={(event) => onChange({ label: event.target.value || undefined })}
         className="field"
       >
@@ -54,7 +54,7 @@ export function FilterBar({ filters, facets, onChange }: Props) {
       {facets.types.length > 0 && (
         <select
           aria-label="Type"
-          value={filters.type ?? ""}
+          value={facets.selected.type}
           onChange={(event) => onChange({ type: event.target.value || undefined })}
           className="field"
         >
@@ -69,7 +69,7 @@ export function FilterBar({ filters, facets, onChange }: Props) {
       {facets.jobs.length > 0 && (
         <select
           aria-label="CI job"
-          value={filters.job ?? ""}
+          value={facets.selected.job}
           onChange={(event) => onChange({ job: event.target.value || undefined })}
           className="field"
         >

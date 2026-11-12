@@ -908,6 +908,36 @@ describe("buildBoard", () => {
     expect(board.types).toEqual(["Bug", "Task"]);
   });
 
+  it("offers each CI job once, in the first spelling seen", () => {
+    const jobs = [makeJob({ name: "Lint" }), makeJob({ name: "lint", branch: "feat/y" })];
+    const board = buildBoard(snapshot([], jobs), DASHBOARD, EVERYONE);
+    expect(board.jobs).toEqual(["Lint"]);
+  });
+
+  it("selects the offered spelling of a filter in any case", () => {
+    const issues = [makeIssue({ number: 1, issueType: "Bug", labels: [label("Bug")] })];
+    const jobs = [makeJob({ name: "lint" })];
+    const query = { label: "BUG", type: "bug", job: "LINT" };
+    const board = buildBoard(snapshot(issues, jobs), DASHBOARD, { ...EVERYONE, query });
+    expect(board.selected).toEqual({ label: "Bug", type: "Bug", job: "lint" });
+    expect(board.labels).toEqual(["Bug"]);
+  });
+
+  it("offers and selects a filter value no item carries", () => {
+    const issues = [makeIssue({ number: 1, issueType: "Bug", labels: [label("bug")] })];
+    const query = { label: "wontfix", type: "Epic", job: "lint" };
+    const board = buildBoard(snapshot(issues), DASHBOARD, { ...EVERYONE, query });
+    expect(board.selected).toEqual(query);
+    expect(board.labels).toEqual(["bug", "wontfix"]);
+    expect(board.types).toEqual(["Bug", "Epic"]);
+    expect(board.jobs).toEqual(["lint"]);
+  });
+
+  it("selects nothing without a filter", () => {
+    const board = buildBoard(snapshot([makeIssue({ number: 1 })]), DASHBOARD, EVERYONE);
+    expect(board.selected).toEqual({ label: "", type: "", job: "" });
+  });
+
   it("shows each issue's type on its card", () => {
     const issues = [
       makeIssue({ number: 1, issueType: "Bug" }),

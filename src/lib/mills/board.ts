@@ -292,6 +292,26 @@ function placer(dashboard: Dashboard, viewer: string | null): (item: FilterItem)
   return (item) => passes(item) && placeOnGrid(grid, item, viewer) !== null;
 }
 
+const lowerCase = (name: string) => name.toLowerCase();
+
+/**
+ * The first spelling of each of `names` by `key`, sorted, and the one `wanted` selects, added
+ * when none matches it, so a select shows every filter that applies.
+ */
+function optionsOf(
+  names: string[],
+  key: (name: string) => string,
+  wanted: string | undefined,
+): { options: string[]; selected: string } {
+  const byKey = new Map<string, string>();
+  for (const name of [...names, ...(wanted ? [wanted] : [])])
+    if (!byKey.has(key(name))) byKey.set(key(name), name);
+  return {
+    options: [...byKey.values()].toSorted(),
+    selected: wanted ? byKey.get(key(wanted))! : "",
+  };
+}
+
 /**
  * The repo chips, the `hidden` ones among them, filter options and sort of a view over `items`,
  * offering the `shown` labels.
@@ -305,31 +325,28 @@ function facetsOf(
 ): Facets {
   const repos = new Set<string>();
   const assignees = new Set<string>();
-  /** First spelling seen of each label, by its `labelKey`. */
-  const labels = new Map<string, string>();
-  /** First spelling seen of each issue type, by its lower case. */
-  const types = new Map<string, string>();
-  const jobs = new Set<string>();
+  const labels: string[] = [];
+  const types: string[] = [];
+  const jobs: string[] = [];
   for (const item of items) {
     repos.add(item.repo);
     for (const assignee of item.assignees) assignees.add(assignee.login);
-    for (const label of item.labels.filter(shown)) {
-      const key = labelKey(label.name);
-      if (!labels.has(key)) labels.set(key, label.name);
-    }
-    if (item.issueType && !types.has(item.issueType.toLowerCase())) {
-      types.set(item.issueType.toLowerCase(), item.issueType);
-    }
-    if (item.kind === "ci-job" && item.name !== null) jobs.add(item.name);
+    for (const label of item.labels.filter(shown)) labels.push(label.name);
+    if (item.issueType) types.push(item.issueType);
+    if (item.kind === "ci-job" && item.name !== null) jobs.push(item.name);
   }
+  const label = optionsOf(labels, labelKey, filters.label);
+  const type = optionsOf(types, lowerCase, filters.type);
+  const job = optionsOf(jobs, lowerCase, filters.job);
   const chips = [...repos].toSorted();
   return {
     repos: chips,
     hidden: chips.filter((repo) => hidden.includes(repo)),
     assignees: [...assignees].toSorted(),
-    labels: [...labels.values()].toSorted(),
-    types: [...types.values()].toSorted(),
-    jobs: [...jobs].toSorted(),
+    labels: label.options,
+    types: type.options,
+    jobs: job.options,
+    selected: { label: label.selected, type: type.selected, job: job.selected },
     sort: { by: filters.sort ?? sort.by, dir: filters.dir ?? sort.dir },
   };
 }
