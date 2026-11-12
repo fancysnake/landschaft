@@ -1,6 +1,7 @@
 import type { Facets } from "../../lib/pacts/views";
 
 import { useDebouncedText } from "../../lib/client/useDebouncedText";
+import { labelKey } from "../../lib/pacts/filter";
 import { type Filters, TEXT_FILTER_KEYS } from "../../lib/pacts/views";
 
 interface Props {
@@ -8,6 +9,14 @@ interface Props {
   /** Of the view it filters. */
   facets: Facets;
   onChange(patch: Partial<Filters>): void;
+}
+
+const lowerCase = (name: string) => name.toLowerCase();
+
+/** The option a filter value selects: filtering ignores case, a select does not. */
+function optionFor(value: string | undefined, options: string[], key = lowerCase): string {
+  if (value === undefined) return "";
+  return options.find((option) => key(option) === key(value)) ?? value;
 }
 
 export function FilterBar({ filters, facets, onChange }: Props) {
@@ -40,7 +49,7 @@ export function FilterBar({ filters, facets, onChange }: Props) {
       </select>
       <select
         aria-label="Label"
-        value={filters.label ?? ""}
+        value={optionFor(filters.label, facets.labels, labelKey)}
         onChange={(event) => onChange({ label: event.target.value || undefined })}
         className="field"
       >
@@ -54,7 +63,7 @@ export function FilterBar({ filters, facets, onChange }: Props) {
       {facets.types.length > 0 && (
         <select
           aria-label="Type"
-          value={filters.type ?? ""}
+          value={optionFor(filters.type, facets.types)}
           onChange={(event) => onChange({ type: event.target.value || undefined })}
           className="field"
         >
@@ -69,7 +78,7 @@ export function FilterBar({ filters, facets, onChange }: Props) {
       {facets.jobs.length > 0 && (
         <select
           aria-label="CI job"
-          value={filters.job ?? ""}
+          value={optionFor(filters.job, facets.jobs)}
           onChange={(event) => onChange({ job: event.target.value || undefined })}
           className="field"
         >
