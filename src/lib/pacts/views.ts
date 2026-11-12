@@ -56,6 +56,8 @@ export interface Facets {
   types: string[];
   /** Names of the failed CI jobs among the dashboard's items. */
   jobs: string[];
+  /** The option each filter selects, in its offered spelling; "" when unfiltered. */
+  selected: { label: string; type: string; job: string };
   sort: { by: SortBy; dir: SortDir };
 }
 
