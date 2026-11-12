@@ -1,40 +1,23 @@
 // @vitest-environment happy-dom
-import { act, createElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { act } from "react";
 
 import type { SyncStatus } from "../pacts/sync";
 
+import { renderHook } from "../__fixtures__/renderHook";
 import { api } from "./api";
-import { SYNCED, type SyncController, useSyncStatus } from "./useSyncStatus";
+import { SYNCED, useSyncStatus } from "./useSyncStatus";
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return { ...actual, api: { sync: vi.fn(), version: vi.fn() } };
 });
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-
 const status = (version: number, extra: Partial<SyncStatus> = {}) =>
   ({ version, boot: "a", runs: 0, inFlight: [], lastError: null, ...extra }) as SyncStatus;
 
-let root: Root;
+const { result, render } = renderHook(useSyncStatus);
 
-async function renderStatus() {
-  root = createRoot(document.createElement("div"));
-  const result: { current: SyncController | null } = { current: null };
-  const report = (controller: SyncController) => {
-    result.current = controller;
-  };
-  function Probe() {
-    report(useSyncStatus());
-    return null;
-  }
-  await act(async () => root.render(createElement(Probe)));
-  return result;
-}
-
-afterEach(async () => {
-  await act(async () => root.unmount());
+afterEach(() => {
   vi.resetAllMocks();
 });
 
@@ -45,8 +28,8 @@ test("a changed version is announced, the first one is not", async () => {
   vi.mocked(api.version).mockResolvedValue(status(1));
   vi.mocked(api.sync).mockResolvedValue({ status: status(2), run: 1 });
 
-  const result = await renderStatus();
-  await act(() => result.current!.sync());
+  await render();
+  await act(() => result.current.sync());
 
   window.removeEventListener(SYNCED, listen);
   expect(announced).toEqual([2]);
@@ -61,17 +44,17 @@ test("a sync waits for its run and reports the errors it ended with", async () =
     .mockResolvedValue(status(3, { runs: 2, lastError: "rate limited" }));
   vi.mocked(api.sync).mockResolvedValue({ status: status(1, { runs: 1 }), run: 2 });
 
-  const result = await renderStatus();
-  await act(() => result.current!.sync());
-  expect(result.current!.syncing).toBe(true);
+  await render();
+  await act(() => result.current.sync());
+  expect(result.current.syncing).toBe(true);
 
   await poll();
-  expect(result.current!.error).toBeNull();
-  expect(result.current!.syncing).toBe(true);
+  expect(result.current.error).toBeNull();
+  expect(result.current.syncing).toBe(true);
 
   await poll();
-  expect(result.current!.error).toBe("rate limited");
-  expect(result.current!.syncing).toBe(false);
+  expect(result.current.error).toBe("rate limited");
+  expect(result.current.syncing).toBe(false);
 });
 
 test("an older run answering last does not end the wait for a newer one", async () => {
@@ -87,11 +70,11 @@ test("an older run answering last does not end the wait for a newer one", async 
       }),
   );
 
-  const result = await renderStatus();
+  await render();
   let older!: Promise<void>, newer!: Promise<void>;
   act(() => {
-    older = result.current!.sync({ repos: ["o/a"] });
-    newer = result.current!.sync({ repos: ["o/b"] });
+    older = result.current.sync({ repos: ["o/a"] });
+    newer = result.current.sync({ repos: ["o/b"] });
   });
   await act(async () => {
     answers[1]!(3);
@@ -103,11 +86,11 @@ test("an older run answering last does not end the wait for a newer one", async 
   });
 
   await poll();
-  expect(result.current!.syncing).toBe(true);
+  expect(result.current.syncing).toBe(true);
 
   await poll();
-  expect(result.current!.error).toBe("rate limited");
-  expect(result.current!.syncing).toBe(false);
+  expect(result.current.error).toBe("rate limited");
+  expect(result.current.syncing).toBe(false);
 });
 
 test("a server restart ends the wait and reports the sync as interrupted", async () => {
@@ -116,21 +99,21 @@ test("a server restart ends the wait and reports the sync as interrupted", async
     .mockResolvedValue(status(0, { boot: "b" }));
   vi.mocked(api.sync).mockResolvedValue({ status: status(7, { runs: 4 }), run: 5 });
 
-  const result = await renderStatus();
-  await act(() => result.current!.sync());
-  expect(result.current!.syncing).toBe(true);
+  await render();
+  await act(() => result.current.sync());
+  expect(result.current.syncing).toBe(true);
 
   await poll();
-  expect(result.current!.error).toBe("Sync interrupted: the server restarted");
-  expect(result.current!.syncing).toBe(false);
+  expect(result.current.error).toBe("Sync interrupted: the server restarted");
+  expect(result.current.syncing).toBe(false);
 });
 
 test("a refused sync is reported", async () => {
   vi.mocked(api.version).mockResolvedValue(status(1));
   vi.mocked(api.sync).mockRejectedValue(new Error("409"));
 
-  const result = await renderStatus();
-  await act(() => result.current!.sync());
+  await render();
+  await act(() => result.current.sync());
 
-  expect(result.current!.error).toBe("Sync failed: 409");
+  expect(result.current.error).toBe("Sync failed: 409");
 });
