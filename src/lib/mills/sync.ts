@@ -242,15 +242,21 @@ export class Syncer implements SyncService {
         ? startedAt.getTime() - Date.parse(state.lastFullSyncAt)
         : Number.POSITIVE_INFINITY;
       const full = Boolean(options.full) || !state?.lastSyncAt || fullAge > FULL_SYNC_MAX_AGE_MS;
-      const since =
-        full || !state?.lastSyncAt
-          ? null
-          : new Date(Date.parse(state.lastSyncAt) - SINCE_OVERLAP_MS).toISOString();
+      const previous = state?.lastSyncAt
+        ? Date.parse(state.lastSyncAt) - SINCE_OVERLAP_MS
+        : Number.NEGATIVE_INFINITY;
+      const since = full || !Number.isFinite(previous) ? null : new Date(previous).toISOString();
 
       const seen = new Set<number>();
       const query: Omit<PageOptions, "after"> = { since, states: full ? "open" : "all" };
       let upserted = 0;
-      const cutoff = closedSince(full ? closedDays(this.config()) : 0, startedAt);
+      const days = closedDays(this.config());
+      const windowStart = closedSince(days, startedAt);
+      // The cache holds the window up to the previous sync, unless a user doubts it or it grew.
+      const refill = Boolean(options.full) || days > (state?.closedDays ?? -1);
+      let cutoff = Number.POSITIVE_INFINITY;
+      if (refill) cutoff = windowStart;
+      else if (full) cutoff = Math.max(windowStart, previous);
       const closedFrom = Number.isFinite(cutoff) ? new Date(cutoff).toISOString() : null;
       const fetchers: Forge["issuesPage"][] = [
         (r, o) => this.forge.issuesPage(r, o),
@@ -277,6 +283,8 @@ export class Syncer implements SyncService {
       this.db.setSyncState(repo, {
         lastSyncAt: stamp,
         lastFullSyncAt: full ? stamp : (state?.lastFullSyncAt ?? null),
+        // An incremental sync keeps a longer record: it fetched every close since that fill.
+        closedDays: full || refill ? days : (state?.closedDays ?? null),
         lastError: null,
         lastAttemptAt: stamp,
       });

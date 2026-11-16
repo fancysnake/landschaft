@@ -34,6 +34,26 @@ describe("Db migration", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it("adds the closed window column and keeps the sync state", () => {
+    const dir = mkdtempSync(join(tmpdir(), "landschaft-db-"));
+    const file = join(dir, "old.db");
+    new Db(file).close();
+    const raw = new DatabaseSync(file);
+    raw.exec(`
+      ALTER TABLE sync_state DROP COLUMN closed_days;
+      INSERT INTO sync_state (repo, last_sync_at) VALUES ('acme/app', '2026-01-01T00:00:00Z');
+    `);
+    raw.close();
+
+    const db = new Db(file);
+    expect(db.getSyncState("acme/app")).toMatchObject({
+      lastSyncAt: "2026-01-01T00:00:00Z",
+      closedDays: null,
+    });
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("drops cached statuses that are not PR status labels", () => {
     const dir = mkdtempSync(join(tmpdir(), "landschaft-db-"));
     const file = join(dir, "old.db");
@@ -138,12 +158,14 @@ describe("Db", () => {
     db.setSyncState(REPO, {
       lastSyncAt: "2026-01-01T00:00:00Z",
       lastFullSyncAt: "2026-01-01T00:00:00Z",
+      closedDays: 7,
     });
     db.setSyncState(REPO, { lastError: "boom" });
     expect(db.getSyncState(REPO)).toEqual({
       repo: REPO,
       lastSyncAt: "2026-01-01T00:00:00Z",
       lastFullSyncAt: "2026-01-01T00:00:00Z",
+      closedDays: 7,
       lastError: "boom",
       lastAttemptAt: null,
     });

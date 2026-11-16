@@ -111,6 +111,10 @@ const syncerWith = (db: Db, forge: Forge, deps: Partial<SyncDeps> = {}) =>
     ...deps,
   });
 
+/** A config of `REPO` whose one dashboard shows the items closed within `days`. */
+const closedWindow = (days: number) => () =>
+  ConfigSchema.parse({ repos: [REPO], dashboards: [{ ...DASHBOARD, closedDays: days }] });
+
 describe("Syncer", () => {
   let db: Db;
 
@@ -150,10 +154,7 @@ describe("Syncer", () => {
 
   it("also fetches the items closed within the window on a full sync", async () => {
     const forge = fakeForge({ issues: [issues(1)] });
-    const syncer = syncerWith(db, forge, {
-      config: () =>
-        ConfigSchema.parse({ repos: [REPO], dashboards: [{ ...DASHBOARD, closedDays: 7 }] }),
-    });
+    const syncer = syncerWith(db, forge, { config: closedWindow(7) });
 
     await syncer.syncRepo(REPO);
 
@@ -166,6 +167,82 @@ describe("Syncer", () => {
       "open",
       "closed",
     ]);
+  });
+
+  it.each([
+    ["since the previous sync on a daily full sync", 7, {}, "2026-04-29T10:58:00.000Z"],
+    [
+      "within the whole window on a forced full sync",
+      7,
+      { full: true },
+      "2026-04-24T12:00:00.000Z",
+    ],
+    ["within the whole window when the cache records none", null, {}, "2026-04-24T12:00:00.000Z"],
+    ["within the whole window when it outgrew the recorded one", 3, {}, "2026-04-24T12:00:00.000Z"],
+  ])("fetches the items closed %s", async (_, recorded, options, since) => {
+    db.setSyncState(REPO, {
+      lastSyncAt: "2026-04-29T11:00:00.000Z",
+      lastFullSyncAt: "2026-04-29T11:00:00.000Z",
+      closedDays: recorded,
+    });
+    const forge = fakeForge();
+
+    await syncerWith(db, forge, { config: closedWindow(7) }).syncRepo(REPO, options);
+
+    expect(forge.issuesPage.mock.calls.map(([, page]) => page)).toEqual([
+      { since: null, states: "open", after: null },
+      { since, states: "closed", after: null },
+    ]);
+    expect(forge.pullsPage.mock.calls[1]?.[1]).toMatchObject({ since, states: "closed" });
+    expect(db.getSyncState(REPO)?.closedDays).toBe(7);
+  });
+
+  it("fetches no item closed before the window when the previous sync is older", async () => {
+    db.setSyncState(REPO, {
+      lastSyncAt: "2026-04-01T11:00:00.000Z",
+      lastFullSyncAt: "2026-04-01T11:00:00.000Z",
+      closedDays: 7,
+    });
+    const forge = fakeForge();
+
+    await syncerWith(db, forge, { config: closedWindow(7) }).syncRepo(REPO);
+
+    expect(forge.issuesPage.mock.calls[1]?.[1].since).toBe("2026-04-24T12:00:00.000Z");
+  });
+
+  it("fetches the whole window on an incremental sync once the window grew", async () => {
+    db.setSyncState(REPO, {
+      lastSyncAt: "2026-05-01T11:00:00.000Z",
+      lastFullSyncAt: "2026-05-01T11:00:00.000Z",
+      closedDays: 7,
+    });
+    const forge = fakeForge();
+
+    const result = await syncerWith(db, forge, { config: closedWindow(30) }).syncRepo(REPO);
+
+    expect(result.full).toBe(false);
+    expect(forge.issuesPage.mock.calls.map(([, page]) => page)).toEqual([
+      { since: "2026-05-01T10:58:00.000Z", states: "all", after: null },
+      { since: "2026-04-01T12:00:00.000Z", states: "closed", after: null },
+    ]);
+    expect(db.getSyncState(REPO)?.closedDays).toBe(30);
+  });
+
+  it("records a shorter window on a full sync alone", async () => {
+    db.setSyncState(REPO, {
+      lastSyncAt: "2026-05-01T11:00:00.000Z",
+      lastFullSyncAt: "2026-05-01T11:00:00.000Z",
+      closedDays: 30,
+    });
+    const forge = fakeForge();
+    const syncer = syncerWith(db, forge);
+
+    await syncer.syncRepo(REPO);
+    expect(db.getSyncState(REPO)?.closedDays).toBe(30);
+
+    await syncer.syncRepo(REPO, { full: true });
+    expect(db.getSyncState(REPO)?.closedDays).toBe(0);
+    expect(forge.issuesPage.mock.calls.map(([, page]) => page.states)).toEqual(["all", "open"]);
   });
 
   it("syncs incrementally afterwards with an overlapping since and all states", async () => {
@@ -762,6 +839,7 @@ const state = (lastSyncAt: string | null, lastError: string | null = null) => ({
   repo: REPO,
   lastSyncAt,
   lastFullSyncAt: null,
+  closedDays: null,
   lastError,
   lastAttemptAt: lastSyncAt,
 });

@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- The daily full sync fetches only the items closed since the repo's last sync, not the whole
+  `closedDays` window. The whole window is fetched on a repo's first sync, by the full resync
+  button, and on the next sync after the window grows, also when the config file was edited by
+  hand.
+
 ### Fixed
 
 - The sync indicator no longer keeps spinning when the server restarts during a sync: the next
