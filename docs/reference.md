@@ -30,9 +30,12 @@ everything the token does. Two kinds of pass:
   sync splits that interval by the number of repositories and syncs one at a time, the stalest
   first, whether switched on or off. A repository whose sync fails is retried after the interval
   too, or at once with Refresh.
-- **Full** — every open issue, plus every item updated within the longest `closedDays` of
-  any dashboard, once a day, for repositories just added in settings, after a dashboard's
-  `closedDays` grows past the longest, and on demand from the full resync button in the top bar.
+- **Full** — every open issue, plus the items closed since the last run, once a day, for
+  repositories just added in settings, and on demand from the full resync button in the top bar.
+
+Closed items are fetched for the longest `closedDays` of any dashboard. The whole window is
+fetched on a repository's first sync, on its next sync after that longest `closedDays` grows, and
+by the full resync button.
 
 The top bar shows the sync status on every page, with the remaining rate-limit budget and the
 Refresh and full resync buttons. Both sync every repository, switched on or off, and every page load

@@ -133,6 +133,7 @@ interface SyncStateRow {
   repo: string;
   last_sync_at: string | null;
   last_full_sync_at: string | null;
+  filled_closed_days: number | null;
   last_error: string | null;
   updated_at: string | null;
 }
@@ -141,6 +142,7 @@ const toSyncState = (row: SyncStateRow): SyncState => ({
   repo: row.repo,
   lastSyncAt: row.last_sync_at,
   lastFullSyncAt: row.last_full_sync_at,
+  filledClosedDays: row.filled_closed_days,
   lastError: row.last_error,
   lastAttemptAt: row.updated_at,
 });
@@ -206,15 +208,21 @@ export class Db implements SyncStore, ViewStore {
     this.migrate();
   }
 
-  /** Adds missing columns; a new column forces a full resync to fill it. */
+  private columns(table: "issues" | "sync_state"): Set<string> {
+    const rows = this.db.prepare(`PRAGMA table_info(${table})`).all() as unknown as {
+      name: string;
+    }[];
+    return new Set(rows.map((column) => column.name));
+  }
+
+  /** Adds missing columns; a new issue column forces a full resync to fill it. */
   private migrate(): void {
     // shortcut: drops the old starred-epics table; remove once no database predates plain epics.
     this.db.exec("DROP TABLE IF EXISTS starred_epics");
-    const columns = new Set(
-      (this.db.prepare("PRAGMA table_info(issues)").all() as unknown as { name: string }[]).map(
-        (column) => column.name,
-      ),
-    );
+    if (!this.columns("sync_state").has("filled_closed_days")) {
+      this.db.exec("ALTER TABLE sync_state ADD COLUMN filled_closed_days INTEGER");
+    }
+    const columns = this.columns("issues");
     const missing = ADDED_COLUMNS.filter(([name]) => !columns.has(name));
     if (missing.length === 0) return;
     this.transaction(() => {
@@ -437,18 +445,27 @@ export class Db implements SyncStore, ViewStore {
       repo,
       lastSyncAt: null,
       lastFullSyncAt: null,
+      filledClosedDays: null,
       lastError: null,
       lastAttemptAt: null,
     };
     const next = { ...current, ...patch };
     this.db
       .prepare(
-        `INSERT INTO sync_state (repo, last_sync_at, last_full_sync_at, last_error, updated_at)
-         VALUES (?, ?, ?, ?, ?)
+        `INSERT INTO sync_state
+           (repo, last_sync_at, last_full_sync_at, filled_closed_days, last_error, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT (repo) DO UPDATE SET last_sync_at = excluded.last_sync_at,
-           last_full_sync_at = excluded.last_full_sync_at, last_error = excluded.last_error,
-           updated_at = excluded.updated_at`,
+           last_full_sync_at = excluded.last_full_sync_at,
+           filled_closed_days = excluded.filled_closed_days, last_error = excluded.last_error, updated_at = excluded.updated_at`,
       )
-      .run(repo, next.lastSyncAt, next.lastFullSyncAt, next.lastError, next.lastAttemptAt);
+      .run(
+        repo,
+        next.lastSyncAt,
+        next.lastFullSyncAt,
+        next.filledClosedDays,
+        next.lastError,
+        next.lastAttemptAt,
+      );
   }
 }
