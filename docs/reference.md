@@ -66,7 +66,8 @@ A PR card shows a pill for each status that holds, whatever lane it is in: `conf
 opened the PR, as long as the PR is in one of the global repos; such an issue card shows a
 `PR open` pill. It drops once the PR is merged or closed. Every parent issue above such an
 issue matches too, up to the top one, so an issue with work under review stays out of a
-`-has:pr` column. A closed sub-issue whose PR is still open counts for its parents.
+`-has:pr` column. Those parent cards show the `PR open` pill too. A closed sub-issue whose PR
+is still open counts for its parents.
 
 ## Closed items
 

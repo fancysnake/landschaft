@@ -140,8 +140,9 @@ describe("isBlocked", () => {
   });
 });
 
-const waitsOn = (number: number) => [{ repo: REPO, number, state: "OPEN" as const }];
-const under = (number: number) => ({ parent: waitsOn(number)[0]! });
+const ref = (number: number) => ({ repo: REPO, number, state: "OPEN" as const });
+const waitsOn = (number: number) => [ref(number)];
+const under = (number: number) => ({ parent: ref(number) });
 
 describe("scopedRepos", () => {
   it("takes the repos of the users' open items and jobs that pass the dashboard filter", () => {
@@ -662,7 +663,14 @@ describe("buildBoard", () => {
       makeIssue({ number: 12, kind: "pr", state: "CLOSED", linked: [{ repo: REPO, number: 7 }] }),
     ];
     const board = buildBoard(snapshot(issues), dashboard, EVERYONE);
-    expect(board.cells[cell("review", "todo")]?.map(numberOf).toSorted()).toEqual([1, 2, 3, 4]);
+    expect(
+      board.cells[cell("review", "todo")]?.map((c) => [numberOf(c), asIssue(c)?.hasPr]),
+    ).toEqual([
+      [4, true],
+      [3, true],
+      [2, true],
+      [1, true],
+    ]);
   });
 
   it("shows items closed within the window, which count for nothing open", () => {
