@@ -513,6 +513,20 @@ describe("Syncer", () => {
     ]);
   });
 
+  it("syncs a repo once when a full request names it during its first, full sync", async () => {
+    const gate = Promise.withResolvers<IssuesPage>();
+    const forge = fakeForge();
+    forge.issuesPage.mockReturnValueOnce(gate.promise);
+    const syncer = syncerWith(db, forge);
+    const run = syncer.syncAll([REPO]);
+    await vi.waitFor(() => expect(syncer.status().inFlight).toContain(REPO));
+    syncer.start({ repos: [REPO], full: true, stale: false });
+    expect(syncer.status().queued).toEqual([]);
+    gate.resolve(EMPTY_PAGE);
+    await run;
+    expect(forge.repoLabels).toHaveBeenCalledTimes(1);
+  });
+
   it("reports each repo's last sync and error in the status", async () => {
     db.setSyncState("acme/bad", { lastError: "boom" });
     const syncer = syncerWith(db, fakeForge());
@@ -681,6 +695,10 @@ describe("Syncer.syncDue", () => {
 
   it("reports no failure for a repo a later pass of the same run recovers", async () => {
     const db = new Db(":memory:");
+    db.setSyncState(REPO, {
+      lastSyncAt: "2026-05-01T11:00:00.000Z",
+      lastFullSyncAt: "2026-05-01T11:00:00.000Z",
+    });
     const forge = fakeForge();
     const syncer = syncerWith(db, forge);
     forge.issuesPage.mockImplementationOnce(async () => {
@@ -691,6 +709,22 @@ describe("Syncer.syncDue", () => {
     await syncer.syncAll([REPO]);
 
     expect(syncer.status()).toMatchObject({ runs: 1, lastError: null });
+    db.close();
+  });
+
+  it("reports the failure of a sync a plain request named while it ran, without a retry", async () => {
+    const db = new Db(":memory:");
+    const forge = fakeForge();
+    const syncer = syncerWith(db, forge);
+    forge.issuesPage.mockImplementationOnce(async () => {
+      void syncer.syncAll([REPO]);
+      throw new Error("boom");
+    });
+
+    await syncer.syncAll([REPO]);
+
+    expect(forge.issuesPage).toHaveBeenCalledTimes(1);
+    expect(syncer.status()).toMatchObject({ runs: 1, lastError: `${REPO}: boom` });
     db.close();
   });
 
@@ -843,17 +877,13 @@ describe("Syncer.start", () => {
     forge.issuesPage.mockReturnValueOnce(gate.promise);
     const syncer = syncerWith(db, forge);
     const running = syncer.syncRepo(REPO);
-    const syncAll = vi.spyOn(syncer, "syncAll").mockResolvedValue();
 
     syncer.start({ full: false, stale: true });
-    syncer.start({ full: false, stale: false });
 
-    expect(syncAll.mock.calls).toEqual([
-      [[], { full: false }],
-      [[REPO], { full: false }],
-    ]);
+    expect(syncer.status().queued).toEqual([]);
     gate.resolve(EMPTY_PAGE);
     await running;
+    expect(forge.repoLabels).toHaveBeenCalledTimes(1);
     db.close();
   });
 
