@@ -61,7 +61,9 @@ A PR card shows a pill for each status that holds, whatever lane it is in: `conf
 
 `has:pr` picks issues that an open PR closes (GitHub's "linked pull requests"), whoever
 opened the PR, as long as the PR is in one of the global repos; such an issue card shows a
-`PR open` pill. It drops once the PR is merged or closed.
+`PR open` pill. It drops once the PR is merged or closed. Every parent issue above such an
+issue matches too, up to the top one, so an issue with work under review stays out of a
+`-has:pr` column. A closed sub-issue whose PR is still open counts for its parents.
 
 ## Closed items
 
@@ -70,7 +72,7 @@ many days, placed by the same filters. `is:closed` picks them, so a `Done` colum
 `is:closed` gathers them and `-is:closed` keeps them out of a lane. Their cards are greyed
 with a `closed` pill, without PR status pills. The failed CI job of a closed PR is closed with
 it, from the day the PR closed. A closed issue or PR
-never counts for `has:pr`, `is:blocked` or `is:blocking`, and the unmatched view lists open
+never matches `has:pr`, `is:blocked` or `is:blocking`, and the unmatched view lists open
 items only.
 
 ## Failed CI jobs

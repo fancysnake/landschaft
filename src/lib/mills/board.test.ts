@@ -141,6 +141,7 @@ describe("isBlocked", () => {
 });
 
 const waitsOn = (number: number) => [{ repo: REPO, number, state: "OPEN" as const }];
+const under = (number: number) => ({ parent: waitsOn(number)[0]! });
 
 describe("scopedRepos", () => {
   it("takes the repos of the users' open items and jobs that pass the dashboard filter", () => {
@@ -641,6 +642,27 @@ describe("buildBoard", () => {
     expect(
       board.cells[cell("review", "todo")]?.map((c) => [numberOf(c), asIssue(c)?.hasPr]),
     ).toEqual([[1, true]]);
+  });
+
+  it("matches has:pr on every ancestor of an issue an open PR closes", () => {
+    const dashboard = {
+      ...DASHBOARD,
+      swimlanes: [makeLane({ id: "review", filter: "is:issue has:pr" }), ...DASHBOARD.swimlanes],
+    };
+    const issues = [
+      makeIssue({ number: 1 }),
+      makeIssue({ number: 2, ...under(1) }),
+      makeIssue({ number: 3, ...under(2) }),
+      makeIssue({ number: 4 }),
+      makeIssue({ number: 5, ...under(4), state: "CLOSED" }),
+      makeIssue({ number: 6 }),
+      makeIssue({ number: 7, ...under(6) }),
+      makeIssue({ number: 10, kind: "pr", linked: [{ repo: REPO, number: 3 }] }),
+      makeIssue({ number: 11, kind: "pr", linked: [{ repo: REPO, number: 5 }] }),
+      makeIssue({ number: 12, kind: "pr", state: "CLOSED", linked: [{ repo: REPO, number: 7 }] }),
+    ];
+    const board = buildBoard(snapshot(issues), dashboard, EVERYONE);
+    expect(board.cells[cell("review", "todo")]?.map(numberOf).toSorted()).toEqual([1, 2, 3, 4]);
   });
 
   it("shows items closed within the window, which count for nothing open", () => {

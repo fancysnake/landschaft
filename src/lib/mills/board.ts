@@ -92,14 +92,19 @@ const keyOf = (ref: { repo: string; number: number }): string => issueKey(ref.re
 type Item = Issue & FilterItem;
 
 /**
- * An issue with what filters test it on: whether an open PR closes it, whether an open blocker
- * holds it, and whether it blocks an open issue. A closed item is none of these, and has no
- * statuses since only open PRs' refresh. Every open item in `issues` counts, whoever's it is;
- * one in a repo outside them is never seen.
+ * An issue with what filters test it on: whether an open PR closes it or a sub-issue at any
+ * depth, open or closed, whether an open blocker holds it, and whether it blocks an open issue.
+ * A closed item is none of these, and has no statuses since only open PRs' refresh. Every open
+ * item in `issues` counts, whoever's it is; one in a repo outside them is never seen.
  */
 export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Issue) => Item {
   const opened = issues.filter((issue) => issue.state === "OPEN");
   const withPr = new Set(opened.flatMap((pr) => pr.linked.map(keyOf)));
+  // A Set visits the keys its loop adds, so this climbs to the top parent.
+  for (const key of withPr) {
+    const parent = byKey.get(key)?.parent;
+    if (parent) withPr.add(keyOf(parent));
+  }
   const blocking = new Set(opened.flatMap((issue) => blockersOf(issue).map(keyOf)));
   return (issue) => ({
     ...issue,

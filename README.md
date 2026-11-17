@@ -124,7 +124,8 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
     and `is:draft` (a draft PR).
     `is:pr is:conflicting|ci:failed|unanswered` gathers the PRs waiting on their author.
   - `has:pr` picks issues an open PR closes (GitHub's "linked pull requests"), whoever
-    opened the PR, as long as the PR is in one of the global repos, and CI jobs whose branch
+    opened the PR, as long as the PR is in one of the global repos, every parent issue above
+    such an issue, even a closed one, up to the top, and CI jobs whose branch
     an open PR comes from, or a closed one with no push since. That closed PR makes the job
     `is:closed`.
   - Failed CI jobs: `is:ci-job`, `job:` and `branch:`.
