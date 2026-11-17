@@ -50,21 +50,11 @@ describe("ConfigKeeper.setHidden", () => {
   });
 });
 
-const scope = (repos: string[], ...windows: number[]) => ({
-  repos,
-  dashboards: windows.map((closedDays) => ({ closedDays })),
-});
-
 describe("reposToResync", () => {
-  it("resyncs every repo when the closed window grew", () => {
-    expect(reposToResync(scope(["acme/a"], 0, 3), scope(["acme/a", "acme/b"], 7))).toEqual([
-      "acme/a",
+  it("resyncs only the added repos", () => {
+    expect(reposToResync({ repos: ["acme/a"] }, { repos: ["acme/a", "acme/b"] })).toEqual([
       "acme/b",
     ]);
-  });
-
-  it("resyncs only the added repos otherwise", () => {
-    expect(reposToResync(scope(["acme/a"], 7), scope(["acme/a", "acme/b"], 3))).toEqual(["acme/b"]);
-    expect(reposToResync(scope(["acme/a"], 7), scope(["acme/a"], 7))).toEqual([]);
+    expect(reposToResync({ repos: ["acme/a"] }, { repos: ["acme/a"] })).toEqual([]);
   });
 });

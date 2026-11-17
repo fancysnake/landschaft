@@ -14,7 +14,7 @@ import { cachedIssue, DASHBOARD, makeIssue, makeJob, REPO } from "../__fixtures_
 import { Db } from "../links/db/sqlite";
 import { ConfigSchema } from "../pacts/config";
 import { InvalidError, SyncBusyError } from "../pacts/services";
-import { closedSince, nextDue, staleRepos, type SyncDeps, Syncer } from "./sync";
+import { closedPlan, closedSince, nextDue, staleRepos, type SyncDeps, Syncer } from "./sync";
 
 interface ForgeData {
   /** Pages of issues, of PRs and of CI branches; a page's cursor is the index of the next one. */
@@ -111,6 +111,10 @@ const syncerWith = (db: Db, forge: Forge, deps: Partial<SyncDeps> = {}) =>
     ...deps,
   });
 
+/** A config of `REPO` whose one dashboard shows the items closed within `days`. */
+const closedWindow = (days: number) => () =>
+  ConfigSchema.parse({ repos: [REPO], dashboards: [{ ...DASHBOARD, closedDays: days }] });
+
 describe("Syncer", () => {
   let db: Db;
 
@@ -150,10 +154,7 @@ describe("Syncer", () => {
 
   it("also fetches the items closed within the window on a full sync", async () => {
     const forge = fakeForge({ issues: [issues(1)] });
-    const syncer = syncerWith(db, forge, {
-      config: () =>
-        ConfigSchema.parse({ repos: [REPO], dashboards: [{ ...DASHBOARD, closedDays: 7 }] }),
-    });
+    const syncer = syncerWith(db, forge, { config: closedWindow(7) });
 
     await syncer.syncRepo(REPO);
 
@@ -166,6 +167,45 @@ describe("Syncer", () => {
       "open",
       "closed",
     ]);
+  });
+
+  it("fetches the items closed since the previous sync on a daily full sync", async () => {
+    db.setSyncState(REPO, {
+      lastSyncAt: "2026-04-29T11:00:00.000Z",
+      lastFullSyncAt: "2026-04-29T11:00:00.000Z",
+      filledClosedDays: 7,
+    });
+    const forge = fakeForge();
+
+    await syncerWith(db, forge, { config: closedWindow(7) }).syncRepo(REPO);
+
+    expect(forge.issuesPage.mock.calls.map(([, page]) => page)).toEqual([
+      { since: null, states: "open", after: null },
+      { since: "2026-04-29T10:58:00.000Z", states: "closed", after: null },
+    ]);
+    expect(forge.pullsPage.mock.calls[1]?.[1]).toMatchObject({
+      since: "2026-04-29T10:58:00.000Z",
+      states: "closed",
+    });
+    expect(db.getSyncState(REPO)?.filledClosedDays).toBe(7);
+  });
+
+  it("fetches the whole window on an incremental sync once the window grew", async () => {
+    db.setSyncState(REPO, {
+      lastSyncAt: "2026-05-01T11:00:00.000Z",
+      lastFullSyncAt: "2026-05-01T11:00:00.000Z",
+      filledClosedDays: 7,
+    });
+    const forge = fakeForge();
+
+    const result = await syncerWith(db, forge, { config: closedWindow(30) }).syncRepo(REPO);
+
+    expect(result.full).toBe(false);
+    expect(forge.issuesPage.mock.calls.map(([, page]) => page)).toEqual([
+      { since: "2026-05-01T10:58:00.000Z", states: "all", after: null },
+      { since: "2026-04-01T12:00:00.000Z", states: "closed", after: null },
+    ]);
+    expect(db.getSyncState(REPO)?.filledClosedDays).toBe(30);
   });
 
   it("syncs incrementally afterwards with an overlapping since and all states", async () => {
@@ -697,6 +737,44 @@ describe("closedSince", () => {
   });
 });
 
+describe("closedPlan", () => {
+  const base = {
+    days: 7,
+    now: new Date("2026-05-10T00:00:00Z"),
+    previous: Date.parse("2026-05-09T00:00:00Z"),
+    filled: 7,
+    forced: false,
+    full: true,
+  };
+  const WINDOW = "2026-05-03T00:00:00.000Z";
+  const LAST_SYNC = "2026-05-09T00:00:00.000Z";
+
+  it.each([
+    ["since the last sync on a daily full sync", {}, LAST_SYNC, 7],
+    ["the whole window on a forced sync", { forced: true }, WINDOW, 7],
+    ["the whole window when the cache holds none", { filled: null }, WINDOW, 7],
+    ["the whole window once it outgrew the cache", { filled: 3 }, WINDOW, 7],
+    ["the whole window on an incremental sync it outgrew", { filled: 3, full: false }, WINDOW, 7],
+    [
+      "nothing before the window when the last sync is older",
+      { previous: Date.parse("2026-04-01T00:00:00Z") },
+      WINDOW,
+      7,
+    ],
+    ["the whole window with no last sync", { previous: null }, WINDOW, 7],
+    ["since the last sync on a full sync to a shorter window", { filled: 30 }, LAST_SYNC, 7],
+    [
+      "nothing on an incremental sync, keeping the longer fill",
+      { filled: 30, full: false },
+      null,
+      30,
+    ],
+    ["nothing for an empty window", { days: 0, filled: 30 }, null, 0],
+  ])("fetches %s", (_, input, from, filled) => {
+    expect(closedPlan({ ...base, ...input })).toEqual({ from, filled });
+  });
+});
+
 describe("Syncer.start", () => {
   it("queues every configured repo when none are named", () => {
     const db = new Db(":memory:");
@@ -762,6 +840,7 @@ const state = (lastSyncAt: string | null, lastError: string | null = null) => ({
   repo: REPO,
   lastSyncAt,
   lastFullSyncAt: null,
+  filledClosedDays: null,
   lastError,
   lastAttemptAt: lastSyncAt,
 });
