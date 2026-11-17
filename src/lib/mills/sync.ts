@@ -133,7 +133,8 @@ export class Syncer implements SyncService {
   private dueError: string | null = null;
   private rateRemaining: number | null = null;
   private viewerLogin: string | null = null;
-  private readonly inFlight = new Set<string>();
+  /** Repos syncing now, each with whether a request forced the sync to be full. */
+  private readonly inFlight = new Map<string, boolean>();
   private readonly db: SyncStore;
   private readonly forge: Forge;
   private readonly config: () => Config;
@@ -160,7 +161,7 @@ export class Syncer implements SyncService {
       lastSyncAt: this.lastSyncAt,
       lastError: [...this.userErrors.values(), this.dueError].filter(Boolean).join("; ") || null,
       rateRemaining: this.rateRemaining,
-      inFlight: [...this.inFlight],
+      inFlight: [...this.inFlight.keys()],
       queued: [...this.queue.keys()],
       repos: Object.fromEntries(
         this.db
@@ -187,14 +188,16 @@ export class Syncer implements SyncService {
   }
 
   /**
-   * Adds `repos` to the running sync-all, or starts one; resolves when that run ends. A run
-   * syncs one repo at a time, skips those already in flight, and ends with every failure it met
-   * in `lastError`, unless only `background` calls fed it; each stays until its repo syncs. Never
-   * rejects.
+   * Adds `repos` to the running sync-all, or starts one; resolves when that run ends. A repo
+   * syncing now is left out unless the call asks for a full sync and that sync is incremental.
+   * A run syncs one repo at a time and ends with every failure it met in `lastError`, unless
+   * only `background` calls fed it; each stays until its repo syncs. Never rejects.
    */
   syncAll(repos: string[], options: SyncOptions & { background?: boolean } = {}): Promise<void> {
+    const full = Boolean(options.full);
     for (const repo of repos) {
-      this.queue.set(repo, Boolean(options.full) || Boolean(this.queue.get(repo)));
+      if (this.inFlight.has(repo) && (!full || this.inFlight.get(repo))) continue;
+      this.queue.set(repo, full || Boolean(this.queue.get(repo)));
     }
     this.userRun ||= !options.background;
     // Deferred a tick, so a run that finds the queue empty ends after `running` is set.
@@ -208,11 +211,8 @@ export class Syncer implements SyncService {
     if (unknown.length > 0) throw new InvalidError(`not configured: ${unknown.join(", ")}`);
     const run = this.runs + 1;
     const wanted = repos ?? configured;
-    // A repo syncing now is fresh once it ends, though its lastSyncAt is still old.
     const queued = stale
-      ? staleRepos(wanted, this.db.listSyncStates(), this.now().getTime()).filter(
-          (repo) => !this.inFlight.has(repo),
-        )
+      ? staleRepos(wanted, this.db.listSyncStates(), this.now().getTime())
       : wanted;
     void this.syncAll(queued, { full });
     return run;
@@ -269,7 +269,6 @@ export class Syncer implements SyncService {
 
   async syncRepo(repo: string, options: SyncOptions = {}): Promise<SyncResult> {
     if (this.inFlight.has(repo)) throw new SyncBusyError(repo);
-    this.inFlight.add(repo);
     const startedAt = this.now();
     const stamp = startedAt.toISOString();
     try {
@@ -278,6 +277,7 @@ export class Syncer implements SyncService {
         ? startedAt.getTime() - Date.parse(state.lastFullSyncAt)
         : Number.POSITIVE_INFINITY;
       const full = Boolean(options.full) || !state?.lastSyncAt || fullAge > FULL_SYNC_MAX_AGE_MS;
+      this.inFlight.set(repo, full);
       const previous = state?.lastSyncAt ? Date.parse(state.lastSyncAt) - SINCE_OVERLAP_MS : null;
       const since = full || previous === null ? null : new Date(previous).toISOString();
 
