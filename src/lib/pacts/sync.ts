@@ -3,7 +3,7 @@ export interface SyncState {
   lastSyncAt: string | null;
   lastFullSyncAt: string | null;
   /** The closed window, in days, the cache was last filled for; null before the first fill. */
-  closedDays: number | null;
+  filledClosedDays: number | null;
   lastError: string | null;
   /** When the last sync started, whether it succeeded or not. */
   lastAttemptAt: string | null;

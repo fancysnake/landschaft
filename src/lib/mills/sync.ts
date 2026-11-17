@@ -28,7 +28,7 @@ export interface SyncDeps {
   now?: () => Date;
 }
 
-/** The longest window any dashboard shows closed items for, in days; what a full sync fetches. */
+/** The longest window any dashboard shows closed items for, in days; what the cache must hold. */
 export const closedDays = (config: { dashboards: Pick<Dashboard, "closedDays">[] }): number =>
   Math.max(0, ...config.dashboards.map((dashboard) => dashboard.closedDays));
 
@@ -37,6 +37,42 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** The earliest close time, in ms, a window of `days` back from `now` keeps; Infinity for 0. */
 export const closedSince = (days: number, now: Date): number =>
   days > 0 ? now.getTime() - days * DAY_MS : Number.POSITIVE_INFINITY;
+
+export interface ClosedPlan {
+  /** Where the fetch of closed items starts, as an ISO time; null fetches none. */
+  from: string | null;
+  /** The window, in days, the cache holds once the sync succeeds. */
+  filled: number | null;
+}
+
+/**
+ * The closed items a sync of a `days` window fetches. The cache holds a `filled` window up to
+ * `previous`, the last sync less the overlap, in ms. A `forced` sync, or one that finds the cache
+ * lacking the window, fetches the whole window; any other full sync fetches only since `previous`.
+ * An incremental sync otherwise fetches closed items with the rest, so it keeps `filled`.
+ */
+export function closedPlan({
+  days,
+  now,
+  previous,
+  filled,
+  forced,
+  full,
+}: {
+  days: number;
+  now: Date;
+  previous: number | null;
+  filled: number | null;
+  forced: boolean;
+  full: boolean;
+}): ClosedPlan {
+  const refill = forced || filled === null || days > filled;
+  if (!refill && !full) return { from: null, filled };
+  if (days === 0) return { from: null, filled: 0 };
+  const start = closedSince(days, now);
+  const from = refill || previous === null ? start : Math.max(start, previous);
+  return { from: new Date(from).toISOString(), filled: days };
+}
 
 type Schedule = Pick<Config, "repos" | "refreshMinutes">;
 
@@ -242,22 +278,20 @@ export class Syncer implements SyncService {
         ? startedAt.getTime() - Date.parse(state.lastFullSyncAt)
         : Number.POSITIVE_INFINITY;
       const full = Boolean(options.full) || !state?.lastSyncAt || fullAge > FULL_SYNC_MAX_AGE_MS;
-      const previous = state?.lastSyncAt
-        ? Date.parse(state.lastSyncAt) - SINCE_OVERLAP_MS
-        : Number.NEGATIVE_INFINITY;
-      const since = full || !Number.isFinite(previous) ? null : new Date(previous).toISOString();
+      const previous = state?.lastSyncAt ? Date.parse(state.lastSyncAt) - SINCE_OVERLAP_MS : null;
+      const since = full || previous === null ? null : new Date(previous).toISOString();
 
       const seen = new Set<number>();
       const query: Omit<PageOptions, "after"> = { since, states: full ? "open" : "all" };
       let upserted = 0;
-      const days = closedDays(this.config());
-      const windowStart = closedSince(days, startedAt);
-      // The cache holds the window up to the previous sync, unless a user doubts it or it grew.
-      const refill = Boolean(options.full) || days > (state?.closedDays ?? -1);
-      let cutoff = Number.POSITIVE_INFINITY;
-      if (refill) cutoff = windowStart;
-      else if (full) cutoff = Math.max(windowStart, previous);
-      const closedFrom = Number.isFinite(cutoff) ? new Date(cutoff).toISOString() : null;
+      const plan = closedPlan({
+        days: closedDays(this.config()),
+        now: startedAt,
+        previous,
+        filled: state?.filledClosedDays ?? null,
+        forced: Boolean(options.full),
+        full,
+      });
       const fetchers: Forge["issuesPage"][] = [
         (r, o) => this.forge.issuesPage(r, o),
         (r, o) => this.forge.pullsPage(r, o),
@@ -265,11 +299,11 @@ export class Syncer implements SyncService {
       for (const fetchPage of fetchers) {
         upserted += await this.drain(fetchPage, repo, query, seen);
         // An open-only full sync misses what closed lately, which boards still show.
-        if (closedFrom) {
+        if (plan.from) {
           upserted += await this.drain(
             fetchPage,
             repo,
-            { since: closedFrom, states: "closed" },
+            { since: plan.from, states: "closed" },
             seen,
           );
         }
@@ -283,8 +317,7 @@ export class Syncer implements SyncService {
       this.db.setSyncState(repo, {
         lastSyncAt: stamp,
         lastFullSyncAt: full ? stamp : (state?.lastFullSyncAt ?? null),
-        // An incremental sync keeps a longer record: it fetched every close since that fill.
-        closedDays: full || refill ? days : (state?.closedDays ?? null),
+        filledClosedDays: plan.filled,
         lastError: null,
         lastAttemptAt: stamp,
       });

@@ -11,8 +11,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 - The daily full sync fetches only the items closed since the repo's last sync, not the whole
   `closedDays` window. The whole window is fetched on a repo's first sync, by the full resync
-  button, and on the next sync after the window grows, also when the config file was edited by
-  hand.
+  button, and on the next sync after the window grows. Saving a longer `closedDays` in settings no
+  longer starts a full sync of every repo.
 
 ### Fixed
 
