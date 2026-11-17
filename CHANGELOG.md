@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Fixed
+
+- A sync request that names a repo while it syncs no longer syncs that repo a second time. A
+  full resync still follows a sync that was not one.
+
 ## [5.4.0] - 2026-11-17
 
 ### Changed

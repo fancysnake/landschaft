@@ -133,7 +133,8 @@ export class Syncer implements SyncService {
   private dueError: string | null = null;
   private rateRemaining: number | null = null;
   private viewerLogin: string | null = null;
-  private readonly inFlight = new Set<string>();
+  /** Repos syncing now, each with whether a request forced the sync to be full. */
+  private readonly inFlight = new Map<string, boolean>();
   private readonly db: SyncStore;
   private readonly forge: Forge;
   private readonly config: () => Config;
@@ -160,7 +161,7 @@ export class Syncer implements SyncService {
       lastSyncAt: this.lastSyncAt,
       lastError: [...this.userErrors.values(), this.dueError].filter(Boolean).join("; ") || null,
       rateRemaining: this.rateRemaining,
-      inFlight: [...this.inFlight],
+      inFlight: [...this.inFlight.keys()],
       queued: [...this.queue.keys()],
       repos: Object.fromEntries(
         this.db
@@ -187,14 +188,17 @@ export class Syncer implements SyncService {
   }
 
   /**
-   * Adds `repos` to the running sync-all, or starts one; resolves when that run ends. A run
-   * syncs one repo at a time, skips those already in flight, and ends with every failure it met
-   * in `lastError`, unless only `background` calls fed it; each stays until its repo syncs. Never
-   * rejects.
+   * Adds `repos` to the running sync-all, or starts one; resolves when that run ends. A repo
+   * syncing now is left out, unless the call asks for a full sync and that sync was not forced
+   * full. A run syncs one repo at a time, skips those in flight, and ends with every failure it
+   * met in `lastError`, unless only `background` calls fed it; each stays until its repo syncs.
+   * Never rejects.
    */
   syncAll(repos: string[], options: SyncOptions & { background?: boolean } = {}): Promise<void> {
+    const full = Boolean(options.full);
     for (const repo of repos) {
-      this.queue.set(repo, Boolean(options.full) || Boolean(this.queue.get(repo)));
+      if (this.inFlight.has(repo) && (!full || this.inFlight.get(repo))) continue;
+      this.queue.set(repo, full || Boolean(this.queue.get(repo)));
     }
     this.userRun ||= !options.background;
     // Deferred a tick, so a run that finds the queue empty ends after `running` is set.
@@ -269,7 +273,7 @@ export class Syncer implements SyncService {
 
   async syncRepo(repo: string, options: SyncOptions = {}): Promise<SyncResult> {
     if (this.inFlight.has(repo)) throw new SyncBusyError(repo);
-    this.inFlight.add(repo);
+    this.inFlight.set(repo, Boolean(options.full));
     const startedAt = this.now();
     const stamp = startedAt.toISOString();
     try {

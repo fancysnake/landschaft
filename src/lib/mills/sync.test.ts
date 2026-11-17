@@ -478,6 +478,41 @@ describe("Syncer", () => {
     ).toContain(null);
   });
 
+  it("syncs a repo once when a request names it while the run syncs it", async () => {
+    const gate = Promise.withResolvers<IssuesPage>();
+    const forge = fakeForge();
+    forge.issuesPage.mockReturnValueOnce(gate.promise);
+    const syncer = syncerWith(db, forge);
+    const run = syncer.syncAll([REPO]);
+    await vi.waitFor(() => expect(syncer.status().inFlight).toContain(REPO));
+    syncer.start({ repos: [REPO], full: false, stale: false });
+    expect(syncer.status().queued).toEqual([]);
+    gate.resolve(EMPTY_PAGE);
+    await run;
+    expect(forge.repoLabels).toHaveBeenCalledTimes(1);
+  });
+
+  it("syncs a repo again in full when a full request names it during an incremental sync", async () => {
+    const gate = Promise.withResolvers<IssuesPage>();
+    const forge = fakeForge();
+    forge.issuesPage.mockReturnValueOnce(gate.promise);
+    db.setSyncState(REPO, {
+      lastSyncAt: "2026-05-01T11:00:00.000Z",
+      lastFullSyncAt: "2026-05-01T11:00:00.000Z",
+    });
+    const syncer = syncerWith(db, forge);
+    const run = syncer.syncAll([REPO]);
+    await vi.waitFor(() => expect(syncer.status().inFlight).toContain(REPO));
+    syncer.start({ repos: [REPO], full: true, stale: false });
+    syncer.start({ repos: [REPO], full: true, stale: false });
+    gate.resolve(EMPTY_PAGE);
+    await run;
+    expect(forge.issuesPage.mock.calls.map(([, options]) => options.since)).toEqual([
+      "2026-05-01T10:58:00.000Z",
+      null,
+    ]);
+  });
+
   it("reports each repo's last sync and error in the status", async () => {
     db.setSyncState("acme/bad", { lastError: "boom" });
     const syncer = syncerWith(db, fakeForge());
@@ -649,7 +684,7 @@ describe("Syncer.syncDue", () => {
     const forge = fakeForge();
     const syncer = syncerWith(db, forge);
     forge.issuesPage.mockImplementationOnce(async () => {
-      void syncer.syncAll([REPO]);
+      void syncer.syncAll([REPO], { full: true });
       throw new Error("boom");
     });
 
