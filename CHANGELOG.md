@@ -7,18 +7,22 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [5.4.0] - 2026-11-17
+
 ### Changed
 
-- The daily full sync fetches only the items closed since the repo's last sync, not the whole
-  `closedDays` window. The whole window is fetched on a repo's first sync, by the full resync
-  button, and on the next sync after the window grows. Saving a longer `closedDays` in settings no
-  longer starts a full sync of every repo.
+- `has:pr` matches every open parent issue above an issue an open PR closes, even when that
+  issue is closed. Parent cards show the `PR open` pill.
+- The daily full sync fetches only the items closed since the repo's last sync. The whole
+  `closedDays` window is fetched on a repo's first sync, by the full resync button, and on the
+  next sync after the window grows. Saving a longer `closedDays` starts no full sync.
 
 ### Fixed
 
-- The sync indicator no longer keeps spinning when the server restarts during a sync: the next
-  status poll stops it and reports the sync as interrupted. The sync status carries `boot`, an
-  id the server picks at start.
+- The sync indicator stops when the server restarts during a sync, and reports the sync as
+  interrupted. The sync status carries `boot`, an id the server picks at start.
+- The Label, Type and CI job selects show a URL filter whose case differs from the option's, as
+  in `?type=bug`.
 
 ## [5.3.0] - 2026-11-11
 
@@ -376,7 +380,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v5.3.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v5.4.0...HEAD
+[5.4.0]: https://github.com/fancysnake/landschaft/compare/v5.3.0...v5.4.0
 [5.3.0]: https://github.com/fancysnake/landschaft/compare/v5.2.0...v5.3.0
 [5.2.0]: https://github.com/fancysnake/landschaft/compare/v5.1.0...v5.2.0
 [5.1.0]: https://github.com/fancysnake/landschaft/compare/v5.0.0...v5.1.0
