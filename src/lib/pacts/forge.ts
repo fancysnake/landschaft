@@ -16,11 +16,9 @@ export interface PageOptions {
   after: string | null;
 }
 
-/** PRs per status query; the caller splits the open PRs into batches this size. */
-export const STATUS_BATCH = 50;
-
 export interface PullStatusPage {
   statuses: PullStatus[];
+  hasNextPage: boolean;
   rateRemaining: number;
 }
 
@@ -37,13 +35,11 @@ export interface CiBranchesPage {
   rateRemaining: number;
 }
 
-/** Branches per CI job query. */
-export const CI_BATCH = 20;
-
 export interface CiJobsPage {
   jobs: CiJob[];
   /** Branches an unexpected error hit, whose cached jobs still hold. */
   failed: string[];
+  hasNextPage: boolean;
   rateRemaining: number;
 }
 
@@ -52,11 +48,11 @@ export interface Forge {
   issuesPage(repo: string, options: PageOptions): Promise<IssuesPage>;
   /** Same contract as `issuesPage`; with `since`, paging ends at the first older PR. */
   pullsPage(repo: string, options: PageOptions): Promise<IssuesPage>;
-  /** Statuses of up to `STATUS_BATCH` PRs. */
-  pullStatuses(repo: string, numbers: number[]): Promise<PullStatusPage>;
+  /** Statuses of the PRs, in as many pages as the forge splits them into; none for no PRs. */
+  pullStatuses(repo: string, numbers: number[]): AsyncIterable<PullStatusPage>;
   ciBranchesPage(repo: string, after: string | null): Promise<CiBranchesPage>;
-  /** Failed jobs on up to `CI_BATCH` branches. */
-  ciJobs(repo: string, branches: CiBranch[]): Promise<CiJobsPage>;
+  /** Failed jobs on the branches, paged like `pullStatuses`. */
+  ciJobs(repo: string, branches: CiBranch[]): AsyncIterable<CiJobsPage>;
   /** Login of the account the token belongs to. */
   viewer(): Promise<string>;
   repoLabels(repo: string): Promise<Omit<LabelDef, "repo">[]>;

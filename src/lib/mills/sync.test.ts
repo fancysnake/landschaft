@@ -7,6 +7,7 @@ import type {
   Forge,
   IssuesPage,
   PageOptions,
+  PullStatusPage,
 } from "../pacts/forge";
 import type { CiJob, FetchedIssue, PullStatus } from "../pacts/issues";
 
@@ -63,22 +64,31 @@ function fakeForge({
       return toIssuesPage(issues, options.after);
     }),
     pullsPage: vi.fn(async (_: string, options: PageOptions) => toIssuesPage(pulls, options.after)),
-    pullStatuses: vi.fn(async (_: string, numbers: number[]) => ({
-      statuses: numbers.map((number): PullStatus => ({
-        number,
-        statuses: conflicting.includes(number) ? ["is:conflicting"] : [],
-      })),
-      rateRemaining: remaining,
-    })),
+    pullStatuses: vi.fn(async function* (
+      _: string,
+      numbers: number[],
+    ): AsyncGenerator<PullStatusPage> {
+      if (numbers.length === 0) return;
+      yield {
+        statuses: numbers.map((number): PullStatus => ({
+          number,
+          statuses: conflicting.includes(number) ? ["is:conflicting"] : [],
+        })),
+        hasNextPage: false,
+        rateRemaining: remaining,
+      };
+    }),
     ciBranchesPage: vi.fn(async (_: string, after: string | null): Promise<CiBranchesPage> => {
       const { items, ...page } = paged(branches, after);
       return { branches: items, ...page };
     }),
-    ciJobs: vi.fn(async (_: string, batch: CiBranch[]): Promise<CiJobsPage> => {
-      const names = new Set(batch.map(({ name }) => name));
-      return {
+    ciJobs: vi.fn(async function* (_: string, asked: CiBranch[]): AsyncGenerator<CiJobsPage> {
+      const names = new Set(asked.map(({ name }) => name));
+      if (names.size === 0) return;
+      yield {
         jobs: jobs.filter((job) => names.has(job.branch)),
         failed: failed.filter((name) => names.has(name)),
+        hasNextPage: false,
         rateRemaining: remaining,
       };
     }),
@@ -282,23 +292,41 @@ describe("Syncer", () => {
     );
   };
 
-  it("asks for PR statuses 50 at a time", async () => {
-    openPulls(51);
-    const forge = fakeForge({ conflicting: [51] });
+  it("stores every page of PR statuses", async () => {
+    openPulls(2);
+    const forge = fakeForge();
+    forge.pullStatuses.mockImplementationOnce(async function* () {
+      yield {
+        statuses: [{ number: 1, statuses: ["is:conflicting"] }],
+        hasNextPage: true,
+        rateRemaining: 5000,
+      };
+      yield {
+        statuses: [{ number: 2, statuses: ["is:conflicting"] }],
+        hasNextPage: false,
+        rateRemaining: 5000,
+      };
+    });
     await syncerWith(db, forge).syncRepo(REPO);
-    expect(forge.pullStatuses.mock.calls.map(([, batch]) => batch.length)).toEqual([50, 1]);
-    expect(cachedIssue(db, REPO, 51)?.statuses).toEqual(["is:conflicting"]);
+    expect(cachedIssue(db, REPO, 1)?.statuses).toEqual(["is:conflicting"]);
+    expect(cachedIssue(db, REPO, 2)?.statuses).toEqual(["is:conflicting"]);
   });
 
-  it("aborts between PR status batches when the rate limit is nearly gone", async () => {
-    openPulls(51);
-    const everyPull = Array.from({ length: 51 }, (_, i) => i + 1);
-    const forge = fakeForge({ remaining: 50, conflicting: everyPull });
+  it("aborts between PR status pages when the rate limit is nearly gone", async () => {
+    openPulls(2);
+    const forge = fakeForge();
+    forge.pullStatuses.mockImplementationOnce(async function* () {
+      yield {
+        statuses: [{ number: 1, statuses: ["is:conflicting"] }],
+        hasNextPage: true,
+        rateRemaining: 50,
+      };
+      throw new Error("a second status page");
+    });
     const syncer = syncerWith(db, forge);
     await expect(syncer.syncRepo(REPO)).rejects.toThrow(/rate limit/);
-    expect(forge.pullStatuses).toHaveBeenCalledTimes(1);
-    const flagged = db.listIssues([REPO]).filter((issue) => issue.statuses.length > 0);
-    expect(flagged).toHaveLength(50);
+    expect(cachedIssue(db, REPO, 1)?.statuses).toEqual(["is:conflicting"]);
+    expect(cachedIssue(db, REPO, 2)?.statuses).toEqual([]);
     expect(syncer.status().rateRemaining).toBe(50);
   });
 
@@ -335,18 +363,14 @@ describe("Syncer", () => {
     expect(forge.ciJobs.mock.calls).toEqual([[REPO, [first, second, third]]]);
   });
 
-  it("asks for CI jobs 20 branches at a time", async () => {
-    const branches = ciBranches(21);
-    const jobs = [
-      makeJob({ name: "lint", branch: "b20" }),
-      makeJob({ name: "lint", branch: "b21" }),
-    ];
-    const forge = fakeForge({ branches: [branches], jobs });
+  it("stores the jobs of every page", async () => {
+    const jobs = [makeJob({ name: "lint", branch: "b1" }), makeJob({ name: "lint", branch: "b2" })];
+    const forge = fakeForge({ branches: [ciBranches(2)] });
+    forge.ciJobs.mockImplementationOnce(async function* () {
+      yield { jobs: jobs.slice(0, 1), failed: [], hasNextPage: true, rateRemaining: 5000 };
+      yield { jobs: jobs.slice(1), failed: [], hasNextPage: false, rateRemaining: 5000 };
+    });
     await syncerWith(db, forge).syncRepo(REPO);
-    expect(forge.ciJobs.mock.calls.map(([, batch]) => batch)).toEqual([
-      branches.slice(0, 20),
-      branches.slice(20),
-    ]);
     expect(db.listCiJobs([REPO])).toEqual(jobs);
   });
 
@@ -364,20 +388,20 @@ describe("Syncer", () => {
   });
 
   it("finishes on a low rate limit when no CI branch needs a job query", async () => {
-    const forge = fakeForge({ remaining: 50 });
-    await syncerWith(db, forge).syncRepo(REPO);
-    expect(forge.ciJobs).not.toHaveBeenCalled();
+    await syncerWith(db, fakeForge({ remaining: 50 })).syncRepo(REPO);
     expect(db.getSyncState(REPO)?.lastSyncAt).toBe(now.toISOString());
   });
 
-  it("aborts between CI job batches when the rate limit is nearly gone", async () => {
+  it("aborts between CI job pages when the rate limit is nearly gone", async () => {
     const cached = makeJob({ name: "lint", branch: "old" });
     db.setCiJobs(REPO, [cached]);
-    const forge = fakeForge({ branches: [ciBranches(21)] });
-    forge.ciJobs.mockResolvedValueOnce({ jobs: [], failed: [], rateRemaining: 50 });
+    const forge = fakeForge({ branches: [ciBranches(1)] });
+    forge.ciJobs.mockImplementationOnce(async function* () {
+      yield { jobs: [], failed: [], hasNextPage: true, rateRemaining: 50 };
+      throw new Error("a second job page");
+    });
     const syncer = syncerWith(db, forge);
     await expect(syncer.syncRepo(REPO)).rejects.toThrow(/rate limit/);
-    expect(forge.ciJobs).toHaveBeenCalledTimes(1);
     expect(db.listCiJobs([REPO])).toEqual([cached]);
     expect(syncer.status().rateRemaining).toBe(50);
   });

@@ -276,7 +276,7 @@ function failedBy(error: GqlError, branches: CiBranch[]): CiBranch[] {
 }
 
 /**
- * The failed jobs on up to `CI_BATCH` branches, in one query. A branch deleted since it was
+ * The failed jobs on the branches, in one query; the caller bounds how many. A branch deleted since it was
  * listed is skipped, and one whose comparison ref is gone gets none; a branch any other error hit
  * is `failed`, so the sync keeps its cached jobs.
  * shortcut: the first 100 commits ahead and checks per branch.
@@ -285,7 +285,7 @@ export async function fetchCiJobs(
   gh: GithubClient,
   repo: string,
   branches: CiBranch[],
-): Promise<CiJobsPage> {
+): Promise<Omit<CiJobsPage, "hasNextPage">> {
   const params = branches.map((_, i) => `$ref${i}: String!, $branch${i}: String!`).join(", ");
   const variables = Object.fromEntries(
     branches.flatMap(({ name }, i) => [
