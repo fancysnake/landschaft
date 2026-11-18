@@ -33,9 +33,6 @@ interface ForgeData {
   broken?: Set<string>;
 }
 
-/** PR statuses per page of the fake forge. */
-const STATUS_PAGE = 50;
-
 /** A forge serving `data`, every method a spy recording what the sync asked for. */
 function fakeForge({
   issues = [],
@@ -71,16 +68,15 @@ function fakeForge({
       _: string,
       numbers: number[],
     ): AsyncGenerator<PullStatusPage> {
-      for (let start = 0; start < numbers.length; start += STATUS_PAGE) {
-        yield {
-          statuses: numbers.slice(start, start + STATUS_PAGE).map((number): PullStatus => ({
-            number,
-            statuses: conflicting.includes(number) ? ["is:conflicting"] : [],
-          })),
-          hasNextPage: start + STATUS_PAGE < numbers.length,
-          rateRemaining: remaining,
-        };
-      }
+      if (numbers.length === 0) return;
+      yield {
+        statuses: numbers.map((number): PullStatus => ({
+          number,
+          statuses: conflicting.includes(number) ? ["is:conflicting"] : [],
+        })),
+        hasNextPage: false,
+        rateRemaining: remaining,
+      };
     }),
     ciBranchesPage: vi.fn(async (_: string, after: string | null): Promise<CiBranchesPage> => {
       const { items, ...page } = paged(branches, after);
@@ -297,20 +293,40 @@ describe("Syncer", () => {
   };
 
   it("stores every page of PR statuses", async () => {
-    openPulls(51);
-    const forge = fakeForge({ conflicting: [51] });
+    openPulls(2);
+    const forge = fakeForge();
+    forge.pullStatuses.mockImplementationOnce(async function* () {
+      yield {
+        statuses: [{ number: 1, statuses: ["is:conflicting"] }],
+        hasNextPage: true,
+        rateRemaining: 5000,
+      };
+      yield {
+        statuses: [{ number: 2, statuses: ["is:conflicting"] }],
+        hasNextPage: false,
+        rateRemaining: 5000,
+      };
+    });
     await syncerWith(db, forge).syncRepo(REPO);
-    expect(cachedIssue(db, REPO, 51)?.statuses).toEqual(["is:conflicting"]);
+    expect(cachedIssue(db, REPO, 1)?.statuses).toEqual(["is:conflicting"]);
+    expect(cachedIssue(db, REPO, 2)?.statuses).toEqual(["is:conflicting"]);
   });
 
   it("aborts between PR status pages when the rate limit is nearly gone", async () => {
-    openPulls(51);
-    const everyPull = Array.from({ length: 51 }, (_, i) => i + 1);
-    const forge = fakeForge({ remaining: 50, conflicting: everyPull });
+    openPulls(2);
+    const forge = fakeForge();
+    forge.pullStatuses.mockImplementationOnce(async function* () {
+      yield {
+        statuses: [{ number: 1, statuses: ["is:conflicting"] }],
+        hasNextPage: true,
+        rateRemaining: 50,
+      };
+      throw new Error("a second status page");
+    });
     const syncer = syncerWith(db, forge);
     await expect(syncer.syncRepo(REPO)).rejects.toThrow(/rate limit/);
-    const flagged = db.listIssues([REPO]).filter((issue) => issue.statuses.length > 0);
-    expect(flagged).toHaveLength(50);
+    expect(cachedIssue(db, REPO, 1)?.statuses).toEqual(["is:conflicting"]);
+    expect(cachedIssue(db, REPO, 2)?.statuses).toEqual([]);
     expect(syncer.status().rateRemaining).toBe(50);
   });
 
