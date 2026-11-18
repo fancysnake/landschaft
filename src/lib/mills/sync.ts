@@ -1,15 +1,9 @@
 import type { Config, Dashboard } from "../pacts/config";
 import type { SyncStore } from "../pacts/db";
+import type { CiBranch, Forge, PageOptions } from "../pacts/forge";
 import type { CiJob } from "../pacts/issues";
 import type { SyncRequest } from "../pacts/web";
 
-import {
-  CI_BATCH,
-  type CiBranch,
-  type Forge,
-  type PageOptions,
-  STATUS_BATCH,
-} from "../pacts/forge";
 import {
   InvalidError,
   SyncBusyError,
@@ -359,21 +353,18 @@ export class Syncer implements SyncService {
     return upserted;
   }
 
-  /** Stores the statuses of every open PR in the cache, `STATUS_BATCH` PRs per query. */
+  /** Stores the statuses of every open PR in the cache. */
   private async refreshPullStatuses(repo: string): Promise<void> {
-    const numbers = this.db.openPullNumbers(repo);
-    for (let start = 0; start < numbers.length; start += STATUS_BATCH) {
-      const batch = numbers.slice(start, start + STATUS_BATCH);
-      const page = await this.forge.pullStatuses(repo, batch);
+    for await (const page of this.forge.pullStatuses(repo, this.db.openPullNumbers(repo))) {
       this.db.setPullStatuses(repo, page.statuses);
-      this.spend(page.rateRemaining, start + STATUS_BATCH < numbers.length);
+      this.spend(page.rateRemaining, page.hasNextPage);
     }
   }
 
   /**
    * Replaces the cached failed CI jobs: lists the branches whose head commit failed and the
-   * default branch, then reads jobs and commit authors of those alone, `CI_BATCH` per query. A
-   * branch a query failed on keeps its cached jobs.
+   * default branch, then reads jobs and commit authors of those alone. A branch a query
+   * failed on keeps its cached jobs.
    */
   private async refreshCiJobs(repo: string): Promise<void> {
     const watched: CiBranch[] = [];
@@ -386,12 +377,10 @@ export class Syncer implements SyncService {
     } while (after);
     const jobs: CiJob[] = [];
     const failed = new Set<string>();
-    for (let start = 0; start < watched.length; start += CI_BATCH) {
-      const batch = watched.slice(start, start + CI_BATCH);
-      const page = await this.forge.ciJobs(repo, batch);
+    for await (const page of this.forge.ciJobs(repo, watched)) {
       jobs.push(...page.jobs);
       for (const name of page.failed) failed.add(name);
-      this.spend(page.rateRemaining, start + CI_BATCH < watched.length);
+      this.spend(page.rateRemaining, page.hasNextPage);
     }
     jobs.push(...this.db.listCiJobs([repo]).filter((job) => failed.has(job.branch)));
     this.db.setCiJobs(repo, jobs);

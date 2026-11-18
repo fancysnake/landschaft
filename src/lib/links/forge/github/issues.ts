@@ -301,14 +301,14 @@ function pullStatusField(number: number): string {
 }
 
 /**
- * Merge conflicts, checks and review threads of up to `STATUS_BATCH` PRs, in one
- * query. Not all of it bumps a PR's `updatedAt`, so the sync asks for every open PR each time.
+ * Merge conflicts, checks and review threads of the PRs, in one query; the caller bounds how
+ * many. Not all of it bumps a PR's `updatedAt`, so the sync asks for every open PR each time.
  */
 export async function fetchPullStatuses(
   gh: GithubClient,
   repo: string,
   numbers: number[],
-): Promise<PullStatusPage> {
+): Promise<Omit<PullStatusPage, "hasNextPage">> {
   const data = await gh.gql<{
     rateLimit: { remaining: number };
     repository: Record<string, PullStatusNode | null> | null;
