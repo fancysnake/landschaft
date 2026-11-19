@@ -46,8 +46,8 @@ export class Views implements ViewService {
     };
   }
 
-  async nav(hidden: string[]): Promise<NavData> {
-    const { config, snapshot, audience } = await this.context(hidden);
+  async nav(): Promise<NavData> {
+    const { config, snapshot, audience } = await this.context([]);
     return {
       dashboards: config.dashboards.map(({ id, name, filter }) => ({
         id,
@@ -55,7 +55,6 @@ export class Views implements ViewService {
         repos: [...scopedRepos(snapshot, { filter }, audience)],
       })),
       repos: config.repos,
-      hidden: config.repos.filter((repo) => hidden.includes(repo)),
       refreshMinutes: config.refreshMinutes,
     };
   }

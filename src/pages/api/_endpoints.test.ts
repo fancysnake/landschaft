@@ -11,7 +11,7 @@ import { ConfigKeeper } from "../../lib/mills/config";
 import { Syncer } from "../../lib/mills/sync";
 import { Views } from "../../lib/mills/views";
 import { type Config, ConfigSchema } from "../../lib/pacts/config";
-import { HIDDEN_REPOS_COOKIE } from "../../lib/pacts/views";
+import { HIDDEN_REPOS_COOKIE } from "../../lib/pacts/web";
 import { GET as board } from "./dashboards/[id]/board";
 import { POST as sync } from "./sync";
 

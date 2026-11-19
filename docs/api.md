@@ -7,17 +7,17 @@ description: "The local JSON API behind landschaft: config, board and inbox view
 All endpoints return JSON and carry no authentication: the server is meant to listen on
 localhost only. Errors are `{ "error": "message" }` with a matching status.
 
-| Route                           | Purpose                                                              |
-| ------------------------------- | -------------------------------------------------------------------- |
-| `GET /api/config`               | The whole config, defaults filled in                                 |
-| `PUT /api/config`               | Replace the whole config; validated, saved atomically                |
-| `GET /api/dashboards/:id/board` | Computed board; the query string is the filter set                   |
-| `GET /api/dashboards/:id/inbox` | Computed inbox; same query string as the board                       |
-| `GET /api/unmatched?filter=`    | Open items no dashboard places; see [Board](#board)                  |
-| `POST /api/sync`                | `{ "repos"?, "full"?, "stale"? }`; see [Sync](#sync)                 |
-| `GET /api/version`              | Sync status per repository plus rate-limit budget                    |
-| `GET /api/labels?repos=a/b,c/d` | Cached label catalogue for the pickers                               |
-| `GET /api/nav`                  | Nav tabs with their repos, global and hidden repos, refresh interval |
+| Route                           | Purpose                                                   |
+| ------------------------------- | --------------------------------------------------------- |
+| `GET /api/config`               | The whole config, defaults filled in                      |
+| `PUT /api/config`               | Replace the whole config; validated, saved atomically     |
+| `GET /api/dashboards/:id/board` | Computed board; the query string is the filter set        |
+| `GET /api/dashboards/:id/inbox` | Computed inbox; same query string as the board            |
+| `GET /api/unmatched?filter=`    | Open items no dashboard places; see [Board](#board)       |
+| `POST /api/sync`                | `{ "repos"?, "full"?, "stale"? }`; see [Sync](#sync)      |
+| `GET /api/version`              | Sync status per repository plus rate-limit budget         |
+| `GET /api/labels?repos=a/b,c/d` | Cached label catalogue for the pickers                    |
+| `GET /api/nav`                  | Nav tabs with their repos, global repos, refresh interval |
 
 ## Board
 
@@ -39,7 +39,7 @@ as cards shaped like the board's with every label, leaving out hidden repositori
 dashboard filter expression; `offer` holds the repos, labels and users the filter box suggests.
 
 The browser keeps the repositories switched off in the `landschaft_hidden_repos` cookie, as
-`owner/repo` names separated by commas. The board, inbox, unmatched and nav routes read it from
+`owner/repo` names separated by commas. The board, inbox and unmatched routes read it from
 the request and leave those repositories' items out; without the cookie every repository is on.
 
 ## Sync

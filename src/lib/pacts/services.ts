@@ -64,9 +64,12 @@ export interface SyncService {
   syncDue(): Promise<void>;
 }
 
-/** Every view leaves out the items of the `hidden` repos, the ones the browser switched off. */
+/**
+ * Every view but the nav leaves out the items of the `hidden` repos, the ones the browser
+ * switched off.
+ */
 export interface ViewService {
-  nav(hidden: string[]): Promise<NavData>;
+  nav(): Promise<NavData>;
   /** Throws `NotFoundError` unless `id` names a board. */
   board(
     id: string,

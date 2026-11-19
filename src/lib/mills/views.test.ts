@@ -39,7 +39,6 @@ describe("Views", () => {
     const { board } = await v.board(DASHBOARD.id, {}, [REPO, "acme/gone"]);
     expect(board.hidden).toEqual([REPO]);
     expect(board.total).toBe(0);
-    expect((await v.nav([REPO, "acme/gone"])).hidden).toEqual([REPO]);
   });
 
   it("finds no inbox under a board's id", async () => {

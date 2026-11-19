@@ -12,6 +12,8 @@ interface Props {
   path: string;
   /** As rendered on the server; refetched when the config is saved or a sync lands. */
   nav: NavData;
+  /** The repos this browser switched off, from its cookie; the top bar keeps the list from here. */
+  hidden: string[];
 }
 
 const link = (inactive = false) =>
@@ -23,8 +25,9 @@ const current = (active: boolean) => (active ? "page" : undefined);
  * The dashboards, the repo chips every board follows, and the sync status with its buttons. A
  * dashboard with no items in the repos switched on is dimmed.
  */
-export default function Nav({ path, nav }: Props) {
-  const [{ dashboards, repos, hidden, refreshMinutes }, setNav] = useState(nav);
+export default function Nav({ path, nav, hidden: initialHidden }: Props) {
+  const [{ dashboards, repos, refreshMinutes }, setNav] = useState(nav);
+  const [hidden, setHidden] = useState(initialHidden);
   const { status, error, syncing, sync, dismissError } = useSyncStatus();
 
   const seq = useRef(0);
@@ -57,10 +60,8 @@ export default function Nav({ path, nav }: Props) {
   const shown = repos.filter((repo) => !hidden.includes(repo));
   const setShown = (selected: string[]) => {
     const off = repos.filter((repo) => !selected.includes(repo));
-    setNav((prev) => ({ ...prev, hidden: off }));
+    setHidden(off);
     saveHidden(off);
-    // Drops a reload that started before the switch and would undo it.
-    reload();
   };
   const active = dashboards.find((dashboard) => path === `/d/${dashboard.id}`);
   const inactive = (dashboard: NavData["dashboards"][number]) =>
@@ -115,7 +116,7 @@ export default function Nav({ path, nav }: Props) {
           </a>
         </div>
       </div>
-      {(repos.length > 1 || hidden.length > 0) && (
+      {(repos.length > 1 || shown.length < repos.length) && (
         <div className="border-t border-neutral-100 px-4 py-2">
           <RepoChips
             repos={repos}

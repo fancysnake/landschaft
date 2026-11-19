@@ -97,21 +97,12 @@ export function laneRows<T extends { fluid: boolean }>(lanes: T[]): [T, ...T[]][
   return rows;
 }
 
-/** The browser cookie that lists the repos switched off, comma-separated. */
-export const HIDDEN_REPOS_COOKIE = "landschaft_hidden_repos";
-
-/** The repos a request's `cookies` switch off. */
-export const hiddenRepos = (cookies: { get(name: string): { value: string } | undefined }) =>
-  cookies.get(HIDDEN_REPOS_COOKIE)?.value.split(",").filter(Boolean) ?? [];
-
 /** What the nav shows. */
 export interface NavData {
   /** Each with the repos among its items. */
   dashboards: { id: string; name: string; repos: string[] }[];
   /** The global repos. */
   repos: string[];
-  /** Those of `repos` switched off. */
-  hidden: string[];
   refreshMinutes: number;
 }
 

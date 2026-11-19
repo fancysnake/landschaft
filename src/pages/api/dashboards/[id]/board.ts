@@ -1,6 +1,5 @@
 import { NotFoundError } from "../../../../lib/pacts/services";
-import { hiddenRepos } from "../../../../lib/pacts/views";
-import { ViewQuerySchema } from "../../../../lib/pacts/web";
+import { hiddenRepos, ViewQuerySchema } from "../../../../lib/pacts/web";
 import { json, parseQuery, route } from "../../_route";
 
 export const GET = route(

@@ -5,7 +5,7 @@ import type { SyncStatus } from "../pacts/sync";
 import type { Board, Card, Filters, Inbox, NavData } from "../pacts/views";
 import type { SyncRequest } from "../pacts/web";
 
-import { HIDDEN_REPOS_COOKIE } from "../pacts/views";
+import { hiddenReposCookie } from "../pacts/web";
 
 /** Tells the islands on this page that the config was saved. */
 export const CONFIG_SAVED = "landschaft:config-saved";
@@ -17,7 +17,7 @@ export const REPOS_SWITCHED = "landschaft:repos-switched";
 export function saveHidden(repos: string[]): void {
   // shortcut: a cookie holds about 4 KB and lasts 400 days after the last switch; move the list
   // into the view requests once someone switches off more repos than fit.
-  document.cookie = `${HIDDEN_REPOS_COOKIE}=${encodeURIComponent(repos.join(","))}; path=/; max-age=34560000; samesite=lax`;
+  document.cookie = hiddenReposCookie(repos);
   window.dispatchEvent(new Event(REPOS_SWITCHED));
 }
 
