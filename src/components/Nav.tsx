@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { NavData } from "../lib/pacts/views";
 
-import { api, CONFIG_SAVED, errorMessage } from "../lib/client/api";
+import { api, CONFIG_SAVED, saveHidden } from "../lib/client/api";
 import { SYNCED, useSyncStatus } from "../lib/client/useSyncStatus";
 import { RepoChips } from "./board/RepoChips";
 import { SyncStatus } from "./board/SyncStatus";
@@ -12,6 +12,8 @@ interface Props {
   path: string;
   /** As rendered on the server; refetched when the config is saved or a sync lands. */
   nav: NavData;
+  /** The repos this browser switched off, from its cookie; the top bar keeps the list from here. */
+  hidden: string[];
 }
 
 const link = (inactive = false) =>
@@ -23,22 +25,20 @@ const current = (active: boolean) => (active ? "page" : undefined);
  * The dashboards, the repo chips every board follows, and the sync status with its buttons. A
  * dashboard with no items in the repos switched on is dimmed.
  */
-export default function Nav({ path, nav }: Props) {
-  const [{ dashboards, repos, hidden, refreshMinutes }, setNav] = useState(nav);
-  const [toggleError, setToggleError] = useState<string | null>(null);
+export default function Nav({ path, nav, hidden: initialHidden }: Props) {
+  const [{ dashboards, repos, refreshMinutes }, setNav] = useState(nav);
+  const [hidden, setHidden] = useState(initialHidden);
   const { status, error, syncing, sync, dismissError } = useSyncStatus();
 
   const seq = useRef(0);
-  const saving = useRef(0);
 
-  // A response is dropped once a newer reload has started, or while a toggle is still saving: it
-  // would undo that toggle, and the last save to settle reloads.
+  // A response is dropped once a newer reload has started.
   const reload = useCallback(() => {
     const mine = ++seq.current;
     api
       .nav()
       .then((next) => {
-        if (mine === seq.current && saving.current === 0) setNav(next);
+        if (mine === seq.current) setNav(next);
       })
       .catch(() => undefined);
   }, []);
@@ -59,28 +59,9 @@ export default function Nav({ path, nav }: Props) {
 
   const shown = repos.filter((repo) => !hidden.includes(repo));
   const setShown = (selected: string[]) => {
-    const flipped = repos.filter((repo) => selected.includes(repo) === hidden.includes(repo));
-    const off = flipped.filter((repo) => !selected.includes(repo));
-    const on = flipped.filter((repo) => selected.includes(repo));
-    setToggleError(null);
-    // Applied now so a click before the reload diffs against what the user already chose.
-    setNav((prev) => ({
-      ...prev,
-      hidden: [...prev.hidden.filter((repo) => !on.includes(repo)), ...off],
-    }));
-    // Saving fires CONFIG_SAVED, which reloads every view.
-    saving.current += 1;
-    void (async () => {
-      try {
-        if (off.length > 0) await api.setHidden({ repos: off, hidden: true });
-        if (on.length > 0) await api.setHidden({ repos: on, hidden: false });
-      } catch (cause) {
-        setToggleError(`Switching repositories failed: ${errorMessage(cause)}`);
-      } finally {
-        saving.current -= 1;
-        if (saving.current === 0) reload();
-      }
-    })();
+    const off = repos.filter((repo) => !selected.includes(repo));
+    setHidden(off);
+    saveHidden(off);
   };
   const active = dashboards.find((dashboard) => path === `/d/${dashboard.id}`);
   const inactive = (dashboard: NavData["dashboards"][number]) =>
@@ -135,7 +116,7 @@ export default function Nav({ path, nav }: Props) {
           </a>
         </div>
       </div>
-      {(repos.length > 1 || hidden.length > 0) && (
+      {(repos.length > 1 || shown.length < repos.length) && (
         <div className="border-t border-neutral-100 px-4 py-2">
           <RepoChips
             repos={repos}
@@ -145,9 +126,6 @@ export default function Nav({ path, nav }: Props) {
             onChange={setShown}
             onSync={(repo) => void sync({ repos: [repo] })}
           />
-          {toggleError && (
-            <ErrorBanner error={toggleError} onDismiss={() => setToggleError(null)} />
-          )}
         </div>
       )}
     </nav>

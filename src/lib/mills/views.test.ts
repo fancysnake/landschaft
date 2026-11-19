@@ -7,8 +7,8 @@ import { ConfigSchema } from "../pacts/config";
 import { NotFoundError } from "../pacts/services";
 import { Views } from "./views";
 
-function views(extra: { hiddenRepos?: string[] } = {}, issues: Issue[] = []) {
-  const config = ConfigSchema.parse({ repos: [REPO], dashboards: [DASHBOARD], ...extra });
+function views(issues: Issue[] = []) {
+  const config = ConfigSchema.parse({ repos: [REPO], dashboards: [DASHBOARD] });
   const store = { snapshot: () => ({ issues, jobs: [] }), listLabels: () => [] };
   const syncer = {
     status: () => ({
@@ -29,20 +29,19 @@ function views(extra: { hiddenRepos?: string[] } = {}, issues: Issue[] = []) {
 
 describe("Views", () => {
   it("builds a board with no viewer", async () => {
-    const { dashboard, board } = await views().board(DASHBOARD.id, {});
+    const { dashboard, board } = await views().board(DASHBOARD.id, {}, []);
     expect(dashboard.id).toBe(DASHBOARD.id);
     expect(board.total).toBe(0);
   });
 
-  it("reports the repos switched off in the config", async () => {
-    const v = views({ hiddenRepos: [REPO] }, [makeIssue({ number: 1 })]);
-    const { board } = await v.board(DASHBOARD.id, {});
+  it("leaves out the repos switched off, and reports those in the config", async () => {
+    const v = views([makeIssue({ number: 1 })]);
+    const { board } = await v.board(DASHBOARD.id, {}, [REPO, "acme/gone"]);
     expect(board.hidden).toEqual([REPO]);
     expect(board.total).toBe(0);
-    expect((await v.nav()).hidden).toEqual([REPO]);
   });
 
   it("finds no inbox under a board's id", async () => {
-    await expect(views().inbox(DASHBOARD.id, {})).rejects.toThrow(NotFoundError);
+    await expect(views().inbox(DASHBOARD.id, {}, [])).rejects.toThrow(NotFoundError);
   });
 });

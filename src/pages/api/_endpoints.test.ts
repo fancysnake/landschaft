@@ -4,15 +4,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Services } from "../../lib/pacts/services";
 
-import { DASHBOARD, REPO } from "../../lib/__fixtures__/issues";
+import { DASHBOARD, makeIssue, REPO } from "../../lib/__fixtures__/issues";
 import { Db } from "../../lib/links/db/sqlite";
 import { GithubForge } from "../../lib/links/forge/github/forge";
 import { ConfigKeeper } from "../../lib/mills/config";
 import { Syncer } from "../../lib/mills/sync";
 import { Views } from "../../lib/mills/views";
 import { type Config, ConfigSchema } from "../../lib/pacts/config";
+import { HIDDEN_REPOS_COOKIE } from "../../lib/pacts/web";
 import { GET as board } from "./dashboards/[id]/board";
-import { POST as hiddenRepos } from "./hidden-repos";
 import { POST as sync } from "./sync";
 
 let db: Db;
@@ -47,14 +47,25 @@ afterEach(async () => {
 async function call(
   endpoint: APIRoute,
   path: string,
-  { body, params = {} }: { body?: unknown; params?: Record<string, string> } = {},
+  {
+    body,
+    params = {},
+    cookies = {},
+  }: { body?: unknown; params?: Record<string, string>; cookies?: Record<string, string> } = {},
 ) {
   const url = new URL(path, "http://localhost");
   const request = new Request(url, {
     method: body === undefined ? "GET" : "POST",
     body: typeof body === "string" ? body : body === undefined ? undefined : JSON.stringify(body),
   });
-  const context = { locals: { services }, params, request, url } as unknown as APIContext;
+  const jar = { get: (name: string) => (name in cookies ? { value: cookies[name] } : undefined) };
+  const context = {
+    cookies: jar,
+    locals: { services },
+    params,
+    request,
+    url,
+  } as unknown as APIContext;
   const response = await endpoint(context);
   return { status: response.status, body: await response.json() };
 }
@@ -94,20 +105,22 @@ describe("GET /api/dashboards/[id]/board", () => {
     expect(response).toMatchObject({ status: 200, body: { dashboard: { id: "main" } } });
   });
 
+  it("leaves out the repos the cookie switches off", async () => {
+    db.upsertIssues([makeIssue({ number: 1 })]);
+    const params = { id: "main" };
+    expect(await call(board, "/api/dashboards/main/board", { params })).toMatchObject({
+      body: { board: { hidden: [] } },
+    });
+    const cookies = { [HIDDEN_REPOS_COOKIE]: `acme/other,${REPO}` };
+    expect(await call(board, "/api/dashboards/main/board", { params, cookies })).toMatchObject({
+      body: { board: { hidden: [REPO], total: 0 } },
+    });
+  });
+
   it("answers 404 for an unknown dashboard", async () => {
     expect(await call(board, "/api/dashboards/nope/board", { params: { id: "nope" } })).toEqual({
       status: 404,
       body: { error: "board not found" },
     });
-  });
-});
-
-describe("POST /api/hidden-repos", () => {
-  it("answers 400 for a repo outside the config", async () => {
-    expect(
-      await call(hiddenRepos, "/api/hidden-repos", {
-        body: { repos: ["acme/other"], hidden: true },
-      }),
-    ).toEqual({ status: 400, body: { error: "repository is not configured" } });
   });
 });

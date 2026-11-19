@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- The repos switched off in the top bar are kept in the browser, not in the config. Each browser
+  has its own list, and Settings no longer shows `hiddenRepos`. A config that still has the key
+  loads; every repo is on once after the upgrade.
+
+### Removed
+
+- `POST /api/hidden-repos`.
+
 ### Fixed
 
 - A sync request that names a repo while it syncs no longer syncs that repo a second time. A

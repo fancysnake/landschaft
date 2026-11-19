@@ -3,10 +3,23 @@ import type { Offer } from "../pacts/filter";
 import type { LabelDef } from "../pacts/issues";
 import type { SyncStatus } from "../pacts/sync";
 import type { Board, Card, Filters, Inbox, NavData } from "../pacts/views";
-import type { HiddenReposRequest, SyncRequest } from "../pacts/web";
+import type { SyncRequest } from "../pacts/web";
+
+import { hiddenReposCookie } from "../pacts/web";
 
 /** Tells the islands on this page that the config was saved. */
 export const CONFIG_SAVED = "landschaft:config-saved";
+
+/** Tells the islands on this page that the repos switched off changed. */
+export const REPOS_SWITCHED = "landschaft:repos-switched";
+
+/** Keeps `repos` as the ones switched off in this browser; every later request carries them. */
+export function saveHidden(repos: string[]): void {
+  // shortcut: a cookie holds about 4 KB and lasts 400 days after the last switch; move the list
+  // into the view requests once someone switches off more repos than fit.
+  document.cookie = hiddenReposCookie(repos);
+  window.dispatchEvent(new Event(REPOS_SWITCHED));
+}
 
 export interface BoardResponse {
   dashboard: BoardDashboard;
@@ -73,7 +86,7 @@ async function request<T>(input: string, init: RequestInit = {}): Promise<T> {
 }
 
 /** Sends a config change, then tells the islands it was saved. */
-async function saveTo<T>(input: string, method: "PUT" | "POST", body: unknown): Promise<T> {
+async function saveTo<T>(input: string, method: "PUT", body: unknown): Promise<T> {
   const saved = await request<T>(input, { method, body: JSON.stringify(body) });
   window.dispatchEvent(new Event(CONFIG_SAVED));
   return saved;
@@ -100,9 +113,6 @@ export const api = {
     request<SyncResponse>("/api/sync", { method: "POST", body: JSON.stringify(body) }),
   config: () => request<Config>("/api/config"),
   saveConfig: (config: unknown) => saveTo<Config>("/api/config", "PUT", config),
-  setHidden: async (body: HiddenReposRequest) => {
-    await saveTo("/api/hidden-repos", "POST", body);
-  },
   nav: () => request<NavData>("/api/nav"),
   labels: (repos: string[]) =>
     request<LabelDef[]>(`/api/labels?repos=${encodeURIComponent(repos.join(","))}`),

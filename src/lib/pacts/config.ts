@@ -167,7 +167,7 @@ const dashboardFilter = z.string().superRefine((text, ctx) => {
 
 /** A config object as read from JSON, before validation. */
 type Raw = Record<string, unknown>;
-export const isRaw = (value: unknown): value is Raw =>
+const isRaw = (value: unknown): value is Raw =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** What every dashboard type has. */
@@ -375,8 +375,6 @@ export const ConfigSchema = z.preprocess(
       repos: z.array(repoName).default([]),
       /** …that these users authored or are assigned to; empty takes everyone's. */
       users: z.array(userName).default([]),
-      /** Repos switched off in the nav; every view leaves their items out. */
-      hiddenRepos: z.array(repoName).default([]),
       refreshMinutes: refreshMinutes.default(5),
       dashboards: z.array(DashboardSchema).default([]),
     })
@@ -384,12 +382,7 @@ export const ConfigSchema = z.preprocess(
       if (!hasUniqueIds(config.dashboards)) {
         ctx.addIssue({ code: "custom", path: ["dashboards"], message: "ids must be unique" });
       }
-    })
-    // A repo dropped from `repos` is not kept switched off for when it comes back.
-    .transform((config) => ({
-      ...config,
-      hiddenRepos: config.hiddenRepos.filter((repo) => config.repos.includes(repo)),
-    })),
+    }),
 );
 
 export type BoardDashboard = Extract<Dashboard, { type: "board" }>;

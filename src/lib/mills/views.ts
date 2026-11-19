@@ -35,19 +35,19 @@ export class Views implements ViewService {
   constructor(private readonly deps: ViewDeps) {}
 
   /** The config, the cached issues and jobs of its repos, who views them and the sync status. */
-  private async context(): Promise<Context> {
+  private async context(hidden: string[]): Promise<Context> {
     const { config: load, store, syncer, viewer } = this.deps;
     const config = load();
     return {
       config,
       snapshot: store.snapshot(config.repos),
-      audience: { users: config.users, viewer: await viewer(), hidden: config.hiddenRepos },
+      audience: { users: config.users, viewer: await viewer(), hidden },
       status: syncer.status(),
     };
   }
 
   async nav(): Promise<NavData> {
-    const { config, snapshot, audience } = await this.context();
+    const { config, snapshot, audience } = await this.context([]);
     return {
       dashboards: config.dashboards.map(({ id, name, filter }) => ({
         id,
@@ -55,27 +55,26 @@ export class Views implements ViewService {
         repos: [...scopedRepos(snapshot, { filter }, audience)],
       })),
       repos: config.repos,
-      hidden: config.hiddenRepos,
       refreshMinutes: config.refreshMinutes,
     };
   }
 
-  async board(id: string, filters: Filters) {
-    const { config, snapshot, audience, status } = await this.context();
+  async board(id: string, filters: Filters, hidden: string[]) {
+    const { config, snapshot, audience, status } = await this.context(hidden);
     const dashboard = dashboardOf(config, id, "board");
     const board = buildBoard(snapshot, dashboard, { ...audience, query: filters });
     return { dashboard, board, status };
   }
 
-  async inbox(id: string, filters: Filters) {
-    const { config, snapshot, audience, status } = await this.context();
+  async inbox(id: string, filters: Filters, hidden: string[]) {
+    const { config, snapshot, audience, status } = await this.context(hidden);
     const dashboard = dashboardOf(config, id, "inbox");
     const inbox = buildInbox(snapshot, dashboard, { ...audience, query: filters });
     return { dashboard, inbox, status };
   }
 
-  async unmatched(query: UnmatchedQuery) {
-    const { config, snapshot, audience, status } = await this.context();
+  async unmatched(query: UnmatchedQuery, hidden: string[]) {
+    const { config, snapshot, audience, status } = await this.context(hidden);
     const { items, offer } = unmatchedItems(snapshot, config.dashboards, { ...audience, query });
     return { items, offer, status };
   }
