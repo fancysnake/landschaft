@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { SyncStatus } from "../pacts/sync";
 
-import { CONFIG_SAVED, errorMessage } from "./api";
+import { CONFIG_SAVED, errorMessage, REPOS_SWITCHED } from "./api";
 import { SYNCED } from "./useSyncStatus";
 
 export interface SyncedController<T> {
@@ -13,7 +13,8 @@ export interface SyncedController<T> {
 }
 
 /**
- * Loads with `get` whenever it changes, and again whenever a sync lands or the config is saved.
+ * Loads with `get` whenever it changes, and again whenever a sync lands, the config is saved or
+ * a repo is switched.
  * `get` must keep its identity across renders (from `useCallback`, say); a new one each render
  * reloads forever.
  */
@@ -50,12 +51,14 @@ export function useSynced<T extends { status: SyncStatus }>(
     const onSynced = (event: Event) => {
       if ((event as CustomEvent<number>).detail !== versionRef.current) void load();
     };
-    const onSaved = () => void load();
+    const reload = () => void load();
     window.addEventListener(SYNCED, onSynced);
-    window.addEventListener(CONFIG_SAVED, onSaved);
+    window.addEventListener(CONFIG_SAVED, reload);
+    window.addEventListener(REPOS_SWITCHED, reload);
     return () => {
       window.removeEventListener(SYNCED, onSynced);
-      window.removeEventListener(CONFIG_SAVED, onSaved);
+      window.removeEventListener(CONFIG_SAVED, reload);
+      window.removeEventListener(REPOS_SWITCHED, reload);
     };
   }, [load]);
 

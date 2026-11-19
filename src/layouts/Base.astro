@@ -2,13 +2,14 @@
 import "../styles/global.css";
 
 import Nav from "../components/Nav";
+import { hiddenRepos } from "../lib/pacts/views";
 
 interface Props {
   title: string;
 }
 
 const { title } = Astro.props;
-const nav = await Astro.locals.services.views.nav();
+const nav = await Astro.locals.services.views.nav(hiddenRepos(Astro.cookies));
 ---
 
 <!doctype html>

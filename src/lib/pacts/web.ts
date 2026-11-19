@@ -3,12 +3,6 @@ import { z } from "zod";
 import { filterText, repoName, SortBySchema, SortDirSchema } from "./config";
 import { type Filters, TEXT_FILTER_KEYS, type TextFilterKey, type UnmatchedQuery } from "./views";
 
-export const HiddenReposRequestSchema = z.object({
-  repos: z.array(repoName),
-  hidden: z.boolean(),
-});
-export type HiddenReposRequest = z.infer<typeof HiddenReposRequestSchema>;
-
 export const SyncRequestSchema = z.strictObject({
   /** What a sync-all queues instead of every configured repo. */
   repos: z.array(repoName).optional(),

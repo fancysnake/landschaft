@@ -40,13 +40,8 @@ export interface SyncOptions {
 
 export interface ConfigService {
   load(): Config;
-  /**
-   * Validates and saves `config` with the stored `hiddenRepos`, which `setHidden` owns, then
-   * fully resyncs the repos it widened.
-   */
-  save(config: unknown): Config;
-  /** Switches `repos` off or on. Throws `InvalidError` for a repo outside the config. */
-  setHidden(repos: string[], hidden: boolean): Config;
+  /** Validates and saves `config`, then fully resyncs the repos it widened. */
+  save(config: Config): Config;
 }
 
 export interface SyncService {
@@ -69,19 +64,25 @@ export interface SyncService {
   syncDue(): Promise<void>;
 }
 
+/** Every view leaves out the items of the `hidden` repos, the ones the browser switched off. */
 export interface ViewService {
-  nav(): Promise<NavData>;
+  nav(hidden: string[]): Promise<NavData>;
   /** Throws `NotFoundError` unless `id` names a board. */
   board(
     id: string,
     filters: Filters,
+    hidden: string[],
   ): Promise<{ dashboard: BoardDashboard; board: Board; status: SyncStatus }>;
   /** Throws `NotFoundError` unless `id` names an inbox. */
   inbox(
     id: string,
     filters: Filters,
+    hidden: string[],
   ): Promise<{ dashboard: InboxDashboard; inbox: Inbox; status: SyncStatus }>;
-  unmatched(query: UnmatchedQuery): Promise<{ items: Card[]; offer: Offer; status: SyncStatus }>;
+  unmatched(
+    query: UnmatchedQuery,
+    hidden: string[],
+  ): Promise<{ items: Card[]; offer: Offer; status: SyncStatus }>;
   labels(repos: string[]): LabelDef[];
 }
 

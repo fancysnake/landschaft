@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { NavData } from "../lib/pacts/views";
 
-import { api, CONFIG_SAVED, errorMessage } from "../lib/client/api";
+import { api, CONFIG_SAVED, saveHidden } from "../lib/client/api";
 import { SYNCED, useSyncStatus } from "../lib/client/useSyncStatus";
 import { RepoChips } from "./board/RepoChips";
 import { SyncStatus } from "./board/SyncStatus";
@@ -25,20 +25,17 @@ const current = (active: boolean) => (active ? "page" : undefined);
  */
 export default function Nav({ path, nav }: Props) {
   const [{ dashboards, repos, hidden, refreshMinutes }, setNav] = useState(nav);
-  const [toggleError, setToggleError] = useState<string | null>(null);
   const { status, error, syncing, sync, dismissError } = useSyncStatus();
 
   const seq = useRef(0);
-  const saving = useRef(0);
 
-  // A response is dropped once a newer reload has started, or while a toggle is still saving: it
-  // would undo that toggle, and the last save to settle reloads.
+  // A response is dropped once a newer reload has started.
   const reload = useCallback(() => {
     const mine = ++seq.current;
     api
       .nav()
       .then((next) => {
-        if (mine === seq.current && saving.current === 0) setNav(next);
+        if (mine === seq.current) setNav(next);
       })
       .catch(() => undefined);
   }, []);
@@ -59,28 +56,11 @@ export default function Nav({ path, nav }: Props) {
 
   const shown = repos.filter((repo) => !hidden.includes(repo));
   const setShown = (selected: string[]) => {
-    const flipped = repos.filter((repo) => selected.includes(repo) === hidden.includes(repo));
-    const off = flipped.filter((repo) => !selected.includes(repo));
-    const on = flipped.filter((repo) => selected.includes(repo));
-    setToggleError(null);
-    // Applied now so a click before the reload diffs against what the user already chose.
-    setNav((prev) => ({
-      ...prev,
-      hidden: [...prev.hidden.filter((repo) => !on.includes(repo)), ...off],
-    }));
-    // Saving fires CONFIG_SAVED, which reloads every view.
-    saving.current += 1;
-    void (async () => {
-      try {
-        if (off.length > 0) await api.setHidden({ repos: off, hidden: true });
-        if (on.length > 0) await api.setHidden({ repos: on, hidden: false });
-      } catch (cause) {
-        setToggleError(`Switching repositories failed: ${errorMessage(cause)}`);
-      } finally {
-        saving.current -= 1;
-        if (saving.current === 0) reload();
-      }
-    })();
+    const off = repos.filter((repo) => !selected.includes(repo));
+    setNav((prev) => ({ ...prev, hidden: off }));
+    saveHidden(off);
+    // Drops a reload that started before the switch and would undo it.
+    reload();
   };
   const active = dashboards.find((dashboard) => path === `/d/${dashboard.id}`);
   const inactive = (dashboard: NavData["dashboards"][number]) =>
@@ -145,9 +125,6 @@ export default function Nav({ path, nav }: Props) {
             onChange={setShown}
             onSync={(repo) => void sync({ repos: [repo] })}
           />
-          {toggleError && (
-            <ErrorBanner error={toggleError} onDismiss={() => setToggleError(null)} />
-          )}
         </div>
       )}
     </nav>

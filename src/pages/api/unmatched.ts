@@ -1,6 +1,12 @@
+import { hiddenRepos } from "../../lib/pacts/views";
 import { UnmatchedQuerySchema } from "../../lib/pacts/web";
 import { json, parseQuery, route } from "./_route";
 
-export const GET = route(async ({ locals, url }) =>
-  json(await locals.services.views.unmatched(parseQuery(UnmatchedQuerySchema, url))),
+export const GET = route(async ({ cookies, locals, url }) =>
+  json(
+    await locals.services.views.unmatched(
+      parseQuery(UnmatchedQuerySchema, url),
+      hiddenRepos(cookies),
+    ),
+  ),
 );

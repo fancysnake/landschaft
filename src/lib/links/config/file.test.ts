@@ -56,7 +56,6 @@ describe("config file", () => {
       version: CONFIG_VERSION,
       repos: [],
       users: [],
-      hiddenRepos: [],
       refreshMinutes: 5,
       dashboards: [],
     });

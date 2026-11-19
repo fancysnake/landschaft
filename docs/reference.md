@@ -110,8 +110,8 @@ commit only, so a job that skipped it (a path filter, say) hides an older failur
 ## Filters
 
 With more than one global repository, or the only one switched off, chips in the top bar switch each on or off; `all` turns
-every chip on and, once all are on, `none` turns them off. The choice is saved in the config as
-`hiddenRepos`, so it holds on every dashboard and in every browser. A dashboard with no items in the repositories switched on is
+every chip on and, once all are on, `none` turns them off. The choice is kept in
+the browser, so it holds on every dashboard, in that browser only. A dashboard with no items in the repositories switched on is
 dimmed in the top bar.
 
 A chip's dot is filled when its repository is on and a ring when off. Its colour says how fresh
