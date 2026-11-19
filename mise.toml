@@ -62,8 +62,4 @@ description = "Trigger an issue sync on the running dev server"
 run = "curl -sf -X POST http://localhost:4321/api/sync"
 
 [tasks.update]
-run = [
-  "mise upgrade --bump --exclude python --minimum-release-age=7d",
-  "aube update",
-  "aube outdated",
-]
+run = ["mise upgrade --bump --minimum-release-age=7d", "aube update", "aube outdated"]
