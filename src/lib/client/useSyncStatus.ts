@@ -30,15 +30,17 @@ export function useSyncStatus(): SyncController {
   const awaited = useRef<{ boot: string; run: number } | null>(null);
 
   const apply = useCallback((next: SyncStatus) => {
+    // Responses can land out of order; an older status is not shown, and the newest one decides.
+    const last = shown.current;
+    const stale = last?.boot === next.boot && next.seq < last.seq;
+    const newest = stale ? last : next;
     const wait = awaited.current;
-    if (wait && (next.boot !== wait.boot || next.runs >= wait.run)) {
+    if (wait && (newest.boot !== wait.boot || newest.runs >= wait.run)) {
       awaited.current = null;
       setSyncing(false);
-      setError(next.boot === wait.boot ? next.lastError : RESTARTED);
+      setError(newest.boot === wait.boot ? newest.lastError : RESTARTED);
     }
-    // Responses can land out of order; an older status still ends the wait, but is not shown.
-    const last = shown.current;
-    if (last?.boot === next.boot && next.seq < last.seq) return;
+    if (stale) return;
     shown.current = next;
     setStatus(next);
     if (last && next.version !== last.version) {
@@ -78,8 +80,6 @@ export function useSyncStatus(): SyncController {
         const joined = awaited.current?.boot === boot ? awaited.current.run : 0;
         awaited.current = { boot, run: Math.max(joined, response.run) };
         apply(response.status);
-        // A newer poll may already show the run as finished; applying it again ends the wait now.
-        if (shown.current) apply(shown.current);
       } catch (cause) {
         setError(`Sync failed: ${errorMessage(cause)}`);
       }

@@ -12,8 +12,21 @@ vi.mock("./api", async (importOriginal) => {
   return { ...actual, api: { sync: vi.fn(), version: vi.fn() } };
 });
 
-const status = (version: number, extra: Partial<SyncStatus> = {}) =>
-  ({ version, boot: "a", runs: 0, inFlight: [], lastError: null, ...extra }) as SyncStatus;
+// `seq` and `runs` only rise on one boot, so tests list statuses in the order the server made them.
+const status = (version: number, seq: number, extra: Partial<SyncStatus> = {}): SyncStatus => ({
+  version,
+  boot: "a",
+  runs: 0,
+  seq,
+  lastSyncAt: null,
+  lastError: null,
+  rateRemaining: null,
+  inFlight: [],
+  queued: [],
+  repos: {},
+  viewer: null,
+  ...extra,
+});
 
 const { result, render } = renderHook(useSyncStatus);
 
@@ -25,8 +38,8 @@ test("a changed version is announced, the first one is not", async () => {
   const announced: unknown[] = [];
   const listen = (event: Event) => announced.push((event as CustomEvent).detail);
   window.addEventListener(SYNCED, listen);
-  vi.mocked(api.version).mockResolvedValue(status(1));
-  vi.mocked(api.sync).mockResolvedValue({ status: status(2), run: 1 });
+  vi.mocked(api.version).mockResolvedValue(status(1, 1));
+  vi.mocked(api.sync).mockResolvedValue({ status: status(2, 2), run: 1 });
 
   await render();
   await act(() => result.current.sync());
@@ -39,10 +52,10 @@ const poll = () => act(async () => void document.dispatchEvent(new Event("visibi
 
 test("a sync waits for its run and reports the errors it ended with", async () => {
   vi.mocked(api.version)
-    .mockResolvedValueOnce(status(1))
-    .mockResolvedValueOnce(status(2, { runs: 1, lastError: "other run" }))
-    .mockResolvedValue(status(3, { runs: 2, lastError: "rate limited" }));
-  vi.mocked(api.sync).mockResolvedValue({ status: status(1, { runs: 1 }), run: 2 });
+    .mockResolvedValueOnce(status(1, 1))
+    .mockResolvedValueOnce(status(2, 3, { runs: 1, lastError: "other run" }))
+    .mockResolvedValue(status(3, 4, { runs: 2, lastError: "rate limited" }));
+  vi.mocked(api.sync).mockResolvedValue({ status: status(1, 2, { runs: 1 }), run: 2 });
 
   await render();
   await act(() => result.current.sync());
@@ -59,14 +72,14 @@ test("a sync waits for its run and reports the errors it ended with", async () =
 
 test("an older run answering last does not end the wait for a newer one", async () => {
   vi.mocked(api.version)
-    .mockResolvedValueOnce(status(1))
-    .mockResolvedValueOnce(status(2, { runs: 2 }))
-    .mockResolvedValue(status(3, { runs: 3, lastError: "rate limited" }));
-  const answers: ((run: number) => void)[] = [];
+    .mockResolvedValueOnce(status(1, 1))
+    .mockResolvedValueOnce(status(2, 4, { runs: 2 }))
+    .mockResolvedValue(status(3, 5, { runs: 3, lastError: "rate limited" }));
+  const answers: ((run: number, seq: number) => void)[] = [];
   vi.mocked(api.sync).mockImplementation(
     () =>
       new Promise((resolve) => {
-        answers.push((run) => resolve({ status: status(1, { runs: 1 }), run }));
+        answers.push((run, seq) => resolve({ status: status(1, seq, { runs: 1 }), run }));
       }),
   );
 
@@ -77,11 +90,11 @@ test("an older run answering last does not end the wait for a newer one", async 
     newer = result.current.sync({ repos: ["o/b"] });
   });
   await act(async () => {
-    answers[1]!(3);
+    answers[1]!(3, 3);
     await newer;
   });
   await act(async () => {
-    answers[0]!(2);
+    answers[0]!(2, 2);
     await older;
   });
 
@@ -95,9 +108,9 @@ test("an older run answering last does not end the wait for a newer one", async 
 
 test("a server restart ends the wait and reports the sync as interrupted", async () => {
   vi.mocked(api.version)
-    .mockResolvedValueOnce(status(7, { runs: 4 }))
-    .mockResolvedValue(status(0, { boot: "b" }));
-  vi.mocked(api.sync).mockResolvedValue({ status: status(7, { runs: 4 }), run: 5 });
+    .mockResolvedValueOnce(status(7, 3, { runs: 4 }))
+    .mockResolvedValue(status(0, 1, { boot: "b" }));
+  vi.mocked(api.sync).mockResolvedValue({ status: status(7, 4, { runs: 4 }), run: 5 });
 
   await render();
   await act(() => result.current.sync());
@@ -109,7 +122,7 @@ test("a server restart ends the wait and reports the sync as interrupted", async
 });
 
 test("a refused sync is reported", async () => {
-  vi.mocked(api.version).mockResolvedValue(status(1));
+  vi.mocked(api.version).mockResolvedValue(status(1, 1));
   vi.mocked(api.sync).mockRejectedValue(new Error("409"));
 
   await render();
@@ -120,9 +133,9 @@ test("a refused sync is reported", async () => {
 
 test("a sync reply landing after a poll that shows its run finished ends the wait at once", async () => {
   vi.mocked(api.version)
-    .mockResolvedValueOnce(status(1, { seq: 1 }))
-    .mockResolvedValue(status(1, { seq: 3, runs: 1, lastError: "rate limited" }));
-  vi.mocked(api.sync).mockResolvedValue({ status: status(1, { seq: 2 }), run: 1 });
+    .mockResolvedValueOnce(status(1, 1))
+    .mockResolvedValue(status(1, 3, { runs: 1, lastError: "rate limited" }));
+  vi.mocked(api.sync).mockResolvedValue({ status: status(1, 2), run: 1 });
 
   await render();
   await poll();
@@ -133,14 +146,14 @@ test("a sync reply landing after a poll that shows its run finished ends the wai
   expect(result.current.syncing).toBe(false);
 });
 
-test("an older status answering last is not shown, and its run still ends the wait", async () => {
+test("an older status answering last is not shown and does not end the wait", async () => {
   const slow = Promise.withResolvers<SyncStatus>();
   vi.mocked(api.version)
-    .mockResolvedValueOnce(status(1, { seq: 1 }))
+    .mockResolvedValueOnce(status(1, 1))
     .mockReturnValueOnce(slow.promise)
-    .mockResolvedValue(status(1, { seq: 4, inFlight: ["o/a"] }));
+    .mockResolvedValue(status(1, 4, { runs: 1, lastError: "rate limited" }));
   vi.mocked(api.sync).mockResolvedValue({
-    status: status(1, { seq: 3, inFlight: ["o/a"] }),
+    status: status(1, 3, { inFlight: ["o/a"] }),
     run: 1,
   });
   const announced: unknown[] = [];
@@ -150,10 +163,14 @@ test("an older status answering last is not shown, and its run still ends the wa
   await render();
   await poll();
   await act(() => result.current.sync({ repos: ["o/a"] }));
-  await act(async () => slow.resolve(status(0, { seq: 2, runs: 1, lastError: "rate limited" })));
+  await act(async () => slow.resolve(status(0, 2)));
+
+  expect(result.current.status?.inFlight).toEqual(["o/a"]);
+  expect(result.current.syncing).toBe(true);
+
+  await poll();
 
   window.removeEventListener(SYNCED, listen);
-  expect(result.current.status?.inFlight).toEqual(["o/a"]);
   expect(announced).toEqual([]);
   expect(result.current.error).toBe("rate limited");
   expect(result.current.syncing).toBe(false);
