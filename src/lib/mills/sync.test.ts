@@ -454,6 +454,12 @@ describe("Syncer", () => {
     expect(syncerWith(db, fakeForge()).status().boot).not.toBe(first);
   });
 
+  it("numbers each status in the order it was taken", () => {
+    const syncer = syncerWith(db, fakeForge());
+    const first = syncer.status().seq;
+    expect(syncer.status().seq).toBeGreaterThan(first);
+  });
+
   it("refuses to overlap a running sync of the same repo", async () => {
     const gate = Promise.withResolvers<IssuesPage>();
     const forge = fakeForge();

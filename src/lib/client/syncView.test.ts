@@ -53,6 +53,7 @@ describe("repoSyncView", () => {
     version: 1,
     boot: "a",
     runs: 0,
+    seq: 0,
     lastSyncAt: null,
     lastError: null,
     rateRemaining: null,
