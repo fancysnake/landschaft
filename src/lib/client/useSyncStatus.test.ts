@@ -118,6 +118,21 @@ test("a refused sync is reported", async () => {
   expect(result.current.error).toBe("Sync failed: 409");
 });
 
+test("a sync reply landing after a poll that shows its run finished ends the wait at once", async () => {
+  vi.mocked(api.version)
+    .mockResolvedValueOnce(status(1, { seq: 1 }))
+    .mockResolvedValue(status(1, { seq: 3, runs: 1, lastError: "rate limited" }));
+  vi.mocked(api.sync).mockResolvedValue({ status: status(1, { seq: 2 }), run: 1 });
+
+  await render();
+  await poll();
+  await act(() => result.current.sync());
+
+  expect(result.current.status?.runs).toBe(1);
+  expect(result.current.error).toBe("rate limited");
+  expect(result.current.syncing).toBe(false);
+});
+
 test("an older status answering last is not shown, and its run still ends the wait", async () => {
   const slow = Promise.withResolvers<SyncStatus>();
   vi.mocked(api.version)

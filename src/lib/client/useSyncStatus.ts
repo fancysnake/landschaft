@@ -78,6 +78,8 @@ export function useSyncStatus(): SyncController {
         const joined = awaited.current?.boot === boot ? awaited.current.run : 0;
         awaited.current = { boot, run: Math.max(joined, response.run) };
         apply(response.status);
+        // A newer poll may already show the run as finished; applying it again ends the wait now.
+        if (shown.current) apply(shown.current);
       } catch (cause) {
         setError(`Sync failed: ${errorMessage(cause)}`);
       }
