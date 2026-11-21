@@ -24,22 +24,27 @@ export function useSyncStatus(): SyncController {
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const versionRef = useRef<number | null>(null);
+  const shown = useRef<SyncStatus | null>(null);
   // The run sync() joined, on the server that answered. The first status that counts the run
   // reports its errors; a status from another server reports the run as interrupted.
   const awaited = useRef<{ boot: string; run: number } | null>(null);
 
   const apply = useCallback((next: SyncStatus) => {
-    setStatus(next);
-    if (versionRef.current !== null && next.version !== versionRef.current) {
-      window.dispatchEvent(new CustomEvent(SYNCED, { detail: next.version }));
-    }
-    versionRef.current = next.version;
+    // Responses can land out of order; an older status is not shown, and the newest one decides.
+    const last = shown.current;
+    const stale = last?.boot === next.boot && next.seq < last.seq;
+    const newest = stale ? last : next;
     const wait = awaited.current;
-    if (wait && (next.boot !== wait.boot || next.runs >= wait.run)) {
+    if (wait && (newest.boot !== wait.boot || newest.runs >= wait.run)) {
       awaited.current = null;
       setSyncing(false);
-      setError(next.boot === wait.boot ? next.lastError : RESTARTED);
+      setError(newest.boot === wait.boot ? newest.lastError : RESTARTED);
+    }
+    if (stale) return;
+    shown.current = next;
+    setStatus(next);
+    if (last && next.version !== last.version) {
+      window.dispatchEvent(new CustomEvent(SYNCED, { detail: next.version }));
     }
   }, []);
 

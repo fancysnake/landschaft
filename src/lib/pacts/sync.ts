@@ -21,6 +21,8 @@ export interface SyncStatus {
   boot: string;
   /** Sync-all runs finished since the server started. */
   runs: number;
+  /** Counts the statuses this server has given out; of two, the higher is the newer. */
+  seq: number;
   lastSyncAt: string | null;
   /** Every failure of the last run a user asked for, then why the scheduler cannot pick a repo. */
   lastError: string | null;

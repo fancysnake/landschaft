@@ -117,6 +117,7 @@ export class Syncer implements SyncService {
   private readonly boot = crypto.randomUUID();
   /** Sync-all runs finished. */
   private runs = 0;
+  private seq = 0;
   private lastSyncAt: string | null = null;
   /**
    * Failures of runs a user asked for, by repo, until that repo syncs or leaves the config. A
@@ -152,6 +153,7 @@ export class Syncer implements SyncService {
       version: this.version,
       boot: this.boot,
       runs: this.runs,
+      seq: ++this.seq,
       lastSyncAt: this.lastSyncAt,
       lastError: [...this.userErrors.values(), this.dueError].filter(Boolean).join("; ") || null,
       rateRemaining: this.rateRemaining,

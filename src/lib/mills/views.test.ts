@@ -15,6 +15,7 @@ function views(issues: Issue[] = []) {
       version: 0,
       boot: "a",
       runs: 0,
+      seq: 0,
       lastSyncAt: null,
       lastError: null,
       rateRemaining: null,

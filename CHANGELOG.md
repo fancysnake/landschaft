@@ -21,6 +21,9 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 - A sync request that names a repo while it syncs no longer syncs that repo a second time. A
   full sync request made while a repo syncs incrementally still syncs it in full afterwards.
+- A sync status that arrives after a newer one no longer replaces it, so the sync button of a
+  repo that still syncs stays disabled. The sync status carries `seq`, which orders the statuses
+  of one server.
 
 ## [5.4.0] - 2026-11-17
 

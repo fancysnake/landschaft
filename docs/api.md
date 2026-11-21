@@ -56,4 +56,5 @@ sync-all joins that run and adds its repositories to it. Follow progress by poll
 reaches `run`, and its failures land in `lastError`, each until its repository next syncs. A
 background sync's failure stays in that repository's entry under `repos`. `boot` is an id the
 server picks when it starts: once it differs from the one in the `202` answer, the server has
-restarted, `runs` counts from zero again, and the run is lost.
+restarted, `runs` counts from zero again, and the run is lost. `seq` numbers the statuses the
+server gives out: of two with the same `boot`, the one with the higher `seq` is the newer.
