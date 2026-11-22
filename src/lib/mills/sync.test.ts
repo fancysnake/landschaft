@@ -15,6 +15,7 @@ import { cachedIssue, DASHBOARD, makeIssue, makeJob, REPO } from "../__fixtures_
 import { Db } from "../links/db/sqlite";
 import { ConfigSchema } from "../pacts/config";
 import { InvalidError, SyncBusyError } from "../pacts/services";
+import { IDLE_PAUSE_MS } from "../specs";
 import { closedPlan, closedSince, nextDue, staleRepos, type SyncDeps, Syncer } from "./sync";
 
 interface ForgeData {
@@ -635,6 +636,22 @@ describe("Syncer.syncDue", () => {
     await syncer.syncDue();
 
     expect(syncAll.mock.calls).toEqual([[["acme/good"], { background: true }]]);
+    db.close();
+  });
+
+  it("pauses once the last request is older than the idle limit, until the next one", async () => {
+    const db = new Db(":memory:");
+    let clock = now.getTime();
+    const syncer = syncerWith(db, fakeForge(), { now: () => new Date(clock) });
+    const syncAll = vi.spyOn(syncer, "syncAll").mockResolvedValue();
+
+    clock += IDLE_PAUSE_MS + 1;
+    await syncer.syncDue();
+    expect(syncAll).not.toHaveBeenCalled();
+
+    syncer.noteRequest();
+    await syncer.syncDue();
+    expect(syncAll.mock.calls).toEqual([[[REPO], { background: true }]]);
     db.close();
   });
 

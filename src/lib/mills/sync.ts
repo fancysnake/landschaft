@@ -12,7 +12,13 @@ import {
   type SyncService,
 } from "../pacts/services";
 import { type SyncState, type SyncStatus, syncIntervals } from "../pacts/sync";
-import { FRESH_SYNC_MS, FULL_SYNC_MAX_AGE_MS, RATE_FLOOR, SINCE_OVERLAP_MS } from "../specs";
+import {
+  FRESH_SYNC_MS,
+  FULL_SYNC_MAX_AGE_MS,
+  IDLE_PAUSE_MS,
+  RATE_FLOOR,
+  SINCE_OVERLAP_MS,
+} from "../specs";
 
 export interface SyncDeps {
   db: SyncStore;
@@ -140,12 +146,18 @@ export class Syncer implements SyncService {
   private running: Promise<void> | null = null;
   /** The running sync-all holds a user's repos, so it reports to `userErrors`. */
   private userRun = false;
+  private lastRequestAt: number;
 
   constructor(deps: SyncDeps) {
     this.db = deps.db;
     this.forge = deps.forge;
     this.config = deps.config;
     this.now = deps.now ?? (() => new Date());
+    this.lastRequestAt = this.now().getTime();
+  }
+
+  noteRequest(): void {
+    this.lastRequestAt = this.now().getTime();
   }
 
   status(): SyncStatus {
@@ -216,6 +228,7 @@ export class Syncer implements SyncService {
 
   async syncDue(): Promise<void> {
     if (this.running || this.inFlight.size > 0) return;
+    if (this.now().getTime() - this.lastRequestAt > IDLE_PAUSE_MS) return;
     let config: Config;
     try {
       config = this.config();

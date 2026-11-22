@@ -7,8 +7,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [6.0.0] - 2026-11-22
+
 ### Changed
 
+- The background sync pauses after ten minutes without a request to the site or the API, and
+  the next request resumes it. A dashboard open in a visible tab keeps the sync going.
 - The repos switched off in the top bar are kept in the browser, not in the config. Each browser
   has its own list, and Settings no longer shows `hiddenRepos`. A config that still has the key
   loads; every repo is on once after the upgrade.
@@ -398,7 +402,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v5.4.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v6.0.0...HEAD
+[6.0.0]: https://github.com/fancysnake/landschaft/compare/v5.4.0...v6.0.0
 [5.4.0]: https://github.com/fancysnake/landschaft/compare/v5.3.0...v5.4.0
 [5.3.0]: https://github.com/fancysnake/landschaft/compare/v5.2.0...v5.3.0
 [5.2.0]: https://github.com/fancysnake/landschaft/compare/v5.1.0...v5.2.0

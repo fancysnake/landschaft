@@ -29,7 +29,9 @@ everything the token does. Two kinds of pass:
 - **Incremental** — issues updated since the last run, every `refreshMinutes`. The background
   sync splits that interval by the number of repositories and syncs one at a time, the stalest
   first, whether switched on or off. A repository whose sync fails is retried after the interval
-  too, or at once with Refresh.
+  too, or at once with Refresh. The background sync pauses after ten minutes without a request
+  to the site or the API, and the next request resumes it; a dashboard open in a visible tab
+  polls, so it keeps the sync going.
 - **Full** — every open issue, plus the items closed since the last run, once a day, for
   repositories just added in settings, and on demand from the full resync button in the top bar.
 
