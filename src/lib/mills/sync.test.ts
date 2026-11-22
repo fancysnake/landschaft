@@ -638,6 +638,22 @@ describe("Syncer.syncDue", () => {
     db.close();
   });
 
+  it("pauses once the last request is over ten minutes old, until the next one", async () => {
+    const db = new Db(":memory:");
+    let clock = now.getTime();
+    const syncer = syncerWith(db, fakeForge(), { now: () => new Date(clock) });
+    const syncAll = vi.spyOn(syncer, "syncAll").mockResolvedValue();
+
+    clock += 600_001;
+    await syncer.syncDue();
+    expect(syncAll).not.toHaveBeenCalled();
+
+    syncer.touch();
+    await syncer.syncDue();
+    expect(syncAll.mock.calls).toEqual([[[REPO], { background: true }]]);
+    db.close();
+  });
+
   it("skips a tick while a sync-all runs", async () => {
     const db = new Db(":memory:");
     const syncer = syncerWith(db, fakeForge());

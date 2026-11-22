@@ -9,3 +9,6 @@ export const FRESH_SYNC_MS = 60 * 1000;
 
 /** The GitHub rate limit a sync aborts below rather than run it dry. */
 export const RATE_FLOOR = 200;
+
+/** The background sync pauses once the last request is this old. */
+export const IDLE_PAUSE_MS = 10 * 60 * 1000;

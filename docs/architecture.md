@@ -20,7 +20,7 @@ Astro 7 in SSR mode (`@astrojs/node`, standalone) with React 19 islands, Tailwin
 - `src/lib/links/forge/github/` — GraphQL transport (`client.ts`, token from `GITHUB_TOKEN` or
   `gh auth token`), issue and PR sync queries (`issues.ts`) and failed CI jobs (`ci.ts`).
 - `src/lib/specs.ts` — business constants the sync obeys (full-sync age, `since` overlap, rate
-  floor); only `mills` read them.
+  floor, idle pause); only `mills` read them.
 - `src/lib/mills/sync.ts` — the `Syncer`: sequential, incremental and full passes, and which
   repo syncs next: the stalest past `refreshMinutes`, one per the interval split by the repos.
 - `src/lib/gates/timer/node.ts` — the timer that asks the `Syncer` for a due sync every five seconds.

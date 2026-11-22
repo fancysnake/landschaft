@@ -58,10 +58,13 @@ export interface SyncService {
   start(request: SyncRequest): number;
   /**
    * Syncs the stalest repo due, at most once per refresh interval split
-   * by the configured repos; skips while a sync runs. Due: last attempt older than the interval.
+   * by the configured repos; skips while a sync runs, and once the last `touch` is older than
+   * `IDLE_PAUSE_MS`. Due: last attempt older than the interval.
    * The repo's failure stays in its sync state, out of `lastError`. Never rejects.
    */
   syncDue(): Promise<void>;
+  /** Records a request to the site or the API. */
+  touch(): void;
 }
 
 /**
