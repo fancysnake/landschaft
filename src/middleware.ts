@@ -8,6 +8,6 @@ import { getApp } from "./lib/inits";
  */
 export const onRequest = defineMiddleware((context, next) => {
   context.locals.services = getApp().services;
-  context.locals.services.sync.touch();
+  context.locals.services.sync.noteRequest();
   return next();
 });

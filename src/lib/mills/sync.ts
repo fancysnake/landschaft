@@ -156,7 +156,7 @@ export class Syncer implements SyncService {
     this.lastRequestAt = this.now().getTime();
   }
 
-  touch(): void {
+  noteRequest(): void {
     this.lastRequestAt = this.now().getTime();
   }
 
