@@ -135,8 +135,11 @@ function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean 
           </span>
         )}
         <Labels labels={card.labels} />
+        <span className="ml-auto tabular-nums" title={card.updatedAt}>
+          updated {relativeTime(card.updatedAt)}
+        </span>
         {card.assignees.length > 0 && (
-          <span className="ml-auto flex -space-x-1.5">
+          <span className="flex -space-x-1.5">
             {card.assignees.map((assignee) => (
               <img
                 key={assignee.login}

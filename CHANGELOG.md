@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- Issue and pull request cards show when the item last changed, as "updated 7 d ago".
+
 ## [6.0.0] - 2026-11-22
 
 ### Changed
