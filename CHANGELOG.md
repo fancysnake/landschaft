@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [6.1.0] - 2026-11-24
+
+### Added
+
+- Issue and pull request cards show when the item last changed, as "updated 7 d ago".
+
 ## [6.0.0] - 2026-11-22
 
 ### Changed
@@ -402,7 +408,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/fancysnake/landschaft/compare/v6.0.0...HEAD
+[unreleased]: https://github.com/fancysnake/landschaft/compare/v6.1.0...HEAD
+[6.1.0]: https://github.com/fancysnake/landschaft/compare/v6.0.0...v6.1.0
 [6.0.0]: https://github.com/fancysnake/landschaft/compare/v5.4.0...v6.0.0
 [5.4.0]: https://github.com/fancysnake/landschaft/compare/v5.3.0...v5.4.0
 [5.3.0]: https://github.com/fancysnake/landschaft/compare/v5.2.0...v5.3.0

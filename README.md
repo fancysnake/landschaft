@@ -149,6 +149,7 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
   collapsed** (per solid swimlane) folds it on every page load. A folded lane marks the columns with the
   lowest count; **leave out of lowest count** (per column) skips a column.
 - Open **pull requests** are cards like issues.
+- An issue or PR card shows when the item last changed, as "updated 7 d ago".
 - Repo chips in the top bar switch each global repository on or off for every dashboard, kept in
   the browser; a dashboard with no items in the repos switched on is dimmed. Each chip shows its
   repo's sync age, syncs it alone, and can show it as the only repo.

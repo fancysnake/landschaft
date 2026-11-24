@@ -3,6 +3,7 @@ import type { PullStatusLabel } from "../../lib/pacts/status";
 import type { Card, CiJobCard, IssueItemCard } from "../../lib/pacts/views";
 
 import { labelStyle, relativeTime, repoShortName } from "../../lib/client/labels";
+import { useNow } from "../../lib/client/useNow";
 import { ProgressBar } from "./ProgressBar";
 import { TONE, type Tone } from "./tone";
 
@@ -36,6 +37,16 @@ function Labels({ labels }: { labels: LabelRef[] }) {
   ));
 }
 
+/** "`verb` 3 min ago", ticking with the clock; the hover title is the exact time. */
+function Age({ verb, at }: { verb: string; at: string }) {
+  const now = useNow();
+  return (
+    <span className="tabular-nums" title={at}>
+      {verb} {relativeTime(at, now)}
+    </span>
+  );
+}
+
 function CiJobItem({ card, showRepo }: { card: CiJobCard; showRepo: boolean }) {
   return (
     <article className={card.state === "CLOSED" ? closedCard : cardClass("border-l-orange-500")}>
@@ -60,8 +71,8 @@ function CiJobItem({ card, showRepo }: { card: CiJobCard; showRepo: boolean }) {
         )}
         {card.state === "CLOSED" && <span className={`pill ${TONE.neutral}`}>closed</span>}
         <Labels labels={card.labels} />
-        <span className="ml-auto tabular-nums" title={card.failedAt}>
-          failed {relativeTime(card.failedAt)}
+        <span className="ml-auto">
+          <Age verb="failed" at={card.failedAt} />
         </span>
       </div>
     </article>
@@ -135,19 +146,22 @@ function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean 
           </span>
         )}
         <Labels labels={card.labels} />
-        {card.assignees.length > 0 && (
-          <span className="ml-auto flex -space-x-1.5">
-            {card.assignees.map((assignee) => (
-              <img
-                key={assignee.login}
-                src={assignee.avatarUrl}
-                alt={assignee.login}
-                title={assignee.login}
-                className="h-5 w-5 rounded-full bg-neutral-200 ring-2 ring-white"
-              />
-            ))}
-          </span>
-        )}
+        <span className="ml-auto flex items-center gap-1.5">
+          <Age verb="updated" at={card.updatedAt} />
+          {card.assignees.length > 0 && (
+            <span className="flex -space-x-1.5">
+              {card.assignees.map((assignee) => (
+                <img
+                  key={assignee.login}
+                  src={assignee.avatarUrl}
+                  alt={assignee.login}
+                  title={assignee.login}
+                  className="h-5 w-5 rounded-full bg-neutral-200 ring-2 ring-white"
+                />
+              ))}
+            </span>
+          )}
+        </span>
       </div>
       {card.progress && (
         <div
