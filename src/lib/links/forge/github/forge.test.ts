@@ -48,6 +48,7 @@ describe("GithubForge", () => {
     const forge = new GithubForge(gh);
 
     await expect(flags(forge.pullStatuses("acme/app", []))).resolves.toEqual([]);
+    await expect(flags(forge.issuesByNumber("acme/app", []))).resolves.toEqual([]);
     await expect(flags(forge.ciJobs("acme/app", []))).resolves.toEqual([]);
 
     expect(requests).toEqual([]);

@@ -5,6 +5,7 @@ import type {
   CiBranchesPage,
   CiJobsPage,
   Forge,
+  IssuesBatch,
   IssuesPage,
   PageOptions,
   PullStatusPage,
@@ -22,6 +23,8 @@ interface ForgeData {
   /** Pages of issues, of PRs and of CI branches; a page's cursor is the index of the next one. */
   issues?: FetchedIssue[][];
   pulls?: FetchedIssue[][];
+  /** The issues a query by number finds. */
+  known?: FetchedIssue[];
   branches?: CiBranch[][];
   remaining?: number;
   /** PRs whose status is conflicting. */
@@ -38,6 +41,7 @@ interface ForgeData {
 function fakeForge({
   issues = [],
   pulls = [],
+  known = [],
   remaining = 5000,
   conflicting = [],
   branches = [],
@@ -65,6 +69,17 @@ function fakeForge({
       return toIssuesPage(issues, options.after);
     }),
     pullsPage: vi.fn(async (_: string, options: PageOptions) => toIssuesPage(pulls, options.after)),
+    issuesByNumber: vi.fn(async function* (
+      repo: string,
+      numbers: number[],
+    ): AsyncGenerator<IssuesBatch> {
+      if (numbers.length === 0) return;
+      yield {
+        issues: known.filter((issue) => issue.repo === repo && numbers.includes(issue.number)),
+        hasNextPage: false,
+        rateRemaining: remaining,
+      };
+    }),
     pullStatuses: vi.fn(async function* (
       _: string,
       numbers: number[],
@@ -97,6 +112,8 @@ function fakeForge({
     repoLabels: vi.fn(async () => [{ name: "bug", color: "ff0000", description: null }]),
   } satisfies Forge;
 }
+
+const under = (number: number) => ({ parent: { repo: REPO, number, state: "OPEN" as const } });
 
 const issues = (...numbers: number[]) => numbers.map((number) => makeIssue({ number }));
 
@@ -178,6 +195,64 @@ describe("Syncer", () => {
       "open",
       "closed",
     ]);
+  });
+
+  it("fetches the issues above an open PR's issue that the cache lacks", async () => {
+    const closed = { state: "CLOSED" as const };
+    const forge = fakeForge({
+      issues: [[makeIssue({ number: 1 }), makeIssue({ number: 5, ...under(4) })]],
+      pulls: [
+        [
+          makeIssue({ number: 10, kind: "pr", linked: [{ repo: REPO, number: 3 }] }),
+          makeIssue({ number: 11, kind: "pr", linked: [{ repo: REPO, number: 5 }] }),
+        ],
+      ],
+      known: [
+        makeIssue({ number: 2, ...closed, ...under(1) }),
+        makeIssue({ number: 3, ...closed, ...under(2) }),
+        makeIssue({ number: 4, ...closed, ...under(1) }),
+      ],
+    });
+    const syncer = syncerWith(db, forge);
+
+    await syncer.syncRepo(REPO);
+
+    expect(forge.issuesByNumber.mock.calls).toEqual([
+      [REPO, [3, 4]],
+      [REPO, [2]],
+    ]);
+    expect([2, 3, 4].map((number) => cachedIssue(db, REPO, number)?.state)).toEqual([
+      "CLOSED",
+      "CLOSED",
+      "CLOSED",
+    ]);
+
+    await syncer.syncRepo(REPO);
+
+    expect(forge.issuesByNumber).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks once for an issue the forge lacks, and never outside the configured repos", async () => {
+    const linked = [
+      { repo: REPO, number: 3 },
+      { repo: "other/repo", number: 4 },
+    ];
+    const forge = fakeForge({ pulls: [[makeIssue({ number: 10, kind: "pr", linked })]] });
+
+    await syncerWith(db, forge).syncRepo(REPO);
+
+    expect(forge.issuesByNumber.mock.calls).toEqual([[REPO, [3]]]);
+  });
+
+  it("fetches nothing above a closed PR", async () => {
+    const linked = [{ repo: REPO, number: 3 }];
+    const forge = fakeForge({
+      pulls: [[makeIssue({ number: 10, kind: "pr", state: "CLOSED", linked })]],
+    });
+
+    await syncerWith(db, forge).syncRepo(REPO);
+
+    expect(forge.issuesByNumber).not.toHaveBeenCalled();
   });
 
   it("fetches the items closed since the previous sync on a daily full sync", async () => {

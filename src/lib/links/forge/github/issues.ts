@@ -1,4 +1,4 @@
-import type { IssuesPage, PageOptions, PullStatusPage } from "../../../pacts/forge";
+import type { IssuesBatch, IssuesPage, PageOptions, PullStatusPage } from "../../../pacts/forge";
 import type { FetchedIssue, IssueState, LabelDef, PullStatus } from "../../../pacts/issues";
 
 import { PULL_STATUS_NAMES, type PullStatusLabel } from "../../../pacts/status";
@@ -214,6 +214,37 @@ export async function fetchIssuesPage(
     issues: issues.nodes.map((node) => toIssue(repo, node)),
     hasNextPage: issues.pageInfo.hasNextPage,
     endCursor: issues.pageInfo.endCursor,
+    rateRemaining: data.rateLimit.remaining,
+  };
+}
+
+/**
+ * The issues with these numbers, in one query of an aliased field each; the caller bounds how
+ * many. One GitHub does not find is left out.
+ */
+export async function fetchIssuesByNumber(
+  gh: GithubClient,
+  repo: string,
+  numbers: number[],
+): Promise<Omit<IssuesBatch, "hasNextPage">> {
+  const data = await gh.gql<{
+    rateLimit: { remaining: number };
+    repository: Record<string, IssueNode | null> | null;
+  }>(
+    `query IssuesByNumber($owner: String!, $name: String!) {
+      rateLimit { remaining }
+      repository(owner: $owner, name: $name) {
+        ${numbers.map((number) => `i${number}: issue(number: ${number}) { ...IssueFields }`).join("\n")}
+      }
+    }
+    ${ISSUE_FIELDS}`,
+    splitRepo(repo),
+    { acceptError: (error) => error.type === "NOT_FOUND" },
+  );
+  if (!data.repository) throw new GithubError(`repository ${repo} not found or not accessible`);
+  const nodes = Object.values(data.repository).filter((node) => node !== null);
+  return {
+    issues: nodes.map((node) => toIssue(repo, node)),
     rateRemaining: data.rateLimit.remaining,
   };
 }
