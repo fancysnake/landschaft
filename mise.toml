@@ -2,7 +2,7 @@
 aube = "2.7.0"
 node = "26.11.1"
 hk = "2.5.0"
-pkl = "0.32.1"
+pkl = "0.33.1"
 pipx = "1.17.12"
 python = "3.14"
 # --include-deps: the mkdocs binary belongs to a dependency of mkdocs-material; uvx = false
