@@ -1,4 +1,9 @@
-import type { IssuesBatch, IssuesPage, PageOptions, PullStatusPage } from "../../../pacts/forge";
+import type {
+  IssuesByNumberPage,
+  IssuesPage,
+  PageOptions,
+  PullStatusPage,
+} from "../../../pacts/forge";
 import type { FetchedIssue, IssueState, LabelDef, PullStatus } from "../../../pacts/issues";
 
 import { PULL_STATUS_NAMES, type PullStatusLabel } from "../../../pacts/status";
@@ -226,7 +231,7 @@ export async function fetchIssuesByNumber(
   gh: GithubClient,
   repo: string,
   numbers: number[],
-): Promise<Omit<IssuesBatch, "hasNextPage">> {
+): Promise<Omit<IssuesByNumberPage, "hasNextPage">> {
   const data = await gh.gql<{
     rateLimit: { remaining: number };
     repository: Record<string, IssueNode | null> | null;

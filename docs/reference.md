@@ -39,9 +39,10 @@ Closed items are fetched for the longest `closedDays` of any dashboard. The whol
 fetched on a repository's first sync, on its next sync after that longest `closedDays` grows, and
 by the full resync button.
 
-A sync also fetches each issue that an open PR closes, and each parent above it, when the cache
-lacks it: an issue closed before that window. `has:pr` needs these to reach the open issues
-above them. They are fetched once and show on no dashboard.
+A repository's sync also fetches each issue that one of its open PRs closes, and each parent
+above it, when the issue's repository is in `repos` and the cache lacks the issue: one closed
+before that window. `has:pr` needs these to reach the open issues above them. They are fetched
+once, and a closed one shows on no dashboard.
 
 The top bar shows the sync status on every page, with the remaining rate-limit budget and the
 Refresh and full resync buttons. Both sync every repository, switched on or off, and every page load

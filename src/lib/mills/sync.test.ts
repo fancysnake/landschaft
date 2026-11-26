@@ -5,7 +5,7 @@ import type {
   CiBranchesPage,
   CiJobsPage,
   Forge,
-  IssuesBatch,
+  IssuesByNumberPage,
   IssuesPage,
   PageOptions,
   PullStatusPage,
@@ -72,7 +72,7 @@ function fakeForge({
     issuesByNumber: vi.fn(async function* (
       repo: string,
       numbers: number[],
-    ): AsyncGenerator<IssuesBatch> {
+    ): AsyncGenerator<IssuesByNumberPage> {
       if (numbers.length === 0) return;
       yield {
         issues: known.filter((issue) => issue.repo === repo && numbers.includes(issue.number)),
@@ -114,6 +114,11 @@ function fakeForge({
 }
 
 const under = (number: number) => ({ parent: { repo: REPO, number, state: "OPEN" as const } });
+
+const closes = (repo: string, number: number) => ({
+  kind: "pr" as const,
+  linked: [{ repo, number }],
+});
 
 const issues = (...numbers: number[]) => numbers.map((number) => makeIssue({ number }));
 
@@ -242,6 +247,17 @@ describe("Syncer", () => {
     await syncerWith(db, forge).syncRepo(REPO);
 
     expect(forge.issuesByNumber.mock.calls).toEqual([[REPO, [3]]]);
+  });
+
+  it("starts from the synced repo's PRs and looks up issues in any configured repo", async () => {
+    const other = "other/repo";
+    db.upsertIssues([makeIssue({ number: 20, repo: other, ...closes(other, 4) })]);
+    const forge = fakeForge({ pulls: [[makeIssue({ number: 10, ...closes(other, 3) })]] });
+    const config = () => ConfigSchema.parse({ repos: [REPO, other] });
+
+    await syncerWith(db, forge, { config }).syncRepo(REPO);
+
+    expect(forge.issuesByNumber.mock.calls).toEqual([[other, [3]]]);
   });
 
   it("fetches nothing above a closed PR", async () => {
