@@ -20,6 +20,7 @@ const item = (extra: Partial<FilterItem> = {}): FilterItem => ({
   repo: "acme/app",
   authors: [],
   assignees: [],
+  reviewers: [],
   labels: [],
   statuses: [],
   hasPr: false,
@@ -103,7 +104,7 @@ describe("parseFilter", () => {
     expect(filterError("label:a|")).toMatch(/expected a value/);
     expect(filterError("repo:app")).toMatch(/owner\/repo/);
     expect(filterError("parent-issue:acme/app")).toMatch(/owner\/repo#number/);
-    expect(filterError("author:@ann")).toMatch(/GitHub login/);
+    expect(filterError("author:@ann")).toMatch(/a login or @me/);
     expect(filterError("has:children")).toMatch(/expected pr, parent-issue, sub-issues/);
   });
 
@@ -159,6 +160,14 @@ describe("matchesFilter", () => {
     expect(fits("user:bob", ann)).toBe(true);
     expect(fits("user:@me", ann, { viewer: "bob" })).toBe(true);
     expect(fits("user:@me", ann)).toBe(false);
+    const reviewed = item({ reviewers: ["Cy.Lee"] });
+    expect(fits("reviewer:cy.lee", reviewed)).toBe(true);
+    expect(fits("reviewer:@me", reviewed, { viewer: "cy.lee" })).toBe(true);
+    expect(fits("reviewer:@me", ann, { viewer: "bob" })).toBe(false);
+    expect(fits("user:cy.lee", reviewed)).toBe(false);
+    expect(fits("repo:group/sub/project", item({ repo: "group/sub/project" }))).toBe(true);
+    expect(fits("is:approved", item({ statuses: ["is:approved"] }))).toBe(true);
+    expect(fits("is:changes-requested", item({ statuses: ["is:approved"] }))).toBe(false);
     expect(fits("author:renovate[bot]", item({ authors: ["renovate"] }))).toBe(true);
   });
 

@@ -5,6 +5,7 @@ import type {
   PullStatusPage,
 } from "../../../pacts/forge";
 import type { FetchedIssue, IssueState, LabelDef, PullStatus } from "../../../pacts/issues";
+import type { PageInfo } from "../page";
 
 import { PULL_STATUS_NAMES, type PullStatusLabel } from "../../../pacts/status";
 import {
@@ -12,7 +13,6 @@ import {
   GithubError,
   isRed,
   type Login,
-  type PageInfo,
   splitRepo,
   type StatusState,
 } from "./client";
@@ -51,6 +51,8 @@ fragment PullFields on PullRequest {
   labels(first: 50) { nodes { name color } }
   assignees(first: 10) { nodes { login avatarUrl } }
   closingIssuesReferences(first: 20) { nodes { number repository { nameWithOwner } } }
+  reviewRequests(first: 20) { nodes { requestedReviewer { ... on User { login } } } }
+  latestReviews(first: 20) { nodes { author { login } } }
 }`;
 
 /** No `since` filter on pullRequests: newest first, the caller stops paging past `since`. */
@@ -115,6 +117,9 @@ export interface PullNode {
   closingIssuesReferences: {
     nodes: { number: number; repository: { nameWithOwner: string } }[];
   };
+  /** A team asked to review has no login. */
+  reviewRequests: { nodes: { requestedReviewer: Partial<Login> | null }[] };
+  latestReviews: { nodes: { author: Login | null }[] };
 }
 
 interface IssuesPageData {
@@ -178,11 +183,16 @@ export function toIssue(repo: string, node: IssueNode): FetchedIssue {
     })),
     blockedByTotal: node.issueDependenciesSummary.totalBlockedBy,
     linked: [],
+    reviewers: [],
   };
 }
 
-/** A merged PR counts as closed. */
+/** A merged PR counts as closed; its reviewers are those asked to review and those who did. */
 export function toPull(repo: string, node: PullNode): FetchedIssue {
+  const reviewers = [
+    ...node.reviewRequests.nodes.map((request) => request.requestedReviewer?.login),
+    ...node.latestReviews.nodes.map((review) => review.author?.login),
+  ].filter((login) => login !== undefined);
   return {
     ...baseFields(repo, node),
     kind: "pr",
@@ -196,6 +206,7 @@ export function toPull(repo: string, node: PullNode): FetchedIssue {
       repo: ref.repository.nameWithOwner,
       number: ref.number,
     })),
+    reviewers: [...new Set(reviewers)],
   };
 }
 
@@ -293,6 +304,7 @@ export interface PullStatusNode {
   number: number;
   isDraft: boolean;
   mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN";
+  reviewDecision: "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | null;
   author: Login | null;
   commits: {
     nodes: {
@@ -319,6 +331,8 @@ export function toPullStatus(node: PullStatusNode): PullStatus {
       (thread) => !thread.isResolved && thread.comments.nodes[0]?.author?.login !== author,
     ),
     "is:draft": node.isDraft,
+    "is:approved": node.reviewDecision === "APPROVED",
+    "is:changes-requested": node.reviewDecision === "CHANGES_REQUESTED",
   };
   return { number: node.number, statuses: PULL_STATUS_NAMES.filter((name) => holds[name]) };
 }
@@ -326,7 +340,7 @@ export function toPullStatus(node: PullStatusNode): PullStatus {
 /** Each PR is its own aliased field. ponytail: first 100 checks and review threads. */
 function pullStatusField(number: number): string {
   return `pr${number}: pullRequest(number: ${number}) {
-    number isDraft mergeable author { login }
+    number isDraft mergeable reviewDecision author { login }
     commits(last: 1) { nodes { commit { statusCheckRollup { state contexts(first: 100) { nodes {
       type: __typename
       ... on CheckRun { status }
@@ -337,8 +351,8 @@ function pullStatusField(number: number): string {
 }
 
 /**
- * Merge conflicts, checks and review threads of the PRs, in one query; the caller bounds how
- * many. Not all of it bumps a PR's `updatedAt`, so the sync asks for every open PR each time.
+ * Merge conflicts, checks, the review decision and review threads of the PRs, in one query; the
+ * caller bounds how many. Not all of it bumps a PR's `updatedAt`, so the sync asks for every open PR each time.
  */
 export async function fetchPullStatuses(
   gh: GithubClient,

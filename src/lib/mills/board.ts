@@ -125,6 +125,7 @@ const jobItem = (job: CiJob, byKey: Map<string, Issue>): JobItem => ({
   repo: job.repo,
   authors: job.authors,
   assignees: [],
+  reviewers: [],
   labels:
     [job.pr && byKey.get(issueKey(job.repo, job.pr.number))].find((pr) => pr?.state === "OPEN")
       ?.labels ?? [],
@@ -186,9 +187,17 @@ function compareBy(by: SortBy, dir: SortDir) {
   };
 }
 
-/** Holds for items one of the global `users` (empty for everyone) authored or is assigned to. */
+/** Holds for what one of `users` authored, is assigned to or reviews; null for no users. */
 const usersNode = (users: string[]): FilterNode | null =>
-  users.length > 0 ? { type: "term", key: "user", values: users } : null;
+  users.length > 0
+    ? {
+        type: "or",
+        nodes: [
+          { type: "term", key: "user", values: users },
+          { type: "term", key: "reviewer", values: users },
+        ],
+      }
+    : null;
 
 /** Holds for items one of the global `users` (empty for everyone) is in that pass `scope`. */
 function inScope(
@@ -233,7 +242,7 @@ function scopedItems(
       item,
       closedAt: issue.closedAt,
       text: `${item.number} ${item.title}`,
-      card: (labels) => toCard(item, labels),
+      card: (labels) => toCard(item, labels, matchesFilter(REVIEWING, item, { viewer })),
     };
   });
   const jobEntries = jobs.map((job): Entry => {
@@ -356,8 +365,11 @@ function labelShown(nodes: (FilterNode | null)[]): LabelShown {
   return (label) => !structural.has(labelKey(label.name));
 }
 
+/** GitLab lets an author review their own merge request, which is no review to mark. */
+const REVIEWING = parseFilter("reviewer:@me -author:@me");
+
 /** `item` as a card showing `labels`. */
-const toCard = (item: Item, labels: LabelRef[]): Card => ({
+const toCard = (item: Item, labels: LabelRef[], reviewing: boolean): Card => ({
   key: keyOf(item),
   kind: item.kind,
   repo: item.repo,
@@ -372,6 +384,7 @@ const toCard = (item: Item, labels: LabelRef[]): Card => ({
   blocked: item.blocked,
   statuses: item.statuses,
   hasPr: item.hasPr,
+  reviewing,
   createdAt: item.createdAt,
   updatedAt: item.updatedAt,
 });

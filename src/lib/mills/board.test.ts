@@ -163,6 +163,32 @@ describe("scopedRepos", () => {
     expect(scoped("", ["@me"])).toEqual(["a/2", "a/4", "a/6"]);
     expect(scoped("is:ci-job", ["@me"])).toEqual(["a/6"]);
   });
+
+  it("takes the PRs a user reviews", () => {
+    const pulls = [
+      makeIssue({ number: 1, repo: "a/1", kind: "pr", author: "ann", reviewers: ["me"] }),
+      makeIssue({ number: 2, repo: "a/2", kind: "pr", author: "ann", reviewers: ["bob"] }),
+    ];
+    const audience = { ...EVERYONE, users: ["@me"], viewer: "me" };
+    expect([...scopedRepos(snapshot(pulls), { filter: "" }, audience)]).toEqual(["a/1"]);
+    expect([...scopedRepos(snapshot(pulls), { filter: "-reviewer:@me" }, audience)]).toEqual([]);
+  });
+});
+
+describe("reviewing", () => {
+  it("marks the PRs the viewer reviews and did not author", () => {
+    const pulls = [
+      makeIssue({ number: 1, kind: "pr", author: "ann", reviewers: ["me"] }),
+      makeIssue({ number: 2, kind: "pr", author: "me", reviewers: ["me", "ann"] }),
+      makeIssue({ number: 3, kind: "pr", author: "ann", reviewers: ["bob"] }),
+    ];
+    const marked = (viewer: string | null) =>
+      unmatchedItems(snapshot(pulls), [], { ...EVERYONE, viewer })
+        .items.filter((card) => "reviewing" in card && card.reviewing)
+        .map(numberOf);
+    expect(marked("me")).toEqual([1]);
+    expect(marked(null)).toEqual([]);
+  });
 });
 
 describe("unmatchedItems", () => {

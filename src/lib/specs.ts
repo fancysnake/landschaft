@@ -7,7 +7,7 @@ export const SINCE_OVERLAP_MS = 2 * 60 * 1000;
 /** A repo synced within this long is skipped by a sync that asks for the stale repos only. */
 export const FRESH_SYNC_MS = 60 * 1000;
 
-/** The GitHub rate limit a sync aborts below rather than run it dry. */
+/** The forge's rate limit a sync aborts below rather than run it dry. */
 export const RATE_FLOOR = 200;
 
 /** The background sync pauses once the last request is this old. */

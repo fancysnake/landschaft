@@ -28,8 +28,8 @@ describe("Db migration", () => {
 
     const db = new Db(file);
     expect(db.getSyncState("acme/app")).toBeNull();
-    db.upsertIssues([makeIssue({ number: 1, author: "ann" })]);
-    expect(cachedIssue(db, REPO, 1)?.author).toBe("ann");
+    db.upsertIssues([makeIssue({ number: 1, author: "ann", reviewers: ["cy"] })]);
+    expect(cachedIssue(db, REPO, 1)).toMatchObject({ author: "ann", reviewers: ["cy"] });
     db.close();
     rmSync(dir, { recursive: true, force: true });
   });

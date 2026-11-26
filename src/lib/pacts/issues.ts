@@ -60,6 +60,8 @@ export interface Issue {
   blockedByTotal: number;
   /** Issues a PR closes when merged; empty for issues. */
   linked: IssueRef[];
+  /** Logins asked to review a PR, or who reviewed it; empty for issues. */
+  reviewers: string[];
   /** PR status labels that hold for a PR, set by the sync's status query; empty for issues. */
   statuses: PullStatusLabel[];
 }

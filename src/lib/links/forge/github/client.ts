@@ -90,11 +90,6 @@ export function createGithubClient(
   };
 }
 
-export interface PageInfo {
-  hasNextPage: boolean;
-  endCursor: string | null;
-}
-
 export function splitRepo(repo: string): { owner: string; name: string } {
   const [owner, name] = repo.split("/");
   if (!owner || !name) throw new GithubError(`invalid repo "${repo}", expected owner/repo`);

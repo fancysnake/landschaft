@@ -61,6 +61,7 @@ describe("toIssue", () => {
       blockedBy: [{ repo: "acme/lib", number: 8, state: "CLOSED" }],
       blockedByTotal: 1,
       linked: [],
+      reviewers: [],
     });
   });
 
@@ -89,6 +90,11 @@ describe("toPull", () => {
       closingIssuesReferences: {
         nodes: [{ number: 12, repository: { nameWithOwner: "acme/app" } }],
       },
+      // A team asked to review comes without a login.
+      reviewRequests: {
+        nodes: [{ requestedReviewer: { login: "cy" } }, { requestedReviewer: {} }],
+      },
+      latestReviews: { nodes: [{ author: { login: "dee" } }, { author: { login: "cy" } }] },
     });
     expect(pull).toMatchObject({
       kind: "pr",
@@ -96,6 +102,7 @@ describe("toPull", () => {
       author: "bob",
       parent: null,
       linked: [{ repo: "acme/app", number: 12 }],
+      reviewers: ["cy", "dee"],
     });
   });
 });
@@ -105,6 +112,7 @@ function statusNode(overrides: Partial<PullStatusNode> = {}): PullStatusNode {
     number: 30,
     isDraft: false,
     mergeable: "MERGEABLE",
+    reviewDecision: null,
     author: { login: "bob" },
     commits: { nodes: [] },
     reviewThreads: { nodes: [] },
@@ -132,6 +140,12 @@ const ci = (state: StatusState, checks: CheckContext[] = []) =>
   toPullStatus(statusNode({ commits: rollup(state, checks) })).statuses;
 
 describe("toPullStatus", () => {
+  it("reads the review decision", () => {
+    expect(holds("is:approved", { reviewDecision: "APPROVED" })).toBe(true);
+    expect(holds("is:changes-requested", { reviewDecision: "CHANGES_REQUESTED" })).toBe(true);
+    expect(toPullStatus(statusNode({ reviewDecision: "REVIEW_REQUIRED" })).statuses).toEqual([]);
+  });
+
   it("is clean without checks, threads or conflicts", () => {
     expect(toPullStatus(statusNode())).toEqual({ number: 30, statuses: [] });
   });
@@ -285,6 +299,8 @@ const pullNode = (number: number, updatedAt: string): PullNode => ({
   labels: { nodes: [] },
   assignees: { nodes: [] },
   closingIssuesReferences: { nodes: [] },
+  reviewRequests: { nodes: [] },
+  latestReviews: { nodes: [] },
 });
 
 describe("fetchPullsPage", () => {

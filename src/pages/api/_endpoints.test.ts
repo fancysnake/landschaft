@@ -30,7 +30,12 @@ beforeEach(() => {
       throw new Error("offline");
     },
   };
-  const syncer = new Syncer({ db, forge: new GithubForge(offline), config: store.load });
+  const forge = new GithubForge(offline);
+  const syncer = new Syncer({
+    db,
+    forges: { github: forge, gitlab: forge },
+    config: store.load,
+  });
   services = {
     config: new ConfigKeeper(store, syncer),
     sync: syncer,

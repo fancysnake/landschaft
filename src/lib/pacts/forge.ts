@@ -4,7 +4,8 @@ export interface IssuesPage {
   issues: FetchedIssue[];
   hasNextPage: boolean;
   endCursor: string | null;
-  rateRemaining: number;
+  /** Requests the forge still allows; null when it does not say. */
+  rateRemaining: number | null;
 }
 
 /** One page of a look-up of issues by number. */
@@ -26,7 +27,7 @@ export interface PageOptions {
 export interface PullStatusPage {
   statuses: PullStatus[];
   hasNextPage: boolean;
-  rateRemaining: number;
+  rateRemaining: number | null;
 }
 
 /** A branch to read failed jobs of; `suites` also reads its head commit's check suites. */
@@ -39,7 +40,7 @@ export interface CiBranchesPage {
   branches: CiBranch[];
   hasNextPage: boolean;
   endCursor: string | null;
-  rateRemaining: number;
+  rateRemaining: number | null;
 }
 
 export interface CiJobsPage {
@@ -47,7 +48,7 @@ export interface CiJobsPage {
   /** Branches an unexpected error hit, whose cached jobs still hold. */
   failed: string[];
   hasNextPage: boolean;
-  rateRemaining: number;
+  rateRemaining: number | null;
 }
 
 /** The code host the sync reads issues, PRs, labels and CI jobs from. */

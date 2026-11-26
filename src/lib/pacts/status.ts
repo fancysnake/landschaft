@@ -1,10 +1,12 @@
-/** PR states the sync reads from GitHub for every open PR. */
+/** PR states the sync reads from the forge for every open PR. */
 export const PULL_STATUS_NAMES = [
   "is:conflicting",
   "is:ci:failed",
   "is:ci:running",
   "is:unanswered",
   "is:draft",
+  "is:approved",
+  "is:changes-requested",
 ] as const;
 export type PullStatusLabel = (typeof PULL_STATUS_NAMES)[number];
 

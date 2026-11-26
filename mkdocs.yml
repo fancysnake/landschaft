@@ -59,6 +59,7 @@ nav:
   - Guide:
       - getting-started.md
       - configuration.md
+      - gitlab.md
       - workflow.md
   - Reference:
       - reference.md

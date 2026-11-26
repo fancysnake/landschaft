@@ -1,6 +1,7 @@
 import type { CiBranch, Forge, PageOptions } from "../../../pacts/forge";
 import type { GithubClient } from "./client";
 
+import { batched } from "../batched";
 import { fetchCiBranchesPage, fetchCiJobs } from "./ci";
 import {
   fetchIssuesByNumber,
@@ -18,14 +19,6 @@ import {
 const ISSUE_BATCH = 50;
 const STATUS_BATCH = 50;
 const CI_BATCH = 20;
-
-/** Fetches `items` `size` at a time, one page per query. */
-async function* batched<T, P>(items: T[], size: number, fetch: (batch: T[]) => Promise<P>) {
-  for (let start = 0; start < items.length; start += size) {
-    const page = await fetch(items.slice(start, start + size));
-    yield { ...page, hasNextPage: start + size < items.length };
-  }
-}
 
 export class GithubForge implements Forge {
   constructor(private readonly gh: GithubClient) {}

@@ -19,6 +19,8 @@ Astro 7 in SSR mode (`@astrojs/node`, standalone) with React 19 islands, Tailwin
 - `src/lib/links/db/sqlite.ts` — SQLite schema and queries (issues, blockers, labels, failed CI jobs, sync state).
 - `src/lib/links/forge/github/` — GraphQL transport (`client.ts`, token from `GITHUB_TOKEN` or
   `gh auth token`), issue and PR sync queries (`issues.ts`) and failed CI jobs (`ci.ts`).
+- `src/lib/links/forge/gitlab/` — GraphQL transport (`client.ts`, instance and token from
+  `GITLAB_URL` and `GITLAB_TOKEN`) and merge request queries (`merge-requests.ts`).
 - `src/lib/specs.ts` — business constants the sync obeys (full-sync age, `since` overlap, rate
   floor, idle pause); only `mills` read them.
 - `src/lib/mills/sync.ts` — the `Syncer`: sequential, incremental and full passes, and which

@@ -28,6 +28,7 @@ export function makeIssue(overrides: Partial<Issue> & { number: number }): Issue
     blockedBy: [],
     blockedByTotal: 0,
     linked: [],
+    reviewers: [],
     statuses: [],
     ...overrides,
   };
