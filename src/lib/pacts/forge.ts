@@ -8,6 +8,13 @@ export interface IssuesPage {
   rateRemaining: number | null;
 }
 
+/** One page of a look-up of issues by number. */
+export interface IssuesByNumberPage {
+  issues: FetchedIssue[];
+  hasNextPage: boolean;
+  rateRemaining: number;
+}
+
 /** Which states a page fetches; a closed PR is closed or merged. */
 export type PageStates = "open" | "closed" | "all";
 
@@ -49,6 +56,8 @@ export interface Forge {
   issuesPage(repo: string, options: PageOptions): Promise<IssuesPage>;
   /** Same contract as `issuesPage`; with `since`, paging ends at the first older PR. */
   pullsPage(repo: string, options: PageOptions): Promise<IssuesPage>;
+  /** The issues with these numbers, paged like `pullStatuses`; one the forge lacks is left out. */
+  issuesByNumber(repo: string, numbers: number[]): AsyncIterable<IssuesByNumberPage>;
   /** Statuses of the PRs, in as many pages as the forge splits them into; none for no PRs. */
   pullStatuses(repo: string, numbers: number[]): AsyncIterable<PullStatusPage>;
   ciBranchesPage(repo: string, after: string | null): Promise<CiBranchesPage>;

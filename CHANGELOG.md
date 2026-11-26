@@ -22,6 +22,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 - The global `users` now also take the PRs they review, so PRs waiting for your review appear
   on your dashboards.
 
+### Fixed
+
+- `has:pr` and the `PR open` pill hold for the open issues above an issue that an open PR
+  closes also when a closed issue in that chain was never synced. The sync now fetches such an
+  issue once, so the result no longer depends on when the cache was built.
+
 ## [6.1.0] - 2026-11-24
 
 ### Added

@@ -1,9 +1,9 @@
 import type { Config, Dashboard } from "../pacts/config";
 import type { SyncStore } from "../pacts/db";
 import type { CiBranch, Forge, PageOptions } from "../pacts/forge";
-import type { CiJob } from "../pacts/issues";
 import type { SyncRequest } from "../pacts/web";
 
+import { type CiJob, type Issue, type IssueRef, keyOf } from "../pacts/issues";
 import {
   InvalidError,
   SyncBusyError,
@@ -73,6 +73,35 @@ export function closedPlan({
   const start = closedSince(days, now);
   const from = refill || previous === null ? start : Math.max(start, previous);
   return { from: new Date(from).toISOString(), filled: days };
+}
+
+/**
+ * What `has:pr` climbs through, by key: what the open PRs in `issues` close, and each parent
+ * above that `byKey` leads to.
+ */
+export function abovePulls(issues: Issue[], byKey: Map<string, Issue>): Map<string, IssueRef> {
+  const refs = new Map<string, IssueRef>();
+  for (const pull of issues) {
+    if (pull.state === "OPEN") for (const ref of pull.linked) refs.set(keyOf(ref), ref);
+  }
+  // A Map visits the keys its loop adds, so this climbs to the top parent.
+  for (const key of refs.keys()) {
+    const parent = byKey.get(key)?.parent;
+    if (parent) refs.set(keyOf(parent), parent);
+  }
+  return refs;
+}
+
+/**
+ * The issues in `repos` that `abovePulls` reaches from the PRs of `repo` and `issues` lack. A
+ * parent above a lacking issue shows only once that issue is cached.
+ */
+function uncachedAbovePulls(issues: Issue[], repo: string, repos: string[]): IssueRef[] {
+  const byKey = new Map(issues.map((issue) => [keyOf(issue), issue]));
+  const own = issues.filter((issue) => issue.repo === repo);
+  return [...abovePulls(own, byKey)]
+    .filter(([key, ref]) => !byKey.has(key) && repos.includes(ref.repo))
+    .map(([, ref]) => ref);
 }
 
 type Schedule = Pick<Config, "repos" | "refreshMinutes">;
@@ -343,6 +372,7 @@ export class Syncer implements SyncService {
       }
 
       const closed = full ? this.db.closeMissing(repo, seen) : 0;
+      upserted += await this.fetchAbovePulls(forge, repo);
       await this.refreshPullStatuses(forge, repo);
       await this.refreshCiJobs(forge, repo);
       this.db.upsertLabels(repo, await forge.repoLabels(repo));
@@ -390,6 +420,32 @@ export class Syncer implements SyncService {
       this.spend(page.rateRemaining, Boolean(after));
     } while (after);
     return upserted;
+  }
+
+  /**
+   * Caches the issues `uncachedAbovePulls` names for `repo`, a level of parents per round, so
+   * `has:pr` reaches the open issues above a closed one no page fetched. Asks for an issue once;
+   * a cached row costs no request. Returns how many issues it upserted.
+   */
+  private async fetchAbovePulls(forge: Forge, repo: string): Promise<number> {
+    const { repos } = this.config();
+    const asked = new Set<string>();
+    let upserted = 0;
+    for (;;) {
+      const lacking = uncachedAbovePulls(this.db.listIssues(repos), repo, repos).filter(
+        (ref) => !asked.has(keyOf(ref)),
+      );
+      if (lacking.length === 0) return upserted;
+      for (const ref of lacking) asked.add(keyOf(ref));
+      for (const [target, refs] of Map.groupBy(lacking, (ref) => ref.repo)) {
+        const numbers = refs.map((ref) => ref.number);
+        for await (const page of forge.issuesByNumber(target, numbers)) {
+          this.db.upsertIssues(page.issues);
+          upserted += page.issues.length;
+          this.spend(page.rateRemaining, page.hasNextPage);
+        }
+      }
+    }
   }
 
   /** Stores the statuses of every open PR in the cache. */

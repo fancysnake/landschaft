@@ -1,4 +1,4 @@
-import type { CiJob, FetchedIssue, LabelDef, PullStatus, Snapshot } from "./issues";
+import type { CiJob, FetchedIssue, Issue, LabelDef, PullStatus, Snapshot } from "./issues";
 import type { SyncState } from "./sync";
 
 /** The cache the sync writes. */
@@ -7,6 +7,8 @@ export interface SyncStore {
   listSyncStates(): SyncState[];
   setSyncState(repo: string, patch: Partial<Omit<SyncState, "repo">>): void;
   upsertIssues(issues: FetchedIssue[]): void;
+  /** Every cached issue and PR of the repos, in any state. */
+  listIssues(repos: string[]): Issue[];
   /** After a full sync: anything still open that the forge did not list is closed. */
   closeMissing(repo: string, seen: Set<number>): number;
   openPullNumbers(repo: string): number[];

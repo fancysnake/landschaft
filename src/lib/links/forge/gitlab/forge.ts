@@ -2,6 +2,7 @@ import type {
   CiBranchesPage,
   CiJobsPage,
   Forge,
+  IssuesByNumberPage,
   IssuesPage,
   PageOptions,
 } from "../../../pacts/forge";
@@ -24,6 +25,8 @@ export class GitlabForge implements Forge {
   pullsPage(repo: string, options: PageOptions) {
     return fetchMergeRequestsPage(this.gitlab, repo, options);
   }
+
+  async *issuesByNumber(): AsyncGenerator<IssuesByNumberPage> {}
 
   pullStatuses(repo: string, numbers: number[]) {
     return batched(numbers, STATUS_BATCH, (batch) => fetchStatuses(this.gitlab, repo, batch));

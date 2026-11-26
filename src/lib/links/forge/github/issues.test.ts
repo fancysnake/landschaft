@@ -6,6 +6,7 @@ import type { StatusState } from "./client";
 import { fakeGithub } from "../../../__fixtures__/github";
 import {
   type CheckContext,
+  fetchIssuesByNumber,
   fetchIssuesPage,
   fetchPullsPage,
   fetchPullStatuses,
@@ -215,6 +216,21 @@ describe("fetchPullStatuses", () => {
       statuses: [{ number: 7, statuses: ["is:conflicting"] }],
       rateRemaining: 4321,
     });
+  });
+});
+
+describe("fetchIssuesByNumber", () => {
+  it("asks for every issue in one query, and drops one GitHub does not find", async () => {
+    const { gh, requests } = fakeGithub({
+      data: { rateLimit: { remaining: 4321 }, repository: { i12: node, i13: null } },
+      errors: [{ message: "Could not resolve to an Issue", type: "NOT_FOUND" }],
+    });
+
+    const page = await fetchIssuesByNumber(gh, "acme/app", [12, 13]);
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.query).toContain("i13: issue(number: 13)");
+    expect(page).toEqual({ issues: [toIssue("acme/app", node)], rateRemaining: 4321 });
   });
 });
 
