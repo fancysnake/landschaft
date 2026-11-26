@@ -7,6 +7,21 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- GitLab backend: set `backend` to `gitlab` in the config or in Settings to read merge requests
+  from a self-managed instance, named by `GITLAB_URL` and read with `GITLAB_TOKEN`. Merge
+  requests show as pull requests; GitLab issues and failed CI jobs are not synced.
+- `reviewer:` picks the PRs a user was asked to review or has reviewed; `reviewer:@me` is yours.
+- `is:approved` and `is:changes-requested` pick PRs by review outcome, and cards carry an
+  `approved` or `changes` pill.
+- A PR you review and did not open carries a `review` pill on its card.
+
+### Changed
+
+- The global `users` now also take the PRs they review, so PRs waiting for your review appear
+  on your dashboards.
+
 ## [6.1.0] - 2026-11-24
 
 ### Added

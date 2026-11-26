@@ -44,7 +44,7 @@ export function SyncStatus({ status, repos, syncing, error, onSync, onDismissErr
       {status.rateRemaining !== null && (
         <span
           className="text-xs text-neutral-500 tabular-nums"
-          title="GitHub API points left this hour"
+          title="API requests the code host still allows"
         >
           · {status.rateRemaining} left
         </span>

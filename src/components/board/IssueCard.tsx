@@ -13,6 +13,8 @@ const STATUS_PILLS: Record<PullStatusLabel, { text: string; title: string; tone:
   "is:ci:running": { text: "CI …", title: "CI running", tone: "amber" },
   "is:unanswered": { text: "comments", title: "Unanswered review comments", tone: "orange" },
   "is:draft": { text: "draft", title: "Draft pull request", tone: "neutral" },
+  "is:approved": { text: "approved", title: "Approved by its reviewers", tone: "green" },
+  "is:changes-requested": { text: "changes", title: "A reviewer requested changes", tone: "red" },
 };
 
 /** Inbox row with a coloured bar on the left for its kind; white unless `surface` tints it. */
@@ -128,6 +130,11 @@ function IssueCard({ card, showRepo }: { card: IssueItemCard; showRepo: boolean 
           {card.number}
         </span>
         {card.kind === "pr" && <span className={`pill ${TONE.sky}`}>PR</span>}
+        {card.reviewing && (
+          <span title="You review this pull request" className={`pill ${TONE.violet}`}>
+            review
+          </span>
+        )}
         {card.issueType && <span className={`pill ${TONE.neutral}`}>{card.issueType}</span>}
         {card.state === "CLOSED" && <span className={`pill ${TONE.neutral}`}>closed</span>}
         {card.blocked && <span className={`pill ${TONE.red}`}>blocked</span>}

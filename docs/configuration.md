@@ -13,18 +13,22 @@ the file is plain JSON you can also edit by hand (it is validated on load and on
 
 ## Global
 
-The open items in `repos` that `users` created or are assigned to form the base set every
-dashboard filters.
+The open items in `repos` that `users` created, are assigned to or review form the base set
+every dashboard filters.
 
-| Field            | Type                 | Default | Meaning                                                              |
-| ---------------- | -------------------- | ------- | -------------------------------------------------------------------- |
-| `version`        | integer              | `0`     | Config format; landschaft upgrades older ones on load                |
-| `repos`          | `owner/repo[]`       | `[]`    | Repositories to sync                                                 |
-| `users`          | `(login \| "@me")[]` | `[]`    | Only items these users created or are assigned to; `[]` = everyone's |
-| `refreshMinutes` | 1–1440               | `5`     | Background sync interval for every repository                        |
-| `dashboards`     | `Dashboard[]`        | `[]`    | Boards and inboxes, in tab order                                     |
+| Field            | Type                 | Default  | Meaning                                                                      |
+| ---------------- | -------------------- | -------- | ---------------------------------------------------------------------------- |
+| `version`        | integer              | `0`      | Config format; landschaft upgrades older ones on load                        |
+| `backend`        | `github` \| `gitlab` | `github` | The code host every repository is read from; see [GitLab](gitlab.md)         |
+| `repos`          | `owner/repo[]`       | `[]`     | Repositories to sync; GitLab project paths under `gitlab`                    |
+| `users`          | `(login \| "@me")[]` | `[]`     | Only items these users created, are assigned to or review; `[]` = everyone's |
+| `refreshMinutes` | 1–1440               | `5`      | Background sync interval for every repository                                |
+| `dashboards`     | `Dashboard[]`        | `[]`     | Boards and inboxes, in tab order                                             |
 
 `@me` stands for the account behind the token.
+
+With `backend` set to `gitlab`, `repos` holds GitLab project paths and the instance comes from the
+environment; the [GitLab](gitlab.md) page has the setup.
 
 ## Dashboard
 
@@ -94,6 +98,7 @@ version newer than the running landschaft fails validation.
 | Dashboards  | `./landschaft.config.json` (`LANDSCHAFT_CONFIG` overrides) |
 | Issue cache | `./landschaft.db` (`LANDSCHAFT_DB` overrides), git-ignored |
 | Token       | `GITHUB_TOKEN`, else `gh auth token`                       |
+| GitLab      | `GITLAB_URL` and `GITLAB_TOKEN`; see [GitLab](gitlab.md)   |
 
 Paths are relative to the directory the command runs in. Saves go through a temp file and a
 rename, so a crash never leaves a half-written config.

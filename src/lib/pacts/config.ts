@@ -18,7 +18,7 @@ const id = z
   .min(1)
   .max(32)
   .regex(/^[a-z0-9_-]+$/i, "letters, digits, - and _ only");
-export const repoName = z.string().regex(REPO, "expected owner/repo");
+export const repoName = z.string().regex(REPO, "expected owner/repo or a GitLab project path");
 
 /** A filter expression (see `filter.ts`); empty matches everything. */
 export const filterText = z.string().superRefine((text, ctx) => {
@@ -145,8 +145,11 @@ function hasUniqueIds(items: { id: string }[]): boolean {
 /** Stands for the token's account in `users` and in filters. */
 export const ME = "@me";
 
-/** A GitHub login, or `@me`. */
-export const userName = z.string().regex(LOGIN, "expected a GitHub login or @me");
+/** A login, or `@me`. */
+export const userName = z.string().regex(LOGIN, "expected a login or @me");
+
+/** The code hosts a config can read from. */
+export const BACKENDS = ["github", "gitlab"] as const;
 
 const refreshMinutes = z.number().int().min(1).max(1440);
 
@@ -371,6 +374,8 @@ export const ConfigSchema = z.preprocess(
   z
     .object({
       version: z.literal(CONFIG_VERSION),
+      /** The code host every repo is read from; GitLab gives merge requests only. */
+      backend: z.enum(BACKENDS).default("github"),
       /** Every board starts from the open items in these repos… */
       repos: z.array(repoName).default([]),
       /** …that these users authored or are assigned to; empty takes everyone's. */

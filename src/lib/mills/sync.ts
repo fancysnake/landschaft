@@ -401,11 +401,15 @@ export class Syncer implements SyncService {
     this.db.setCiJobs(repo, jobs);
   }
 
-  /** Records the rate limit left; aborts the sync when it runs low and `more` requests follow. */
-  private spend(rateRemaining: number, more: boolean): void {
+  /**
+   * Records the rate limit left, when the forge says; aborts the sync when it runs low and `more`
+   * requests follow.
+   */
+  private spend(rateRemaining: number | null, more: boolean): void {
+    if (rateRemaining === null) return;
     this.rateRemaining = rateRemaining;
     if (more && rateRemaining < RATE_FLOOR) {
-      throw new Error(`GitHub rate limit nearly exhausted (${rateRemaining} left), sync aborted`);
+      throw new Error(`rate limit nearly exhausted (${rateRemaining} left), sync aborted`);
     }
   }
 }

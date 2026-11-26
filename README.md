@@ -113,15 +113,16 @@ repos after `repo:` and users after `user:`, `author:` and `assignee:`.
   values, and quotes hold spaces: `label:"needs review"`. `AND` and `OR` count only in
   uppercase. `-` binds tightest, then AND, then OR. Labels match by name, ignoring case.
 - Terms:
-  - `label:`, `repo:`, `author:`, `assignee:` and `user:` (author or assignee), where `@me` is
-    the account behind the token.
+  - `label:`, `repo:`, `author:`, `assignee:`, `user:` (author or assignee) and `reviewer:`
+    (asked to review a PR, or reviewed it), where `@me` is the account behind the token.
   - `is:issue`, `is:pr`, `is:blocked` (has an open blocker or parent issue), `is:blocking` (blocks an open
     issue or is an open sub-issue's parent), `is:closed` (closed or merged; see the dashboard's `closedDays`).
   - `has:parent-issue`, `has:sub-issues`, `parent-issue:owner/repo#12`.
-  - PR statuses from GitHub: `is:conflicting` (merge conflicts), `is:ci:failed` (the last
+  - PR statuses: `is:conflicting` (merge conflicts), `is:ci:failed` (the last
     commit shows GitHub's red ✗), `is:ci:running` (a check has not finished),
     `is:unanswered` (an unresolved review thread whose last comment is not the PR author's)
-    and `is:draft` (a draft PR).
+    `is:draft` (a draft PR), `is:approved` (the reviewers approved) and
+    `is:changes-requested` (a reviewer asked for changes).
     `is:pr is:conflicting|ci:failed|unanswered` gathers the PRs waiting on their author.
   - `has:pr` picks issues an open PR closes (GitHub's "linked pull requests"), whoever
     opened the PR, as long as the PR is in one of the global repos. It also picks every open

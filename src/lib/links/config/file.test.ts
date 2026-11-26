@@ -54,6 +54,7 @@ describe("config file", () => {
   it("returns an empty config when the file is missing", () => {
     expect(loadConfig(file)).toEqual({
       version: CONFIG_VERSION,
+      backend: "github",
       repos: [],
       users: [],
       refreshMinutes: 5,
@@ -218,17 +219,20 @@ describe("config schema rules", () => {
     );
   });
 
-  it("takes GitHub logins and @me as users", () => {
+  it("takes logins and @me as users", () => {
     const ok = {
       dashboards: [
-        { ...base, users: ["@me", "ann-b", "mona-cat_octo", "renovate[bot]", "renovate"] },
+        {
+          ...base,
+          users: ["@me", "ann-b", "mona-cat_octo", "renovate[bot]", "renovate", "cy.lee"],
+        },
       ],
     };
     expect(ConfigSchema.safeParse(ok).success).toBe(true);
     for (const bad of ["@ann", "ann b", "-ann", ""])
       expect(() =>
         saveConfig({ dashboards: [{ ...base, users: [bad] }] }, "/dev/null/never"),
-      ).toThrow(/GitHub login/);
+      ).toThrow(/a login or @me/);
   });
 });
 

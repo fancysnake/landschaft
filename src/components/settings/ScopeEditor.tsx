@@ -1,20 +1,39 @@
-import { type Config, repoName, userName } from "../../lib/pacts/config";
+import { BACKENDS, type Config, repoName, userName } from "../../lib/pacts/config";
 import { ChipList } from "./ChipList";
 import { Field } from "./Field";
 
-type Scope = Pick<Config, "repos" | "users" | "refreshMinutes">;
+type Scope = Pick<Config, "backend" | "repos" | "users" | "refreshMinutes">;
+
+const BACKEND_NAMES: Record<Config["backend"], string> = { github: "GitHub", gitlab: "GitLab" };
 
 interface Props {
   scope: Scope;
   onChange(scope: Scope): void;
 }
 
-/** The base set every dashboard filters: the global repos, users and refresh interval. */
+/** The base set every dashboard filters: the backend, its repos, the users and the refresh interval. */
 export function ScopeEditor({ scope, onChange }: Props) {
   const patch = (changes: Partial<Scope>) => onChange({ ...scope, ...changes });
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_1fr_10rem]">
+    <div className="grid gap-4 lg:grid-cols-[10rem_1fr_1fr_10rem]">
+      <Field
+        label="Backend"
+        hint="GitLab shows merge requests only, from the instance in GITLAB_URL with the token in GITLAB_TOKEN."
+      >
+        <select
+          value={scope.backend}
+          onChange={(event) => patch({ backend: event.target.value as Config["backend"] })}
+          className="field w-32"
+        >
+          {BACKENDS.map((backend) => (
+            <option key={backend} value={backend}>
+              {BACKEND_NAMES[backend]}
+            </option>
+          ))}
+        </select>
+      </Field>
+
       <Field
         group
         label="Repositories"
@@ -24,7 +43,7 @@ export function ScopeEditor({ scope, onChange }: Props) {
           items={scope.repos}
           onChange={(repos) => patch({ repos })}
           schema={repoName}
-          placeholder="owner/repo"
+          placeholder={scope.backend === "gitlab" ? "group/project" : "owner/repo"}
         />
       </Field>
 

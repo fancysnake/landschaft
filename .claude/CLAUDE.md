@@ -45,7 +45,9 @@ type-checked (`astro check`), not formatted.
 - `src/lib/links/` — Node-only adapters: `config/file.ts` (JSON file, atomic save),
   `db/sqlite.ts` (SQLite), `forge/github/client.ts` (GraphQL transport, token),
   `forge/github/issues.ts` (issue and PR sync queries), `forge/github/ci.ts` (failed CI job queries),
-  `forge/github/forge.ts` (`GithubForge`, the `Forge` over those queries).
+  `forge/github/forge.ts` (`GithubForge`, the `Forge` over those queries),
+  `forge/gitlab/` (`GitlabForge`: merge requests of a self-managed GitLab; `inits` picks the
+  forge by the config's `backend`).
 - `src/lib/gates/timer/node.ts` — the sync timer, a gate `inits` starts with the `Syncer`.
 - `src/lib/inits.ts` — process singleton that reads `LANDSCHAFT_*` env and wires links into
   mills; `src/middleware.ts` puts its `Services` on `context.locals` (typed in `src/env.d.ts`).

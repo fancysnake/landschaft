@@ -313,6 +313,20 @@ describe("Syncer", () => {
     expect(cachedIssue(db, REPO, 2)?.statuses).toEqual(["is:conflicting"]);
   });
 
+  it("keeps the last known rate limit through pages that report none", async () => {
+    const forge = fakeForge();
+    forge.pullsPage.mockResolvedValue({ ...EMPTY_PAGE, rateRemaining: null });
+    forge.ciBranchesPage.mockResolvedValue({
+      branches: [],
+      hasNextPage: false,
+      endCursor: null,
+      rateRemaining: null,
+    });
+    const syncer = syncerWith(db, forge);
+    await syncer.syncRepo(REPO);
+    expect(syncer.status().rateRemaining).toBe(5000);
+  });
+
   it("aborts between PR status pages when the rate limit is nearly gone", async () => {
     openPulls(2);
     const forge = fakeForge();

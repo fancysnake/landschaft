@@ -101,6 +101,7 @@ interface IssueRow {
   kind: string;
   linked_json: string;
   status_json: string;
+  reviewers_json: string;
 }
 
 interface BlockerRow {
@@ -181,6 +182,7 @@ function rowToIssue(row: IssueRow, blockedBy: StatedRef[]): Issue {
     blockedBy,
     blockedByTotal: row.blocked_by_total,
     linked: JSON.parse(row.linked_json) as IssueRef[],
+    reviewers: JSON.parse(row.reviewers_json) as string[],
     statuses: (JSON.parse(row.status_json) as string[]).filter(isPullStatusLabel),
   };
 }
@@ -195,6 +197,7 @@ const ADDED_COLUMNS = [
   ["linked_json", "TEXT NOT NULL DEFAULT '[]'"],
   ["status_json", "TEXT NOT NULL DEFAULT '[]'"],
   ["parent_state", "TEXT"],
+  ["reviewers_json", "TEXT NOT NULL DEFAULT '[]'"],
 ] as const;
 
 export class Db implements SyncStore, ViewStore {
@@ -255,8 +258,8 @@ export class Db implements SyncStore, ViewStore {
     const upsert = this.db.prepare(`
       INSERT INTO issues (repo, number, node_id, title, state, url, issue_type, author, created_at,
         updated_at, closed_at, labels_json, assignees_json, parent_repo, parent_number, sub_total,
-        sub_completed, sub_percent, blocked_by_total, kind, linked_json, parent_state)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        sub_completed, sub_percent, blocked_by_total, kind, linked_json, parent_state, reviewers_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (repo, number) DO UPDATE SET
         node_id = excluded.node_id, title = excluded.title, state = excluded.state, url = excluded.url,
         issue_type = excluded.issue_type, author = excluded.author, created_at = excluded.created_at,
@@ -266,7 +269,7 @@ export class Db implements SyncStore, ViewStore {
         sub_total = excluded.sub_total, sub_completed = excluded.sub_completed,
         sub_percent = excluded.sub_percent, blocked_by_total = excluded.blocked_by_total,
         kind = excluded.kind, linked_json = excluded.linked_json,
-        parent_state = excluded.parent_state
+        parent_state = excluded.parent_state, reviewers_json = excluded.reviewers_json
     `);
     const clearBlockers = this.db.prepare("DELETE FROM blocked_by WHERE repo = ? AND number = ?");
     const insertBlocker = this.db.prepare(
@@ -297,6 +300,7 @@ export class Db implements SyncStore, ViewStore {
           issue.kind,
           JSON.stringify(issue.linked),
           issue.parent?.state ?? null,
+          JSON.stringify(issue.reviewers),
         );
         clearBlockers.run(issue.repo, issue.number);
         for (const blocker of issue.blockedBy) {

@@ -15,9 +15,10 @@ export type FilterNode =
   | { type: "not"; node: FilterNode }
   | { type: "and" | "or"; nodes: FilterNode[] };
 
-/** A GitHub login, or `@me`. */
-export const LOGIN = /^(@me|[a-z\d](?:[a-z\d_-]*[a-z\d])?(\[bot\])?)$/i;
-export const REPO = /^[\w.-]+\/[\w.-]+$/;
+/** A GitHub or GitLab login, or `@me`. */
+export const LOGIN = /^(@me|[a-z\d_](?:[\w.-]*[a-z\d_])?(\[bot\])?)$/i;
+/** `owner/repo`, or a GitLab project path, which nests: `group/sub/project`. */
+export const REPO = /^[\w.-]+(\/[\w.-]+)+$/;
 export const ISSUE_REF = /^[\w.-]+\/[\w.-]+#\d+$/;
 
 /** A label name as every comparison sees it: labels match whatever their case. */
@@ -213,6 +214,8 @@ export interface FilterItem {
   /** An issue's or PR's author; a CI job's commit authors (see `CiJob`). */
   authors: string[];
   assignees: { login: string }[];
+  /** See `Issue.reviewers`; empty for a CI job. */
+  reviewers: string[];
   labels: { name: string }[];
   statuses: PullStatusLabel[];
   /** An issue an open PR closes; a CI job with a PR (see `CiJob`). */
@@ -279,7 +282,7 @@ const matching = (pattern: RegExp, expected: string) => ({
   check: { test: (value: string) => pattern.test(value), expected },
 });
 const person = {
-  ...matching(LOGIN, "a GitHub login or @me"),
+  ...matching(LOGIN, "a login or @me"),
   suggest: ({ users }: Offer) => [...new Set(["@me", ...users])],
 };
 
@@ -315,7 +318,7 @@ const KEYS = {
       item.parent !== null && same(`${item.parent.repo}#${item.parent.number}`, value),
   },
   repo: {
-    ...matching(REPO, "owner/repo"),
+    ...matching(REPO, "owner/repo or a GitLab project path"),
     suggest: ({ repos }) => repos,
     holds: (value, item) => same(item.repo, value),
   },
@@ -327,6 +330,11 @@ const KEYS = {
     ...person,
     holds: (value, item, { viewer }) =>
       item.assignees.some(({ login }) => isLogin(value, login, viewer)),
+  },
+  reviewer: {
+    ...person,
+    holds: (value, item, { viewer }) =>
+      item.reviewers.some((login) => isLogin(value, login, viewer)),
   },
   user: {
     ...person,

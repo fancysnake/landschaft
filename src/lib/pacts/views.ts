@@ -40,6 +40,8 @@ export interface IssueItemCard {
   statuses: PullStatusLabel[];
   /** An open PR closes it. */
   hasPr: boolean;
+  /** A PR the viewer reviews and did not author. */
+  reviewing: boolean;
   createdAt: string;
   updatedAt: string;
 }
