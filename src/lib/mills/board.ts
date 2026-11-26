@@ -22,6 +22,7 @@ import {
   type Issue,
   issueKey,
   type IssueState,
+  keyOf,
   type LabelRef,
   type Snapshot,
   type StatedRef,
@@ -38,7 +39,7 @@ import {
   laneRows,
   type UnmatchedQuery,
 } from "../pacts/views";
-import { closedSince } from "./sync";
+import { abovePulls, closedSince } from "./sync";
 
 /** A swimlane or column with its filter parsed; a null `node` matches everything. */
 export interface Group {
@@ -86,8 +87,6 @@ export function isBlocked(issue: Issue, byKey: Map<string, Issue>): boolean {
   );
 }
 
-const keyOf = (ref: { repo: string; number: number }): string => issueKey(ref.repo, ref.number);
-
 /** An issue with what filters test it on; see `itemsOf`. */
 type Item = Issue & FilterItem;
 
@@ -99,12 +98,7 @@ type Item = Issue & FilterItem;
  */
 export function itemsOf(issues: Issue[], byKey: Map<string, Issue>): (issue: Issue) => Item {
   const opened = issues.filter((issue) => issue.state === "OPEN");
-  const withPr = new Set(opened.flatMap((pr) => pr.linked.map(keyOf)));
-  // A Set visits the keys its loop adds, so this climbs to the top parent.
-  for (const key of withPr) {
-    const parent = byKey.get(key)?.parent;
-    if (parent) withPr.add(keyOf(parent));
-  }
+  const withPr = abovePulls(issues, byKey);
   const blocking = new Set(opened.flatMap((issue) => blockersOf(issue).map(keyOf)));
   return (issue) => ({
     ...issue,

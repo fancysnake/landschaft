@@ -3,6 +3,7 @@ import type { GithubClient } from "./client";
 
 import { fetchCiBranchesPage, fetchCiJobs } from "./ci";
 import {
+  fetchIssuesByNumber,
   fetchIssuesPage,
   fetchPullsPage,
   fetchPullStatuses,
@@ -10,7 +11,11 @@ import {
   fetchViewer,
 } from "./issues";
 
-/** PRs per status query and branches per CI job query, bounded by GitHub's GraphQL query cost. */
+/**
+ * Issues per query by number, PRs per status query and branches per CI job query, bounded by
+ * GitHub's GraphQL query cost.
+ */
+const ISSUE_BATCH = 50;
 const STATUS_BATCH = 50;
 const CI_BATCH = 20;
 
@@ -31,6 +36,10 @@ export class GithubForge implements Forge {
 
   pullsPage(repo: string, options: PageOptions) {
     return fetchPullsPage(this.gh, repo, options);
+  }
+
+  issuesByNumber(repo: string, numbers: number[]) {
+    return batched(numbers, ISSUE_BATCH, (batch) => fetchIssuesByNumber(this.gh, repo, batch));
   }
 
   pullStatuses(repo: string, numbers: number[]) {

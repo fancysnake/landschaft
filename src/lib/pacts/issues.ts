@@ -76,6 +76,10 @@ export function issueKey(repo: string, number: number): string {
   return `${repo}#${number}`;
 }
 
+export function keyOf({ repo, number }: IssueRef): string {
+  return issueKey(repo, number);
+}
+
 /**
  * A check run or commit status that failed on an unmerged branch's head commit. `authors` are
  * those of the branch's commits ahead of the default branch, or of its last three on the default
