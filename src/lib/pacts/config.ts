@@ -387,6 +387,13 @@ export const ConfigSchema = z.preprocess(
       if (!hasUniqueIds(config.dashboards)) {
         ctx.addIssue({ code: "custom", path: ["dashboards"], message: "ids must be unique" });
       }
+      if (config.backend !== "github") return;
+      for (const [index, repo] of config.repos.entries()) {
+        if (repo.split("/").length > 2) {
+          const message = `${repo}: a GitHub repository is owner/repo`;
+          ctx.addIssue({ code: "custom", path: ["repos", index], message });
+        }
+      }
     }),
 );
 

@@ -71,7 +71,8 @@ from your reviews:
 
 A card you review and did not open also carries a `review` pill. Review state narrows either
 lane: `is:approved`, `is:changes-requested`. For example, `reviewer:@me -author:@me
--is:approved` holds the reviews that still wait for you.
+-is:approved` drops the merge requests GitLab reports approved, unless a reviewer requested
+changes. Approval counts for the whole merge request, not for your own review.
 
 With global **Users** set, a dashboard holds the merge requests those users created, are
 assigned to or review.

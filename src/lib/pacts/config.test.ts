@@ -13,6 +13,11 @@ describe("backend", () => {
     expect(ConfigSchema.safeParse({ backend: "gitea" }).success).toBe(false);
     expect(ConfigSchema.safeParse({ repos: ["project"] }).success).toBe(false);
   });
+
+  it("rejects a nested path on GitHub", () => {
+    const parsed = ConfigSchema.safeParse({ repos: ["acme/a", "acme/tools/api"] });
+    expect(parsed.error?.issues).toMatchObject([{ path: ["repos", 1] }]);
+  });
 });
 
 describe("hidden repos", () => {
