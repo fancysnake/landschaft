@@ -1,5 +1,6 @@
 import type { CiBranch, CiBranchesPage, CiJobsPage } from "../../../pacts/forge";
 import type { CiJob } from "../../../pacts/issues";
+import type { PageInfo } from "../page";
 
 import { ciJobKey } from "../../../pacts/issues";
 import {
@@ -8,7 +9,6 @@ import {
   type GqlError,
   isRed,
   type Login,
-  type PageInfo,
   splitRepo,
   type StatusState,
 } from "./client";

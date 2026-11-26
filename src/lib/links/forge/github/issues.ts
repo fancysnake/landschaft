@@ -1,5 +1,6 @@
 import type { IssuesPage, PageOptions, PullStatusPage } from "../../../pacts/forge";
 import type { FetchedIssue, IssueState, LabelDef, PullStatus } from "../../../pacts/issues";
+import type { PageInfo } from "../page";
 
 import { PULL_STATUS_NAMES, type PullStatusLabel } from "../../../pacts/status";
 import {
@@ -7,7 +8,6 @@ import {
   GithubError,
   isRed,
   type Login,
-  type PageInfo,
   splitRepo,
   type StatusState,
 } from "./client";

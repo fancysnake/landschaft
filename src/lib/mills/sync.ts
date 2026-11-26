@@ -22,7 +22,8 @@ import {
 
 export interface SyncDeps {
   db: SyncStore;
-  forge: Forge;
+  /** The forge of each backend; a sync reads the config's backend once, at its start. */
+  forges: Record<Config["backend"], Forge>;
   /** Read on every use, so settings changes apply without a restart. */
   config: () => Config;
   now?: () => Date;
@@ -134,10 +135,12 @@ export class Syncer implements SyncService {
   private dueError: string | null = null;
   private rateRemaining: number | null = null;
   private viewerLogin: string | null = null;
+  /** The backend `viewerLogin` and `rateRemaining` came from. */
+  private backend: Config["backend"] | null = null;
   /** Repos syncing now, each with whether a request forced the sync to be full. */
   private readonly inFlight = new Map<string, boolean>();
   private readonly db: SyncStore;
-  private readonly forge: Forge;
+  private readonly forges: Record<Config["backend"], Forge>;
   private readonly config: () => Config;
   private readonly now: () => Date;
   private viewerPromise: Promise<string> | null = null;
@@ -150,7 +153,7 @@ export class Syncer implements SyncService {
 
   constructor(deps: SyncDeps) {
     this.db = deps.db;
-    this.forge = deps.forge;
+    this.forges = deps.forges;
     this.config = deps.config;
     this.now = deps.now ?? (() => new Date());
     this.lastRequestAt = this.now().getTime();
@@ -180,19 +183,39 @@ export class Syncer implements SyncService {
     };
   }
 
-  /** Login behind the token, fetched once; a failure is retried on the next call. */
+  /** The forge of the configured backend; a new backend drops what the old one reported. */
+  private forge(): Forge {
+    const { backend } = this.config();
+    if (backend !== this.backend) {
+      this.backend = backend;
+      this.viewerPromise = null;
+      this.viewerLogin = null;
+      this.rateRemaining = null;
+    }
+    return this.forges[backend];
+  }
+
+  /** Login behind the token, fetched once per backend; a failure is retried on the next call. */
   viewer(): Promise<string> {
-    this.viewerPromise ??= this.forge.viewer().then(
+    let forge: Forge;
+    try {
+      forge = this.forge();
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    if (this.viewerPromise) return this.viewerPromise;
+    const promise: Promise<string> = forge.viewer().then(
       (login) => {
-        this.viewerLogin = login;
+        if (this.viewerPromise === promise) this.viewerLogin = login;
         return login;
       },
       (error: unknown) => {
-        this.viewerPromise = null;
+        if (this.viewerPromise === promise) this.viewerPromise = null;
         throw error;
       },
     );
-    return this.viewerPromise;
+    this.viewerPromise = promise;
+    return promise;
   }
 
   /**
@@ -281,6 +304,7 @@ export class Syncer implements SyncService {
     const startedAt = this.now();
     const stamp = startedAt.toISOString();
     try {
+      const forge = this.forge();
       const state = this.db.getSyncState(repo);
       const fullAge = state?.lastFullSyncAt
         ? startedAt.getTime() - Date.parse(state.lastFullSyncAt)
@@ -302,8 +326,8 @@ export class Syncer implements SyncService {
         full,
       });
       const fetchers: Forge["issuesPage"][] = [
-        (r, o) => this.forge.issuesPage(r, o),
-        (r, o) => this.forge.pullsPage(r, o),
+        (r, o) => forge.issuesPage(r, o),
+        (r, o) => forge.pullsPage(r, o),
       ];
       for (const fetchPage of fetchers) {
         upserted += await this.drain(fetchPage, repo, query, seen);
@@ -319,9 +343,9 @@ export class Syncer implements SyncService {
       }
 
       const closed = full ? this.db.closeMissing(repo, seen) : 0;
-      await this.refreshPullStatuses(repo);
-      await this.refreshCiJobs(repo);
-      this.db.upsertLabels(repo, await this.forge.repoLabels(repo));
+      await this.refreshPullStatuses(forge, repo);
+      await this.refreshCiJobs(forge, repo);
+      this.db.upsertLabels(repo, await forge.repoLabels(repo));
 
       this.db.setSyncState(repo, {
         lastSyncAt: stamp,
@@ -369,8 +393,8 @@ export class Syncer implements SyncService {
   }
 
   /** Stores the statuses of every open PR in the cache. */
-  private async refreshPullStatuses(repo: string): Promise<void> {
-    for await (const page of this.forge.pullStatuses(repo, this.db.openPullNumbers(repo))) {
+  private async refreshPullStatuses(forge: Forge, repo: string): Promise<void> {
+    for await (const page of forge.pullStatuses(repo, this.db.openPullNumbers(repo))) {
       this.db.setPullStatuses(repo, page.statuses);
       this.spend(page.rateRemaining, page.hasNextPage);
     }
@@ -381,18 +405,18 @@ export class Syncer implements SyncService {
    * default branch, then reads jobs and commit authors of those alone. A branch a query
    * failed on keeps its cached jobs.
    */
-  private async refreshCiJobs(repo: string): Promise<void> {
+  private async refreshCiJobs(forge: Forge, repo: string): Promise<void> {
     const watched: CiBranch[] = [];
     let after: string | null = null;
     do {
-      const page = await this.forge.ciBranchesPage(repo, after);
+      const page = await forge.ciBranchesPage(repo, after);
       watched.push(...page.branches);
       after = page.hasNextPage ? page.endCursor : null;
       this.spend(page.rateRemaining, Boolean(after) || watched.length > 0);
     } while (after);
     const jobs: CiJob[] = [];
     const failed = new Set<string>();
-    for await (const page of this.forge.ciJobs(repo, watched)) {
+    for await (const page of forge.ciJobs(repo, watched)) {
       jobs.push(...page.jobs);
       for (const name of page.failed) failed.add(name);
       this.spend(page.rateRemaining, page.hasNextPage);

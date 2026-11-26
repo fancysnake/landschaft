@@ -378,7 +378,7 @@ export const ConfigSchema = z.preprocess(
       backend: z.enum(BACKENDS).default("github"),
       /** Every board starts from the open items in these repos… */
       repos: z.array(repoName).default([]),
-      /** …that these users authored or are assigned to; empty takes everyone's. */
+      /** …that these users authored, are assigned to or review; empty takes everyone's. */
       users: z.array(userName).default([]),
       refreshMinutes: refreshMinutes.default(5),
       dashboards: z.array(DashboardSchema).default([]),

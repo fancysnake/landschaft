@@ -193,7 +193,6 @@ function compareBy(by: SortBy, dir: SortDir) {
   };
 }
 
-/** Holds for items one of the global `users` (empty for everyone) authored or is assigned to. */
 /** Holds for what one of `users` authored, is assigned to or reviews; null for no users. */
 const usersNode = (users: string[]): FilterNode | null =>
   users.length > 0

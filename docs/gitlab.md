@@ -59,8 +59,6 @@ The same switch in `landschaft.config.json`:
 }
 ```
 
-Restart once after the switch, so that `@me` stands for the GitLab account.
-
 ## Filters for review work
 
 `reviewer:` picks the merge requests a user was asked to review. Two lanes split your own work

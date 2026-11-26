@@ -1,7 +1,6 @@
 import { resolve } from "node:path";
 
 import type { ConfigStore } from "./pacts/config";
-import type { Forge } from "./pacts/forge";
 import type { Services } from "./pacts/services";
 
 import { startTimer } from "./gates/timer/node";
@@ -20,19 +19,6 @@ export interface App {
   stop(): void;
 }
 
-/** The forge `pick` names at each call, so a saved backend applies to the next sync. */
-function switching(pick: () => Forge): Forge {
-  return {
-    issuesPage: (...args) => pick().issuesPage(...args),
-    pullsPage: (...args) => pick().pullsPage(...args),
-    pullStatuses: (...args) => pick().pullStatuses(...args),
-    ciBranchesPage: (...args) => pick().ciBranchesPage(...args),
-    ciJobs: (...args) => pick().ciJobs(...args),
-    viewer: () => pick().viewer(),
-    repoLabels: (...args) => pick().repoLabels(...args),
-  };
-}
-
 const registry = globalThis as { landschaftApp?: App };
 
 /** One DB handle, forge and sync scheduler per process, surviving Vite HMR re-evaluation. */
@@ -48,8 +34,7 @@ export function getApp(): App {
       github: new GithubForge(createGithubClient(getToken)),
       gitlab: new GitlabForge(createGitlabClient(getAccess)),
     };
-    const forge = switching(() => forges[config.load().backend]);
-    const syncer = new Syncer({ db, forge, config: config.load });
+    const syncer = new Syncer({ db, forges, config: config.load });
     const stopTimer = startTimer(syncer);
     registry.landschaftApp = {
       services: {

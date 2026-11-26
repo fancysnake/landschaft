@@ -1,16 +1,12 @@
 import type { IssuesPage, PageOptions, PullStatusPage } from "../../../pacts/forge";
 import type { FetchedIssue, LabelDef, PullStatus } from "../../../pacts/issues";
+import type { PageInfo } from "../page";
 
 import { PULL_STATUS_NAMES, type PullStatusLabel } from "../../../pacts/status";
 import { type GitlabClient, GitlabError } from "./client";
 
 interface User {
   username: string;
-}
-
-interface PageInfo {
-  hasNextPage: boolean;
-  endCursor: string | null;
 }
 
 /** `locked` is a merge request in the middle of its merge. */
@@ -142,6 +138,14 @@ const RUNNING: ReadonlySet<PipelineStatus> = new Set([
   "RUNNING",
 ]);
 
+export type ReviewState =
+  | "UNREVIEWED"
+  | "REVIEWED"
+  | "REQUESTED_CHANGES"
+  | "APPROVED"
+  | "UNAPPROVED"
+  | "REVIEW_STARTED";
+
 export interface StatusNode {
   iid: string;
   draft: boolean;
@@ -149,7 +153,7 @@ export interface StatusNode {
   approved: boolean;
   author: User | null;
   headPipeline: { status: PipelineStatus } | null;
-  reviewers: { nodes: { mergeRequestInteraction: { reviewState: string | null } | null }[] };
+  reviewers: { nodes: { mergeRequestInteraction: { reviewState: ReviewState | null } | null }[] };
   discussions: {
     nodes: {
       resolvable: boolean;
@@ -234,7 +238,7 @@ query Labels($path: ID!, $after: String) {
   project(fullPath: $path) {
     labels(first: 100, after: $after, includeAncestorGroups: true) {
       pageInfo { hasNextPage endCursor }
-      nodes { title color description }
+      nodes { id title color description }
     }
   }
 }`;
@@ -243,17 +247,20 @@ interface LabelsData {
   project: {
     labels: {
       pageInfo: PageInfo;
-      nodes: { title: string; color: string; description: string | null }[];
+      nodes: { id: string; title: string; color: string; description: string | null }[];
     };
   } | null;
 }
 
-/** The project's labels and those of the groups above it, which its merge requests can carry. */
+/**
+ * The project's labels and those of the groups above it, which its merge requests can carry; one
+ * per name, the project's own over a group's.
+ */
 export async function fetchLabels(
   gitlab: GitlabClient,
   repo: string,
 ): Promise<Omit<LabelDef, "repo">[]> {
-  const labels: Omit<LabelDef, "repo">[] = [];
+  const labels = new Map<string, Omit<LabelDef, "repo">>();
   let after: string | null = null;
   do {
     const result: { data: LabelsData } = await gitlab.gql<LabelsData>(LABELS_QUERY, {
@@ -261,14 +268,11 @@ export async function fetchLabels(
       after,
     });
     const page = found(repo, result.data.project).labels;
-    labels.push(
-      ...page.nodes.map(({ title, color, description }) => ({
-        name: title,
-        color: hex(color),
-        description,
-      })),
-    );
+    for (const { id, title, color, description } of page.nodes) {
+      if (labels.has(title) && !id.includes("/ProjectLabel/")) continue;
+      labels.set(title, { name: title, color: hex(color), description });
+    }
     after = page.pageInfo.hasNextPage ? page.pageInfo.endCursor : null;
   } while (after);
-  return labels;
+  return [...labels.values()];
 }

@@ -10,6 +10,7 @@ import {
   fetchStatuses,
   fetchViewer,
   type MergeRequestNode,
+  type ReviewState,
   type StatusNode,
   toPull,
   toPullStatus,
@@ -141,7 +142,9 @@ const statusNode = (overrides: Partial<StatusNode> = {}): StatusNode => ({
 const statuses = (overrides: Partial<StatusNode>): PullStatusLabel[] =>
   toPullStatus(statusNode(overrides)).statuses;
 
-const reviewer = (reviewState: string | null) => ({ mergeRequestInteraction: { reviewState } });
+const reviewer = (reviewState: ReviewState | null) => ({
+  mergeRequestInteraction: { reviewState },
+});
 
 const thread = (resolvable: boolean, resolved: boolean, last: string) => ({
   resolvable,
@@ -211,12 +214,19 @@ describe("fetchViewer", () => {
   });
 });
 
-const labels = (title: string, endCursor: string | null) => ({
+const labelNode = (title: string, kind = "ProjectLabel", color = "#ff0000") => ({
+  id: `gid://gitlab/${kind}/1`,
+  title,
+  color,
+  description: null,
+});
+
+const labels = (title: string, endCursor: string | null, nodes = [labelNode(title)]) => ({
   data: {
     project: {
       labels: {
         pageInfo: { hasNextPage: endCursor !== null, endCursor },
-        nodes: [{ title, color: "#ff0000", description: null }],
+        nodes,
       },
     },
   },
@@ -230,6 +240,17 @@ describe("fetchLabels", () => {
       { name: "docs", color: "ff0000", description: null },
     ]);
     expect(requests.map(({ variables }) => variables.after)).toEqual([null, "c2"]);
+  });
+
+  it("keeps one label per name, the project's over a group's", async () => {
+    const { gitlab } = fakeGitlab(
+      labels("bug", "c2", [labelNode("bug", "GroupLabel", "#00ff00")]),
+      labels("bug", null, [labelNode("bug"), labelNode("docs", "GroupLabel")]),
+    );
+    await expect(fetchLabels(gitlab, REPO)).resolves.toEqual([
+      { name: "bug", color: "ff0000", description: null },
+      { name: "docs", color: "ff0000", description: null },
+    ]);
   });
 });
 

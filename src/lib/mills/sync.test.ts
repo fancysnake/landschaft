@@ -116,7 +116,7 @@ const now = new Date("2026-05-01T12:00:00Z");
 const syncerWith = (db: Db, forge: Forge, deps: Partial<SyncDeps> = {}) =>
   new Syncer({
     db,
-    forge,
+    forges: { github: forge, gitlab: forge },
     config: () => ConfigSchema.parse({ repos: [REPO] }),
     now: () => now,
     ...deps,
@@ -597,6 +597,43 @@ describe("Syncer", () => {
     expect(await syncer.viewer()).toBe("me");
     expect(forge.viewer).toHaveBeenCalledTimes(1);
     expect(syncer.status().viewer).toBe("me");
+  });
+
+  describe("on a backend switch", () => {
+    let backend: "github" | "gitlab";
+    const switchable = () => ConfigSchema.parse({ repos: [REPO], backend });
+
+    beforeEach(() => {
+      backend = "github";
+    });
+
+    it("drops the viewer and rate limit the old forge reported", async () => {
+      const github = fakeForge();
+      const gitlab = fakeForge();
+      gitlab.viewer.mockResolvedValue("lab-me");
+      gitlab.pullsPage.mockResolvedValue({ ...EMPTY_PAGE, rateRemaining: null });
+      const syncer = syncerWith(db, github, { forges: { github, gitlab }, config: switchable });
+      await syncer.viewer();
+      await syncer.syncRepo(REPO);
+      backend = "gitlab";
+      expect(await syncer.viewer()).toBe("lab-me");
+      expect(syncer.status()).toMatchObject({ viewer: "lab-me", rateRemaining: null });
+    });
+
+    it("finishes a running sync on the forge it started with", async () => {
+      const github = fakeForge();
+      const gitlab = fakeForge();
+      github.issuesPage.mockImplementationOnce(async () => {
+        backend = "gitlab";
+        return EMPTY_PAGE;
+      });
+      const syncer = syncerWith(db, github, { forges: { github, gitlab }, config: switchable });
+      await syncer.syncRepo(REPO);
+      expect(github.pullsPage).toHaveBeenCalled();
+      expect(github.repoLabels).toHaveBeenCalled();
+      expect(gitlab.pullsPage).not.toHaveBeenCalled();
+      expect(gitlab.repoLabels).not.toHaveBeenCalled();
+    });
   });
 });
 
