@@ -21,6 +21,12 @@ describe("ConfigKeeper.save", () => {
     expect(syncer.syncAll).toHaveBeenCalledWith(["acme/b"], { full: true });
   });
 
+  it("fully resyncs every repo when a save changes the backend", () => {
+    const { keeper, syncer } = setup(["acme/a", "acme/b"]);
+    keeper.save({ ...keeper.load(), backend: "gitlab" });
+    expect(syncer.syncAll).toHaveBeenCalledWith(["acme/a", "acme/b"], { full: true });
+  });
+
   it("syncs nothing when no repo needs it", () => {
     const { keeper, syncer } = setup(["acme/a"]);
     keeper.save(keeper.load());
@@ -28,11 +34,17 @@ describe("ConfigKeeper.save", () => {
   });
 });
 
+const github = (...repos: string[]) => ({ backend: "github" as const, repos });
+
 describe("reposToResync", () => {
   it("resyncs only the added repos", () => {
-    expect(reposToResync({ repos: ["acme/a"] }, { repos: ["acme/a", "acme/b"] })).toEqual([
-      "acme/b",
+    expect(reposToResync(github("acme/a"), github("acme/a", "acme/b"))).toEqual(["acme/b"]);
+    expect(reposToResync(github("acme/a"), github("acme/a"))).toEqual([]);
+  });
+
+  it("resyncs every repo under a new backend", () => {
+    expect(reposToResync(github("acme/a"), { backend: "gitlab", repos: ["acme/a"] })).toEqual([
+      "acme/a",
     ]);
-    expect(reposToResync({ repos: ["acme/a"] }, { repos: ["acme/a"] })).toEqual([]);
   });
 });

@@ -137,10 +137,12 @@ interface SyncStateRow {
   filled_closed_days: number | null;
   last_error: string | null;
   updated_at: string | null;
+  backend: SyncState["backend"];
 }
 
 const toSyncState = (row: SyncStateRow): SyncState => ({
   repo: row.repo,
+  backend: row.backend,
   lastSyncAt: row.last_sync_at,
   lastFullSyncAt: row.last_full_sync_at,
   filledClosedDays: row.filled_closed_days,
@@ -224,6 +226,11 @@ export class Db implements SyncStore, ViewStore {
     this.db.exec("DROP TABLE IF EXISTS starred_epics");
     if (!this.columns("sync_state").has("filled_closed_days")) {
       this.db.exec("ALTER TABLE sync_state ADD COLUMN filled_closed_days INTEGER");
+    }
+    if (!this.columns("sync_state").has("backend")) {
+      // A database without the column predates GitLab, so GitHub filled it.
+      this.db.exec("ALTER TABLE sync_state ADD COLUMN backend TEXT");
+      this.db.exec("UPDATE sync_state SET backend = 'github'");
     }
     const columns = this.columns("issues");
     const missing = ADDED_COLUMNS.filter(([name]) => !columns.has(name));
@@ -447,6 +454,7 @@ export class Db implements SyncStore, ViewStore {
   setSyncState(repo: string, patch: Partial<Omit<SyncState, "repo">>): void {
     const current = this.getSyncState(repo) ?? {
       repo,
+      backend: null,
       lastSyncAt: null,
       lastFullSyncAt: null,
       filledClosedDays: null,
@@ -457,11 +465,12 @@ export class Db implements SyncStore, ViewStore {
     this.db
       .prepare(
         `INSERT INTO sync_state
-           (repo, last_sync_at, last_full_sync_at, filled_closed_days, last_error, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)
+           (repo, last_sync_at, last_full_sync_at, filled_closed_days, last_error, updated_at, backend)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (repo) DO UPDATE SET last_sync_at = excluded.last_sync_at,
            last_full_sync_at = excluded.last_full_sync_at,
-           filled_closed_days = excluded.filled_closed_days, last_error = excluded.last_error, updated_at = excluded.updated_at`,
+           filled_closed_days = excluded.filled_closed_days, last_error = excluded.last_error,
+           updated_at = excluded.updated_at, backend = excluded.backend`,
       )
       .run(
         repo,
@@ -470,6 +479,15 @@ export class Db implements SyncStore, ViewStore {
         next.filledClosedDays,
         next.lastError,
         next.lastAttemptAt,
+        next.backend,
       );
+  }
+
+  clearRepo(repo: string): void {
+    this.transaction(() => {
+      for (const table of ["issues", "blocked_by", "labels", "ci_jobs", "sync_state"]) {
+        this.db.prepare(`DELETE FROM ${table} WHERE repo = ?`).run(repo);
+      }
+    });
   }
 }

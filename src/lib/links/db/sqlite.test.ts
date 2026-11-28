@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { cachedIssue, label, makeIssue, REPO } from "../../__fixtures__/issues";
+import { cachedIssue, label, makeIssue, makeJob, REPO } from "../../__fixtures__/issues";
 import { Db } from "./sqlite";
 
 describe("Db migration", () => {
@@ -49,6 +49,26 @@ describe("Db migration", () => {
     expect(db.getSyncState("acme/app")).toMatchObject({
       lastSyncAt: "2026-01-01T00:00:00Z",
       filledClosedDays: null,
+    });
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("adds the backend column and marks the synced repos as read from GitHub", () => {
+    const dir = mkdtempSync(join(tmpdir(), "landschaft-db-"));
+    const file = join(dir, "old.db");
+    new Db(file).close();
+    const raw = new DatabaseSync(file);
+    raw.exec(`
+      ALTER TABLE sync_state DROP COLUMN backend;
+      INSERT INTO sync_state (repo, last_sync_at) VALUES ('acme/app', '2026-01-01T00:00:00Z');
+    `);
+    raw.close();
+
+    const db = new Db(file);
+    expect(db.getSyncState("acme/app")).toMatchObject({
+      lastSyncAt: "2026-01-01T00:00:00Z",
+      backend: "github",
     });
     db.close();
     rmSync(dir, { recursive: true, force: true });
@@ -153,16 +173,34 @@ describe("Db", () => {
     ]);
   });
 
+  it("clears everything cached for one repo", () => {
+    for (const repo of [REPO, "acme/lib"]) {
+      db.upsertIssues([makeIssue({ number: 1, repo })]);
+      db.upsertLabels(repo, [{ name: "bug", color: "ff0000", description: null }]);
+      db.setCiJobs(repo, [makeJob({ name: "test", repo })]);
+      db.setSyncState(repo, { lastSyncAt: "2026-01-01T00:00:00Z" });
+    }
+
+    db.clearRepo(REPO);
+
+    expect(db.listIssues([REPO, "acme/lib"]).map(({ repo }) => repo)).toEqual(["acme/lib"]);
+    expect(db.listLabels([REPO, "acme/lib"]).map(({ repo }) => repo)).toEqual(["acme/lib"]);
+    expect(db.listCiJobs([REPO, "acme/lib"]).map(({ repo }) => repo)).toEqual(["acme/lib"]);
+    expect(db.listSyncStates().map(({ repo }) => repo)).toEqual(["acme/lib"]);
+  });
+
   it("stores sync state as a patch", () => {
     expect(db.getSyncState(REPO)).toBeNull();
     db.setSyncState(REPO, {
       lastSyncAt: "2026-01-01T00:00:00Z",
       lastFullSyncAt: "2026-01-01T00:00:00Z",
       filledClosedDays: 7,
+      backend: "gitlab",
     });
     db.setSyncState(REPO, { lastError: "boom" });
     expect(db.getSyncState(REPO)).toEqual({
       repo: REPO,
+      backend: "gitlab",
       lastSyncAt: "2026-01-01T00:00:00Z",
       lastFullSyncAt: "2026-01-01T00:00:00Z",
       filledClosedDays: 7,

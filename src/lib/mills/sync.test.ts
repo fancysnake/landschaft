@@ -725,6 +725,38 @@ describe("Syncer", () => {
       expect(gitlab.pullsPage).not.toHaveBeenCalled();
       expect(gitlab.repoLabels).not.toHaveBeenCalled();
     });
+
+    it("drops what the old forge cached for a kept repo, then syncs it in full", async () => {
+      const github = fakeForge({
+        issues: [[makeIssue({ number: 1 }), makeIssue({ number: 3, state: "CLOSED" })]],
+        branches: [ciBranches(1)],
+        jobs: [makeJob({ name: "test", branch: "b1" })],
+      });
+      const gitlab = fakeForge({ pulls: [[makeIssue({ number: 7, kind: "pr" })]] });
+      gitlab.repoLabels.mockResolvedValue([]);
+      const syncer = syncerWith(db, github, { forges: { github, gitlab }, config: switchable });
+      await syncer.syncRepo(REPO);
+      backend = "gitlab";
+
+      const result = await syncer.syncRepo(REPO);
+
+      expect(result).toMatchObject({ full: true, closed: 0 });
+      expect(gitlab.pullsPage.mock.calls[0]?.[1]).toMatchObject({ since: null, states: "open" });
+      expect(db.listIssues([REPO]).map(({ number }) => number)).toEqual([7]);
+      expect(db.getSyncState(REPO)?.backend).toBe("gitlab");
+    });
+
+    it("keeps the cache of a repo whose sync fails on the same backend", async () => {
+      const github = fakeForge({ issues: [issues(1)] });
+      const syncer = syncerWith(db, github, { config: switchable });
+      await syncer.syncRepo(REPO);
+      github.issuesPage.mockRejectedValueOnce(new Error("boom"));
+
+      await expect(syncer.syncRepo(REPO)).rejects.toThrow("boom");
+
+      expect(db.listIssues([REPO]).map(({ number }) => number)).toEqual([1]);
+      expect(db.getSyncState(REPO)).toMatchObject({ backend: "github", lastError: "boom" });
+    });
   });
 });
 
@@ -1092,6 +1124,7 @@ describe("Syncer.start", () => {
 const ago = (ms: number) => new Date(now.getTime() - ms).toISOString();
 const state = (lastSyncAt: string | null, lastError: string | null = null) => ({
   repo: REPO,
+  backend: null,
   lastSyncAt,
   lastFullSyncAt: null,
   filledClosedDays: null,

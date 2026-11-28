@@ -6,6 +6,8 @@ export interface SyncStore {
   getSyncState(repo: string): SyncState | null;
   listSyncStates(): SyncState[];
   setSyncState(repo: string, patch: Partial<Omit<SyncState, "repo">>): void;
+  /** Drops the repo's issues, PRs, labels, CI jobs and sync state. */
+  clearRepo(repo: string): void;
   upsertIssues(issues: FetchedIssue[]): void;
   /** Every cached issue and PR of the repos, in any state. */
   listIssues(repos: string[]): Issue[];

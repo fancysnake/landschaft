@@ -213,8 +213,7 @@ export class Syncer implements SyncService {
   }
 
   /** The forge of the configured backend; a new backend drops what the old one reported. */
-  private forge(): Forge {
-    const { backend } = this.config();
+  private forge(backend = this.config().backend): Forge {
     if (backend !== this.backend) {
       this.backend = backend;
       this.viewerPromise = null;
@@ -332,9 +331,16 @@ export class Syncer implements SyncService {
     if (this.inFlight.has(repo)) throw new SyncBusyError(repo);
     const startedAt = this.now();
     const stamp = startedAt.toISOString();
+    let backend: Config["backend"] | undefined;
     try {
-      const forge = this.forge();
-      const state = this.db.getSyncState(repo);
+      ({ backend } = this.config());
+      const forge = this.forge(backend);
+      let state = this.db.getSyncState(repo);
+      // Another forge's rows share only the repo path and the numbers with this one's.
+      if (state?.backend && state.backend !== backend) {
+        this.db.clearRepo(repo);
+        state = null;
+      }
       const fullAge = state?.lastFullSyncAt
         ? startedAt.getTime() - Date.parse(state.lastFullSyncAt)
         : Number.POSITIVE_INFINITY;
@@ -378,6 +384,7 @@ export class Syncer implements SyncService {
       this.db.upsertLabels(repo, await forge.repoLabels(repo));
 
       this.db.setSyncState(repo, {
+        backend,
         lastSyncAt: stamp,
         lastFullSyncAt: full ? stamp : (state?.lastFullSyncAt ?? null),
         filledClosedDays: plan.filled,
@@ -389,6 +396,8 @@ export class Syncer implements SyncService {
       return { repo, full, upserted, closed };
     } catch (error) {
       this.db.setSyncState(repo, {
+        // Rows a failed sync wrote before it failed are this backend's too.
+        ...(backend && { backend }),
         lastError: errorMessage(error),
         lastAttemptAt: stamp,
       });
