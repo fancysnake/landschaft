@@ -1,3 +1,4 @@
+import type { Config } from "./config";
 import type { CiJob, FetchedIssue, Issue, LabelDef, PullStatus, Snapshot } from "./issues";
 import type { SyncState } from "./sync";
 
@@ -6,8 +7,11 @@ export interface SyncStore {
   getSyncState(repo: string): SyncState | null;
   listSyncStates(): SyncState[];
   setSyncState(repo: string, patch: Partial<Omit<SyncState, "repo">>): void;
-  /** Drops the repo's issues, PRs, labels, CI jobs and sync state. */
-  clearRepo(repo: string): void;
+  /**
+   * Drops the repo's issues, PRs, labels, CI jobs and sync state, and in the same step records
+   * `backend` as the source of what the cache holds next.
+   */
+  clearRepo(repo: string, backend: Config["backend"]): void;
   upsertIssues(issues: FetchedIssue[]): void;
   /** Every cached issue and PR of the repos, in any state. */
   listIssues(repos: string[]): Issue[];

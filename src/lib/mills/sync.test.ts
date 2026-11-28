@@ -153,6 +153,8 @@ describe("Syncer", () => {
 
   beforeEach(() => {
     db = new Db(":memory:");
+    // The rows the tests seed came from GitHub; a sync drops rows of no recorded backend.
+    db.setSyncState(REPO, { backend: "github" });
   });
 
   afterEach(() => {
@@ -746,6 +748,45 @@ describe("Syncer", () => {
       expect(db.getSyncState(REPO)?.backend).toBe("gitlab");
     });
 
+    it("drops what an unfinished sync cached once the backend switches back", async () => {
+      const github = fakeForge({ issues: [issues(1)] });
+      const gitlab = fakeForge();
+      gitlab.pullsPage
+        .mockResolvedValueOnce({
+          ...EMPTY_PAGE,
+          issues: [makeIssue({ number: 7, kind: "pr" })],
+          hasNextPage: true,
+          endCursor: "1",
+        })
+        // Never settles, as when the process stops partway through a sync.
+        .mockReturnValueOnce(Promise.withResolvers<IssuesPage>().promise);
+      const deps = { forges: { github, gitlab }, config: switchable };
+      await syncerWith(db, github, deps).syncRepo(REPO);
+      backend = "gitlab";
+      void syncerWith(db, github, deps).syncRepo(REPO);
+      await vi.waitFor(() => expect(cachedIssue(db, REPO, 7)).not.toBeNull());
+      backend = "github";
+
+      await syncerWith(db, github, deps).syncRepo(REPO);
+
+      expect(db.listIssues([REPO]).map(({ number }) => number)).toEqual([1]);
+    });
+
+    it("claims another repo's cache before it adds a parent issue there", async () => {
+      db.upsertIssues([makeIssue({ number: 9, repo: "acme/lib" })]);
+      db.setSyncState("acme/lib", { backend: "gitlab", lastSyncAt: now.toISOString() });
+      const github = fakeForge({
+        pulls: [[makeIssue({ number: 10, kind: "pr", linked: [{ repo: "acme/lib", number: 3 }] })]],
+        known: [makeIssue({ number: 3, repo: "acme/lib", state: "CLOSED" })],
+      });
+      await syncerWith(db, github, {
+        config: () => ConfigSchema.parse({ repos: [REPO, "acme/lib"] }),
+      }).syncRepo(REPO);
+
+      expect(db.listIssues(["acme/lib"]).map(({ number }) => number)).toEqual([3]);
+      expect(db.getSyncState("acme/lib")).toMatchObject({ backend: "github", lastSyncAt: null });
+    });
+
     it("keeps the cache of a repo whose sync fails on the same backend", async () => {
       const github = fakeForge({ issues: [issues(1)] });
       const syncer = syncerWith(db, github, { config: switchable });
@@ -917,6 +958,7 @@ describe("Syncer.syncDue", () => {
   it("reports no failure for a repo a later pass of the same run recovers", async () => {
     const db = new Db(":memory:");
     db.setSyncState(REPO, {
+      backend: "github",
       lastSyncAt: "2026-05-01T11:00:00.000Z",
       lastFullSyncAt: "2026-05-01T11:00:00.000Z",
     });

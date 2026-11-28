@@ -27,7 +27,7 @@ describe("Db migration", () => {
     old.close();
 
     const db = new Db(file);
-    expect(db.getSyncState("acme/app")).toBeNull();
+    expect(db.getSyncState("acme/app")).toMatchObject({ lastSyncAt: null, backend: "github" });
     db.upsertIssues([makeIssue({ number: 1, author: "ann", reviewers: ["cy"] })]);
     expect(cachedIssue(db, REPO, 1)).toMatchObject({ author: "ann", reviewers: ["cy"] });
     db.close();
@@ -173,20 +173,34 @@ describe("Db", () => {
     ]);
   });
 
-  it("clears everything cached for one repo", () => {
+  it("clears everything cached for one repo and records its new backend", () => {
+    const dir = mkdtempSync(join(tmpdir(), "landschaft-db-"));
+    const file = join(dir, "clear.db");
+    const stored = new Db(file);
     for (const repo of [REPO, "acme/lib"]) {
-      db.upsertIssues([makeIssue({ number: 1, repo })]);
-      db.upsertLabels(repo, [{ name: "bug", color: "ff0000", description: null }]);
-      db.setCiJobs(repo, [makeJob({ name: "test", repo })]);
-      db.setSyncState(repo, { lastSyncAt: "2026-01-01T00:00:00Z" });
+      const blockedBy = [{ repo, number: 2, state: "OPEN" as const }];
+      stored.upsertIssues([makeIssue({ number: 1, repo, blockedBy })]);
+      stored.upsertLabels(repo, [{ name: "bug", color: "ff0000", description: null }]);
+      stored.setCiJobs(repo, [makeJob({ name: "test", repo })]);
+      stored.setSyncState(repo, { backend: "github", lastSyncAt: "2026-01-01T00:00:00Z" });
     }
 
-    db.clearRepo(REPO);
+    stored.clearRepo(REPO, "gitlab");
 
-    expect(db.listIssues([REPO, "acme/lib"]).map(({ repo }) => repo)).toEqual(["acme/lib"]);
-    expect(db.listLabels([REPO, "acme/lib"]).map(({ repo }) => repo)).toEqual(["acme/lib"]);
-    expect(db.listCiJobs([REPO, "acme/lib"]).map(({ repo }) => repo)).toEqual(["acme/lib"]);
-    expect(db.listSyncStates().map(({ repo }) => repo)).toEqual(["acme/lib"]);
+    // Every table, so a new per-repo one fails here until this test fills it and the clear covers it.
+    const raw = new DatabaseSync(file);
+    const tables = raw
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name != 'sync_state'")
+      .all() as unknown as { name: string }[];
+    for (const { name } of tables) {
+      const repos = raw.prepare(`SELECT DISTINCT repo FROM ${name}`).all();
+      expect([name, repos.map(({ repo }) => repo)]).toEqual([name, ["acme/lib"]]);
+    }
+    expect(stored.getSyncState(REPO)).toMatchObject({ backend: "gitlab", lastSyncAt: null });
+    expect(stored.getSyncState("acme/lib")?.lastSyncAt).toBe("2026-01-01T00:00:00Z");
+    raw.close();
+    stored.close();
+    rmSync(dir, { recursive: true, force: true });
   });
 
   it("stores sync state as a patch", () => {

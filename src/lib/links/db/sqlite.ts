@@ -239,7 +239,8 @@ export class Db implements SyncStore, ViewStore {
       for (const [name, definition] of missing) {
         this.db.exec(`ALTER TABLE issues ADD COLUMN ${name} ${definition}`);
       }
-      this.db.exec("DELETE FROM sync_state");
+      // A repo without a last sync syncs in full; its backend stays, so its rows are kept.
+      this.db.exec("UPDATE sync_state SET last_sync_at = NULL");
     });
   }
 
@@ -483,11 +484,12 @@ export class Db implements SyncStore, ViewStore {
       );
   }
 
-  clearRepo(repo: string): void {
+  clearRepo(repo: string, backend: NonNullable<SyncState["backend"]>): void {
     this.transaction(() => {
       for (const table of ["issues", "blocked_by", "labels", "ci_jobs", "sync_state"]) {
         this.db.prepare(`DELETE FROM ${table} WHERE repo = ?`).run(repo);
       }
+      this.setSyncState(repo, { backend });
     });
   }
 }
