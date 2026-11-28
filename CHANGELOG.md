@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- The repo chips stay on one line. When the line is too narrow they shrink together, and hover
+  or keyboard focus opens a shrunk chip at its full width.
+
 ### Fixed
 
 - `has:pr` and the `PR open` pill hold for the open issues above an issue that an open PR
