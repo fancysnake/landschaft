@@ -1,5 +1,9 @@
+import type { Config } from "./config";
+
 export interface SyncState {
   repo: string;
+  /** The backend the repo's cached rows came from; null while no sync has recorded one. */
+  backend: Config["backend"] | null;
   lastSyncAt: string | null;
   lastFullSyncAt: string | null;
   /** The closed window, in days, the cache was last filled for; null before the first fill. */

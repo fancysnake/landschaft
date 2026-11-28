@@ -11,7 +11,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 - GitLab backend: set `backend` to `gitlab` in the config or in Settings to read merge requests
   from a self-managed instance, named by `GITLAB_URL` and read with `GITLAB_TOKEN`. Merge
-  requests show as pull requests; GitLab issues and failed CI jobs are not synced.
+  requests show as pull requests; GitLab issues and failed CI jobs are not synced. A backend
+  change drops what the old backend cached for each repository and syncs it in full.
 - `reviewer:` picks the PRs a user was asked to review or has reviewed; `reviewer:@me` is yours.
 - `is:approved` and `is:changes-requested` pick PRs by review outcome, and cards carry an
   `approved` or `changes` pill.

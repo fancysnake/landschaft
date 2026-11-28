@@ -213,8 +213,7 @@ export class Syncer implements SyncService {
   }
 
   /** The forge of the configured backend; a new backend drops what the old one reported. */
-  private forge(): Forge {
-    const { backend } = this.config();
+  private forge(backend: Config["backend"]): Forge {
     if (backend !== this.backend) {
       this.backend = backend;
       this.viewerPromise = null;
@@ -228,7 +227,7 @@ export class Syncer implements SyncService {
   viewer(): Promise<string> {
     let forge: Forge;
     try {
-      forge = this.forge();
+      forge = this.forge(this.config().backend);
     } catch (error) {
       return Promise.reject(error);
     }
@@ -333,7 +332,10 @@ export class Syncer implements SyncService {
     const startedAt = this.now();
     const stamp = startedAt.toISOString();
     try {
-      const forge = this.forge();
+      const config = this.config();
+      const { backend } = config;
+      const forge = this.forge(backend);
+      this.claim(repo, backend);
       const state = this.db.getSyncState(repo);
       const fullAge = state?.lastFullSyncAt
         ? startedAt.getTime() - Date.parse(state.lastFullSyncAt)
@@ -347,7 +349,7 @@ export class Syncer implements SyncService {
       const query: Omit<PageOptions, "after"> = { since, states: full ? "open" : "all" };
       let upserted = 0;
       const plan = closedPlan({
-        days: closedDays(this.config()),
+        days: closedDays(config),
         now: startedAt,
         previous,
         filled: state?.filledClosedDays ?? null,
@@ -372,7 +374,7 @@ export class Syncer implements SyncService {
       }
 
       const closed = full ? this.db.closeMissing(repo, seen) : 0;
-      upserted += await this.fetchAbovePulls(forge, repo);
+      upserted += await this.fetchAbovePulls(forge, repo, config);
       await this.refreshPullStatuses(forge, repo);
       await this.refreshCiJobs(forge, repo);
       this.db.upsertLabels(repo, await forge.repoLabels(repo));
@@ -388,15 +390,20 @@ export class Syncer implements SyncService {
       this.userErrors.delete(repo);
       return { repo, full, upserted, closed };
     } catch (error) {
-      this.db.setSyncState(repo, {
-        lastError: errorMessage(error),
-        lastAttemptAt: stamp,
-      });
+      this.db.setSyncState(repo, { lastError: errorMessage(error), lastAttemptAt: stamp });
       throw error;
     } finally {
       this.inFlight.delete(repo);
       this.version += 1;
     }
+  }
+
+  /**
+   * Records `backend` as the source of the repo's cache before a row is written there, dropping
+   * what another backend left: its rows share only the repo path and the numbers with this one's.
+   */
+  private claim(repo: string, backend: Config["backend"]): void {
+    if (this.db.getSyncState(repo)?.backend !== backend) this.db.clearRepo(repo, backend);
   }
 
   /**
@@ -427,8 +434,11 @@ export class Syncer implements SyncService {
    * `has:pr` reaches the open issues above a closed one no page fetched. Asks for an issue once;
    * a cached row costs no request. Returns how many issues it upserted.
    */
-  private async fetchAbovePulls(forge: Forge, repo: string): Promise<number> {
-    const { repos } = this.config();
+  private async fetchAbovePulls(
+    forge: Forge,
+    repo: string,
+    { repos, backend }: Config,
+  ): Promise<number> {
     const asked = new Set<string>();
     let upserted = 0;
     for (;;) {
@@ -439,6 +449,7 @@ export class Syncer implements SyncService {
       for (const ref of lacking) asked.add(keyOf(ref));
       for (const [target, refs] of Map.groupBy(lacking, (ref) => ref.repo)) {
         const numbers = refs.map((ref) => ref.number);
+        this.claim(target, backend);
         for await (const page of forge.issuesByNumber(target, numbers)) {
           this.db.upsertIssues(page.issues);
           upserted += page.issues.length;
