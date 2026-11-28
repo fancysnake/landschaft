@@ -34,28 +34,28 @@ const HEALTH_DOT: Record<SyncHealth, { on: string; off: string }> = {
  * on hover; in a crowded row it gives way before the name does.
  */
 const EDGE =
-  "grid h-5 w-5 min-w-0 shrink-[999] place-items-center overflow-hidden rounded-full opacity-0 transition-opacity duration-150 group-has-[:focus-visible]:opacity-100 group-hover:opacity-100 hover:bg-white hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-sky-600 disabled:text-neutral-300 disabled:hover:bg-transparent motion-reduce:transition-none";
+  "grid h-5 w-5 min-w-0 shrink-[999] place-items-center overflow-hidden rounded-full opacity-0 transition-opacity duration-150 chip-open:opacity-100 hover:bg-white hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-sky-600 disabled:text-neutral-300 disabled:hover:bg-transparent motion-reduce:transition-none";
 
 /** A shrunk chip at its full width, laid over its neighbours, while hovered or focused by keyboard. */
-const OPEN =
-  "group-hover:z-10 group-hover:w-max group-hover:shrink-0 group-hover:shadow-md group-has-[:focus-visible]:z-10 group-has-[:focus-visible]:w-max group-has-[:focus-visible]:shrink-0 group-has-[:focus-visible]:shadow-md";
+const OPEN = "chip-open:z-10 chip-open:w-max chip-open:shrink-0 chip-open:shadow-md";
 
 interface ChipProps {
   repo: string;
   on: boolean;
   alone: boolean;
+  opensLeft: boolean;
   view: RepoSyncView;
   onToggle(): void;
   onSync(): void;
   onOnly(): void;
 }
 
-function RepoChip({ repo, on, alone, view, onToggle, onSync, onOnly }: ChipProps) {
+function RepoChip({ repo, on, alone, opensLeft, view, onToggle, onSync, onOnly }: ChipProps) {
   const dot =
     view.phase === "idle" ? HEALTH_DOT[view.health][on ? "on" : "off"] : PHASE_DOT[view.phase];
   return (
-    // The slot shrinks with the row; an open chip overflows it, inward at the row's ends.
-    <div className="group flex h-5.5 min-w-0 justify-center first:justify-start nth-last-2:justify-end nth-last-3:justify-end">
+    // The slot shrinks with the row; an open chip overflows it toward the middle of the row.
+    <div className={`group flex h-5.5 min-w-0 ${opensLeft ? "justify-end" : "justify-start"}`}>
       <div
         className={`relative flex h-full w-full min-w-0 items-center rounded-full border text-xs ${OPEN} ${
           on
@@ -136,7 +136,7 @@ export function RepoChips({ repos, shown, status, refreshMinutes, onChange, onSy
 
   return (
     <div role="group" aria-label="Repositories" className="flex items-center gap-1">
-      {sorted.map((repo) => {
+      {sorted.map((repo, index) => {
         const on = shown.includes(repo);
         return (
           <RepoChip
@@ -144,6 +144,7 @@ export function RepoChips({ repos, shown, status, refreshMinutes, onChange, onSy
             repo={repo}
             on={on}
             alone={isAlone(repo)}
+            opensLeft={index >= sorted.length / 2}
             view={repoSyncView(repo, status, refreshMinutes, now)}
             onToggle={() => onChange(on ? shown.filter((r) => r !== repo) : [...shown, repo])}
             onSync={() => onSync(repo)}

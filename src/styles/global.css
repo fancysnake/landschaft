@@ -19,6 +19,19 @@
   }
 }
 
+/* Inside a hovered or keyboard-focused `group`. Touch screens match the focus half only. */
+@custom-variant chip-open {
+  @media (hover: hover) {
+    &:is(:where(.group):hover *) {
+      @slot;
+    }
+  }
+
+  &:is(:where(.group):has(:focus-visible) *) {
+    @slot;
+  }
+}
+
 /* Shape only: the colour comes from a `TONE` next to it. */
 @utility pill {
   @apply inline-flex items-center rounded px-1.5 text-[0.6875rem] leading-[1.125rem] font-medium ring-1 ring-inset;
