@@ -29,62 +29,75 @@ const HEALTH_DOT: Record<SyncHealth, { on: string; off: string }> = {
   stale: { on: "bg-orange-600", off: `${RING} ring-orange-600` },
 };
 
-/** A chip's edge button; its space stays reserved so the chips do not shift on hover. */
+/**
+ * A chip's edge button. Its space stays reserved while the row has room, so the chips do not shift
+ * on hover; in a crowded row it gives way before the name does.
+ */
 const EDGE =
-  "grid size-5 shrink-0 place-items-center rounded-full opacity-0 transition-opacity duration-150 group-has-[:focus-visible]:opacity-100 group-hover:opacity-100 hover:bg-white hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-sky-600 disabled:text-neutral-300 disabled:hover:bg-transparent motion-reduce:transition-none";
+  "grid h-5 w-5 min-w-0 shrink-[999] place-items-center overflow-hidden rounded-full opacity-0 transition-opacity duration-150 chip-open:opacity-100 hover:bg-white hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-sky-600 disabled:text-neutral-300 disabled:hover:bg-transparent motion-reduce:transition-none";
+
+/** A shrunk chip at its full width, laid over its neighbours, while hovered or focused by keyboard. */
+const OPEN = "chip-open:z-10 chip-open:w-max chip-open:shrink-0 chip-open:shadow-md";
 
 interface ChipProps {
   repo: string;
   on: boolean;
   alone: boolean;
+  opensLeft: boolean;
   view: RepoSyncView;
   onToggle(): void;
   onSync(): void;
   onOnly(): void;
 }
 
-function RepoChip({ repo, on, alone, view, onToggle, onSync, onOnly }: ChipProps) {
+function RepoChip({ repo, on, alone, opensLeft, view, onToggle, onSync, onOnly }: ChipProps) {
   const dot =
     view.phase === "idle" ? HEALTH_DOT[view.health][on ? "on" : "off"] : PHASE_DOT[view.phase];
   return (
-    <div
-      className={`group flex h-5.5 items-center rounded-full border text-xs ${
-        on
-          ? "border-neutral-300 bg-neutral-100 text-neutral-900"
-          : "border-neutral-200 bg-white text-neutral-400"
-      }`}
-    >
-      <button
-        type="button"
-        disabled={view.phase !== "idle"}
-        aria-label={view.label}
-        title={view.label}
-        onClick={onSync}
-        className={`${EDGE} ${view.health === "failed" ? "text-red-700" : "text-neutral-700"}`}
+    // The slot shrinks with the row; an open chip overflows it toward the middle of the row.
+    <div className={`group flex h-5.5 min-w-0 ${opensLeft ? "justify-end" : "justify-start"}`}>
+      <div
+        className={`relative flex h-full w-full min-w-0 items-center rounded-full border text-xs ${OPEN} ${
+          on
+            ? "border-neutral-300 bg-neutral-100 text-neutral-900"
+            : "border-neutral-200 bg-white text-neutral-400"
+        }`}
       >
-        <Icon>{ROTATE}</Icon>
-      </button>
-      <button
-        type="button"
-        aria-pressed={on}
-        aria-label={repo}
-        title={on ? `Hide ${repo}` : `Show ${repo}`}
-        onClick={onToggle}
-        className="flex h-full items-center gap-1.5 rounded-full px-1 hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-sky-600"
-      >
-        <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${dot}`} />
-        {repoShortName(repo)}
-      </button>
-      <button
-        type="button"
-        aria-pressed={alone}
-        aria-label={`Show only ${repo}`}
-        title={alone ? "Show the repos from before" : `Show only ${repo}`}
-        onClick={onOnly}
-        className={`${EDGE} ${alone ? "bg-white text-sky-700" : "text-neutral-700"}`}
-      >
-        <Icon>{FOCUS}</Icon>
-      </button>
+        <button
+          type="button"
+          disabled={view.phase !== "idle"}
+          aria-label={view.label}
+          title={view.label}
+          onClick={onSync}
+          className={`${EDGE} ${view.health === "failed" ? "text-red-700" : "text-neutral-700"}`}
+        >
+          <Icon>{ROTATE}</Icon>
+        </button>
+        <button
+          type="button"
+          aria-pressed={on}
+          aria-label={repo}
+          title={on ? `Hide ${repo}` : `Show ${repo}`}
+          onClick={onToggle}
+          className="flex h-full min-w-0 items-center gap-1.5 rounded-full pl-1 hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-sky-600"
+        >
+          <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${dot}`} />
+          {/* The fade sits in the padding, so it reaches the name only when the name is clipped. */}
+          <span className="overflow-hidden mask-r-from-[calc(100%-0.5rem)] pr-2 whitespace-nowrap">
+            {repoShortName(repo)}
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-pressed={alone}
+          aria-label={`Show only ${repo}`}
+          title={alone ? "Show the repos from before" : `Show only ${repo}`}
+          onClick={onOnly}
+          className={`${EDGE} ${alone ? "bg-white text-sky-700" : "text-neutral-700"}`}
+        >
+          <Icon>{FOCUS}</Icon>
+        </button>
+      </div>
     </div>
   );
 }
@@ -99,10 +112,11 @@ interface Props {
 }
 
 /**
- * A chip per repo, its dot showing the sync state. The name switches it on or off; hover or
- * keyboard focus reveals the edges: sync it on the left, show it alone on the right (pressed again,
- * the repos from before come back). Ends with a switch that turns them all on, or all off once they
- * are all on.
+ * A chip per repo on one line, its dot showing the sync state; the chips shrink together when the
+ * line is too narrow. The name switches it on or off; hover or keyboard focus opens a shrunk chip
+ * and reveals the edges: sync it on the left, show it alone on the right (pressed again, the repos
+ * from before come back). Ends with a switch that turns them all on, or all off once they are all
+ * on.
  */
 export function RepoChips({ repos, shown, status, refreshMinutes, onChange, onSync }: Props) {
   const now = useNow();
@@ -121,8 +135,8 @@ export function RepoChips({ repos, shown, status, refreshMinutes, onChange, onSy
   }
 
   return (
-    <div role="group" aria-label="Repositories" className="flex flex-wrap items-center gap-1">
-      {sorted.map((repo) => {
+    <div role="group" aria-label="Repositories" className="flex items-center gap-1">
+      {sorted.map((repo, index) => {
         const on = shown.includes(repo);
         return (
           <RepoChip
@@ -130,6 +144,7 @@ export function RepoChips({ repos, shown, status, refreshMinutes, onChange, onSy
             repo={repo}
             on={on}
             alone={isAlone(repo)}
+            opensLeft={index >= sorted.length / 2}
             view={repoSyncView(repo, status, refreshMinutes, now)}
             onToggle={() => onChange(on ? shown.filter((r) => r !== repo) : [...shown, repo])}
             onSync={() => onSync(repo)}
@@ -140,7 +155,7 @@ export function RepoChips({ repos, shown, status, refreshMinutes, onChange, onSy
       <button
         type="button"
         onClick={() => onChange(allOn ? [] : repos)}
-        className="rounded-full px-2 text-xs font-medium text-neutral-500 hover:text-neutral-900"
+        className="shrink-0 rounded-full px-2 text-xs font-medium text-neutral-500 hover:text-neutral-900"
       >
         {allOn ? "none" : "all"}
       </button>
